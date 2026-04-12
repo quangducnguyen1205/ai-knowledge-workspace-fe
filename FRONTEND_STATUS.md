@@ -25,6 +25,8 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 - Trigger transcript indexing as an explicit user action
 - Search within the selected workspace only
 - Open a separate transcript-context view for a chosen search result
+- Keep indexing unavailable while assets are still processing, failed, or missing transcript rows
+- Show friendlier demo-facing messages for transcript 409 states and upload validation rejections
 - Current UI structure: top workspace bar plus three panels for assets, selected asset/transcript, and search/context
 
 ## 4. Backend API Surface Used
@@ -60,11 +62,13 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 - No heavy design system or production-polished UI
 - No delete/edit asset management
 - No advanced search filters beyond the current workspace-scoped query flow
+- Conflict and validation handling is still intentionally lightweight and frontend-only
 
 ## 7. Quick Status Summary
 
 - Separate frontend repo is scaffolded and running as a Vite + React + TypeScript demo app
 - Current UI already covers workspace, upload, status, transcript, explicit indexing, search, and transcript context
+- Demo-safety cleanup now prevents misleading indexing and uses clearer upload/transcript failure copy
 - Docker-first local development is set up and is the recommended way to run the app
 - The frontend currently depends only on the Spring product API surface
 - Scope is still intentionally narrow, debuggable, and demo-friendly

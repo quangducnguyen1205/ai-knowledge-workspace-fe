@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  ApiClientError,
   getAssetStatus,
   getAssetTranscript,
   indexAssetTranscript,
+  isApiClientError,
   listAssets,
   uploadAsset,
   type AssetIndexResponse,
@@ -26,6 +28,20 @@ export function isTerminalProcessing(status: ProcessingJobStatus | undefined): b
   return status === 'SUCCEEDED' || status === 'FAILED';
 }
 
+type FriendlyMessageCopy = {
+  title: string;
+  message: string;
+  detail?: string;
+};
+
+type IndexActionState = {
+  title: string;
+  description: string;
+  buttonLabel: string;
+  buttonTone: 'primary' | 'secondary' | 'ghost';
+  canIndex: boolean;
+};
+
 function getAssetStatusDescription(status: AssetStatus | null): string {
   switch (status) {
     case 'PROCESSING':
@@ -39,6 +55,151 @@ function getAssetStatusDescription(status: AssetStatus | null): string {
     default:
       return 'Asset state not available yet.';
   }
+}
+
+function getTechnicalDetail(error: ApiClientError): string | undefined {
+  const normalizedMessage = error.message.trim();
+
+  if (!normalizedMessage) {
+    return undefined;
+  }
+
+  if (
+    ['bad request', 'conflict', 'unsupported media type', 'unprocessable entity'].includes(
+      normalizedMessage.toLowerCase(),
+    )
+  ) {
+    return error.code ? `Backend detail: ${error.code}` : undefined;
+  }
+
+  return error.code
+    ? `Backend detail: ${error.code} - ${normalizedMessage}`
+    : `Backend detail: ${normalizedMessage}`;
+}
+
+function getFriendlyUploadErrorCopy(error: unknown): FriendlyMessageCopy | null {
+  if (!isApiClientError(error)) {
+    return null;
+  }
+
+  if (error.status === 0) {
+    return {
+      title: 'Upload could not reach Spring',
+      message: 'The frontend could not contact the Spring backend, so the upload never started.',
+    };
+  }
+
+  if ([400, 409, 413, 415, 422].includes(error.status)) {
+    return {
+      title: 'Upload was rejected',
+      message:
+        'Spring did not accept this file for processing. Try a supported audio or video file and confirm the selected workspace is still valid.',
+      detail: getTechnicalDetail(error),
+    };
+  }
+
+  return null;
+}
+
+function getTranscriptConflictCopy(
+  error: unknown,
+  resolvedAssetStatus: AssetStatus | null,
+  processingJobStatus?: ProcessingJobStatus,
+): FriendlyMessageCopy | null {
+  if (!(isApiClientError(error) && error.status === 409)) {
+    return null;
+  }
+
+  if (resolvedAssetStatus === 'FAILED' || processingJobStatus === 'FAILED') {
+    return {
+      title: 'Transcript is unavailable for this asset',
+      message: 'Spring marked processing as failed, so there are no transcript rows available to inspect or index.',
+      detail: getTechnicalDetail(error),
+    };
+  }
+
+  if (processingJobStatus === 'SUCCEEDED' || resolvedAssetStatus === 'TRANSCRIPT_READY') {
+    return {
+      title: 'Transcript rows are still unavailable',
+      message:
+        'The processing job finished, but Spring has not returned transcript rows for this asset yet. Indexing stays disabled until rows exist.',
+      detail: getTechnicalDetail(error),
+    };
+  }
+
+  return {
+    title: 'Transcript is still being prepared',
+    message: 'Spring has not exposed transcript rows for this asset yet. Wait for processing to finish before indexing.',
+    detail: getTechnicalDetail(error),
+  };
+}
+
+function getIndexActionState(input: {
+  resolvedAssetStatus: AssetStatus | null;
+  processingJobStatus?: ProcessingJobStatus;
+  transcriptRows?: TranscriptRow[];
+  transcriptError: unknown;
+}): IndexActionState {
+  const transcriptRowCount = input.transcriptRows?.length ?? 0;
+
+  if (transcriptRowCount > 0 && input.resolvedAssetStatus === 'SEARCHABLE') {
+    return {
+      title: 'Rebuild search documents',
+      description:
+        'This asset is already searchable. Re-index only if you want Spring search documents refreshed from the current transcript rows.',
+      buttonLabel: 'Re-index transcript',
+      buttonTone: 'secondary',
+      canIndex: true,
+    };
+  }
+
+  if (transcriptRowCount > 0) {
+    return {
+      title: 'Make this asset searchable',
+      description: `${transcriptRowCount} transcript row${transcriptRowCount === 1 ? '' : 's'} loaded. Run the explicit indexing step to publish this asset into workspace search.`,
+      buttonLabel: 'Index transcript',
+      buttonTone: 'primary',
+      canIndex: true,
+    };
+  }
+
+  if (input.resolvedAssetStatus === 'FAILED' || input.processingJobStatus === 'FAILED') {
+    return {
+      title: 'Indexing unavailable',
+      description: 'Processing failed for this asset, so Spring has no transcript rows available to index.',
+      buttonLabel: 'Indexing unavailable',
+      buttonTone: 'ghost',
+      canIndex: false,
+    };
+  }
+
+  if (input.resolvedAssetStatus === 'PROCESSING' || !isTerminalProcessing(input.processingJobStatus)) {
+    return {
+      title: 'Indexing unavailable',
+      description: 'Wait for Spring to finish processing and expose transcript rows before indexing becomes a valid action.',
+      buttonLabel: 'Waiting for transcript',
+      buttonTone: 'ghost',
+      canIndex: false,
+    };
+  }
+
+  if (isApiClientError(input.transcriptError) && input.transcriptError.status === 409) {
+    return {
+      title: 'Indexing unavailable',
+      description: 'Spring did not return transcript rows for this asset, so indexing stays disabled for now.',
+      buttonLabel: 'Transcript unavailable',
+      buttonTone: 'ghost',
+      canIndex: false,
+    };
+  }
+
+  return {
+    title: 'Indexing unavailable',
+    description: 'Transcript rows must be available before this frontend can call the explicit index action.',
+    buttonLabel: 'Indexing unavailable',
+    buttonTone: 'ghost',
+    canIndex: false,
+  };
 }
 
 export function deriveAssetStatus(
@@ -142,6 +303,7 @@ export function AssetsPanel({
   const [title, setTitle] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const uploadErrorCopy = getFriendlyUploadErrorCopy(uploadError);
 
   useEffect(() => {
     if (uploadSuccessId) {
@@ -210,7 +372,14 @@ export function AssetsPanel({
           />
         ) : null}
 
-        {uploadError ? <ErrorBanner error={uploadError} /> : null}
+        {uploadError ? (
+          <ErrorBanner
+            error={uploadError}
+            title={uploadErrorCopy?.title}
+            message={uploadErrorCopy?.message}
+            detail={uploadErrorCopy?.detail}
+          />
+        ) : null}
       </form>
 
       <div className="asset-list">
@@ -296,9 +465,18 @@ export function SelectedAssetPanel({
   isIndexing: boolean;
   onIndex: () => void;
 }) {
-  const canIndex = Boolean(transcriptRows?.length);
   const transcriptRowCount = transcriptRows?.length ?? 0;
-  const assetStatusDescription = getAssetStatusDescription(resolvedAssetStatus);
+  const transcriptConflictCopy = getTranscriptConflictCopy(
+    transcriptError,
+    resolvedAssetStatus,
+    statusResponse?.processingJobStatus,
+  );
+  const indexActionState = getIndexActionState({
+    resolvedAssetStatus,
+    processingJobStatus: statusResponse?.processingJobStatus,
+    transcriptRows,
+    transcriptError,
+  });
   const statusPairs = useMemo(
     () => [
       ['Workspace', workspaceName],
@@ -362,24 +540,28 @@ export function SelectedAssetPanel({
         />
       ) : null}
 
+      {!statusError && resolvedAssetStatus === 'FAILED' ? (
+        <InfoBanner
+          tone="warning"
+          title="Processing failed"
+          message="Spring marked this asset as failed, so transcript inspection and explicit indexing are unavailable for this item."
+        />
+      ) : null}
+
       <div className="panel-block">
         <div className="action-card">
           <div className="action-card__copy">
             <p className="panel__eyebrow">Explicit indexing</p>
-            <h3>{resolvedAssetStatus === 'SEARCHABLE' ? 'Rebuild search documents' : 'Make this asset searchable'}</h3>
-            <p>{assetStatusDescription}</p>
+            <h3>{indexActionState.title}</h3>
+            <p>{indexActionState.description}</p>
           </div>
           <Button
             type="button"
-            tone={resolvedAssetStatus === 'SEARCHABLE' ? 'secondary' : 'primary'}
+            tone={indexActionState.buttonTone}
             onClick={onIndex}
-            disabled={!canIndex || isIndexing}
+            disabled={!indexActionState.canIndex || isIndexing}
           >
-            {isIndexing
-              ? 'Indexing...'
-              : resolvedAssetStatus === 'SEARCHABLE'
-                ? 'Re-index transcript'
-                : 'Index transcript'}
+            {isIndexing ? 'Indexing...' : indexActionState.buttonLabel}
           </Button>
         </div>
 
@@ -396,7 +578,15 @@ export function SelectedAssetPanel({
         </div>
 
         {transcriptLoading ? <LoadingBlock label="Loading transcript rows..." /> : null}
-        {!transcriptLoading && transcriptError ? <ErrorBanner error={transcriptError} /> : null}
+        {!transcriptLoading && transcriptConflictCopy ? (
+          <InfoBanner
+            tone="warning"
+            title={transcriptConflictCopy.title}
+            message={transcriptConflictCopy.message}
+            detail={transcriptConflictCopy.detail}
+          />
+        ) : null}
+        {!transcriptLoading && transcriptError && !transcriptConflictCopy ? <ErrorBanner error={transcriptError} /> : null}
         {!transcriptLoading && !transcriptError && !transcriptRows?.length ? (
           <EmptyState
             title="Transcript not loaded yet"
