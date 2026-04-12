@@ -25,6 +25,7 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 - Trigger transcript indexing as an explicit user action
 - Search within the selected workspace only
 - Open a separate transcript-context view for a chosen search result
+- Current UI structure: top workspace bar plus three panels for assets, selected asset/transcript, and search/context
 
 ## 4. Backend API Surface Used
 

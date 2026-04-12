@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { backendDisplayUrl, createWorkspace, listWorkspaces, usingProxy, type Workspace } from '../../lib/api';
-import { Button, ErrorBanner } from '../../lib/ui';
+import { Button, ErrorBanner, formatDateTime } from '../../lib/ui';
 
 const workspaceKeys = {
   all: ['workspaces'] as const,
@@ -28,6 +28,7 @@ export function useCreateWorkspaceMutation() {
 
 export function WorkspaceBar({
   workspaces,
+  selectedWorkspace,
   selectedWorkspaceId,
   isLoading,
   createError,
@@ -37,6 +38,7 @@ export function WorkspaceBar({
   isCreating,
 }: {
   workspaces: Workspace[];
+  selectedWorkspace: Workspace | null;
   selectedWorkspaceId: string | null;
   isLoading: boolean;
   createError: unknown;
@@ -66,6 +68,29 @@ export function WorkspaceBar({
 
   return (
     <div className="workspace-bar">
+      <div className="workspace-bar__top">
+        <div className={`workspace-focus ${isLoading ? 'workspace-focus--busy' : ''}`}>
+          <span className="workspace-focus__eyebrow">Active workspace</span>
+          <div className="workspace-focus__main">
+            <strong>{selectedWorkspace?.name ?? 'Loading workspace...'}</strong>
+            <span>
+              {workspaces.length} workspace{workspaces.length === 1 ? '' : 's'} available
+            </span>
+          </div>
+          <div className="workspace-focus__meta">
+            <span>
+              {selectedWorkspace ? `Created ${formatDateTime(selectedWorkspace.createdAt)}` : 'Waiting for workspace data'}
+            </span>
+            <span>{isLoading ? 'Refreshing workspace scope...' : 'Assets and search are scoped here'}</span>
+          </div>
+        </div>
+
+        <div className="pill">
+          <span className="pill__label">Backend</span>
+          <span className="pill__value">{usingProxy ? `proxy -> ${backendDisplayUrl}` : backendDisplayUrl}</span>
+        </div>
+      </div>
+
       <div className="workspace-bar__cluster">
         <label className="field">
           <span className="field__label">Workspace scope</span>
@@ -82,6 +107,7 @@ export function WorkspaceBar({
               </option>
             ))}
           </select>
+          <span className="field__hint">Switching workspace refreshes asset listing and search scope.</span>
         </label>
 
         <form className="workspace-create" onSubmit={handleSubmit}>
@@ -95,6 +121,7 @@ export function WorkspaceBar({
               placeholder="Algorithms, Databases, Distributed Systems..."
               maxLength={255}
             />
+            <span className="field__hint">New workspaces become easy demo scopes for upload and search.</span>
           </label>
           <Button type="submit" tone="secondary" disabled={isCreating || !workspaceName.trim()}>
             {isCreating ? 'Creating...' : 'Add workspace'}
@@ -102,15 +129,7 @@ export function WorkspaceBar({
         </form>
       </div>
 
-      <div className="workspace-bar__cluster workspace-bar__cluster--meta">
-        <div className="pill">
-          <span className="pill__label">Backend</span>
-          <span className="pill__value">{usingProxy ? `proxy -> ${backendDisplayUrl}` : backendDisplayUrl}</span>
-        </div>
-      </div>
-
       {createError ? <ErrorBanner error={createError} className="workspace-bar__error" /> : null}
     </div>
   );
 }
-

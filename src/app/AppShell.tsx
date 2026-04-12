@@ -291,10 +291,16 @@ export function AppShell() {
             One page, three panels, explicit indexing, and a separate transcript-context follow-up view. The UI always
             keeps the active workspace visible so the backend scope stays obvious.
           </p>
+          <div className="hero__chips">
+            <span className="hero-chip">Active workspace: {selectedWorkspace.name}</span>
+            <span className="hero-chip">Indexing stays explicit</span>
+            <span className="hero-chip">Search stays workspace-scoped</span>
+          </div>
         </div>
 
         <WorkspaceBar
           workspaces={workspacesQuery.data ?? []}
+          selectedWorkspace={selectedWorkspace}
           selectedWorkspaceId={selectedWorkspaceId}
           isLoading={workspacesQuery.isLoading || isTransitionPending}
           createError={createWorkspaceMutation.error}

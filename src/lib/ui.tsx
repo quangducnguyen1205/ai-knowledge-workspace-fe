@@ -117,13 +117,15 @@ export function InfoBanner({
   title,
   message,
   className,
+  tone = 'info',
 }: {
   title: string;
   message: string;
   className?: string;
+  tone?: 'info' | 'success' | 'warning';
 }) {
   return (
-    <div className={joinClassNames('message message--info', className)}>
+    <div className={joinClassNames('message', `message--${tone}`, className)}>
       <strong>{title}</strong>
       <p>{message}</p>
     </div>

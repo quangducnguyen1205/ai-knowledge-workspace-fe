@@ -8,7 +8,7 @@ import {
   type TranscriptContextResponse,
   type TranscriptRow,
 } from '../../lib/api';
-import { Button, EmptyState, ErrorBanner, LoadingBlock, Section, formatDateTime, formatScore } from '../../lib/ui';
+import { Button, EmptyState, ErrorBanner, InfoBanner, LoadingBlock, Section, formatDateTime, formatScore } from '../../lib/ui';
 
 export type SearchParams = {
   query: string;
@@ -120,6 +120,11 @@ export function SearchPanel({
         </label>
       </form>
 
+      <InfoBanner
+        title={`Search scope: ${workspaceName}`}
+        message="Only searchable assets inside the active workspace are considered by this search panel."
+      />
+
       {searchError ? <ErrorBanner error={searchError} /> : null}
 
       {activeQuery ? (
@@ -129,7 +134,12 @@ export function SearchPanel({
             results for <code>{activeQuery}</code> in {workspaceName}
           </span>
         </div>
-      ) : null}
+      ) : (
+        <EmptyState
+          title="Search inside the active workspace"
+          description="Run a query after at least one asset reaches SEARCHABLE. Results stay scoped to the workspace selected above."
+        />
+      )}
 
       {isSearching ? <LoadingBlock label="Searching Spring-owned transcript rows..." /> : null}
 
@@ -164,7 +174,13 @@ export function SearchPanel({
                   <div className="search-result__meta">
                     <span>Segment {result.segmentIndex ?? 'n/a'}</span>
                     <span>{formatDateTime(result.createdAt)}</span>
-                    <span>{lookupId ? 'Context ready' : 'Missing row id'}</span>
+                    <span>{workspaceName}</span>
+                  </div>
+                  <div className="search-result__footer">
+                    <span className="search-result__scope">Scoped to the active workspace</span>
+                    <span className="search-result__action">
+                      {lookupId ? 'Open transcript context' : 'Context unavailable'}
+                    </span>
                   </div>
                 </button>
               </li>
@@ -190,6 +206,13 @@ export function SearchPanel({
 
         {contextResponse ? (
           <div className="context-window">
+            {selectedResult ? (
+              <div className="context-window__selected">
+                <strong>{selectedResult.assetTitle}</strong>
+                <span>Matched query inside {workspaceName}</span>
+              </div>
+            ) : null}
+
             <div className="context-window__meta">
               <span>Hit segment: {contextResponse.hitSegmentIndex ?? 'n/a'}</span>
               <span>Window size: {contextResponse.window}</span>
@@ -207,6 +230,7 @@ export function SearchPanel({
                     <div className="transcript-list__meta">
                       <span>Segment {row.segmentIndex ?? 'n/a'}</span>
                       <span>{formatDateTime(row.createdAt)}</span>
+                      {isHit ? <span className="hit-pill">Hit row</span> : null}
                     </div>
                     <p>{row.text}</p>
                   </li>
@@ -219,4 +243,3 @@ export function SearchPanel({
     </Section>
   );
 }
-

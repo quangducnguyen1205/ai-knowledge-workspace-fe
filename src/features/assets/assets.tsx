@@ -26,6 +26,21 @@ export function isTerminalProcessing(status: ProcessingJobStatus | undefined): b
   return status === 'SUCCEEDED' || status === 'FAILED';
 }
 
+function getAssetStatusDescription(status: AssetStatus | null): string {
+  switch (status) {
+    case 'PROCESSING':
+      return 'Upload accepted. Wait for transcript readiness before indexing.';
+    case 'TRANSCRIPT_READY':
+      return 'Transcript rows are available. Explicit indexing is the next step.';
+    case 'SEARCHABLE':
+      return 'Indexed successfully and eligible for workspace search.';
+    case 'FAILED':
+      return 'Processing or transcript retrieval failed for this asset.';
+    default:
+      return 'Asset state not available yet.';
+  }
+}
+
 export function deriveAssetStatus(
   asset: AssetSummary | null,
   statusResponse: AssetStatusResponse | undefined,
@@ -178,8 +193,22 @@ export function AssetsPanel({
         </label>
 
         <Button type="submit" disabled={isUploading || !file}>
-          {isUploading ? 'Uploading...' : 'Upload into workspace'}
+          {isUploading ? `Uploading to ${workspaceName}...` : 'Upload into workspace'}
         </Button>
+
+        {file ? (
+          <div className="selected-file">
+            <strong>Selected file</strong>
+            <span>{file.name}</span>
+          </div>
+        ) : null}
+
+        {isUploading ? (
+          <InfoBanner
+            title="Uploading asset"
+            message={`Sending the selected file into ${workspaceName}. The asset should appear here first, then status polling continues.`}
+          />
+        ) : null}
 
         {uploadError ? <ErrorBanner error={uploadError} /> : null}
       </form>
@@ -187,7 +216,15 @@ export function AssetsPanel({
       <div className="asset-list">
         <div className="asset-list__meta">
           <strong>{assets.length}</strong>
-          <span>{assets.length === 1 ? 'asset in scope' : 'assets in scope'}</span>
+          <span>{assets.length === 1 ? 'asset in active workspace' : 'assets in active workspace'}</span>
+        </div>
+
+        <div className="status-legend">
+          <span className="status-legend__label">Status legend</span>
+          <StatusBadge status="PROCESSING" />
+          <StatusBadge status="TRANSCRIPT_READY" />
+          <StatusBadge status="SEARCHABLE" />
+          <StatusBadge status="FAILED" />
         </div>
 
         {assetsLoading ? <LoadingBlock label="Loading workspace assets..." compact /> : null}
@@ -220,6 +257,7 @@ export function AssetsPanel({
                       <span>{formatDateTime(asset.createdAt)}</span>
                       <span className="asset-card__id">{asset.assetId}</span>
                     </div>
+                    <p className="asset-card__summary">{getAssetStatusDescription(asset.assetStatus)}</p>
                   </button>
                 </li>
               );
@@ -259,14 +297,17 @@ export function SelectedAssetPanel({
   onIndex: () => void;
 }) {
   const canIndex = Boolean(transcriptRows?.length);
+  const transcriptRowCount = transcriptRows?.length ?? 0;
+  const assetStatusDescription = getAssetStatusDescription(resolvedAssetStatus);
   const statusPairs = useMemo(
     () => [
       ['Workspace', workspaceName],
       ['Asset status', resolvedAssetStatus ?? 'Unknown'],
       ['Processing job', statusResponse?.processingJobStatus ?? 'Waiting for status'],
+      ['Transcript rows', transcriptRowCount > 0 ? String(transcriptRowCount) : 'Not loaded yet'],
       ['Created', asset ? formatDateTime(asset.createdAt) : 'Unknown'],
     ],
-    [asset, resolvedAssetStatus, statusResponse?.processingJobStatus, workspaceName],
+    [asset, resolvedAssetStatus, statusResponse?.processingJobStatus, transcriptRowCount, workspaceName],
   );
 
   if (!asset) {
@@ -299,14 +340,35 @@ export function SelectedAssetPanel({
 
       {!statusError && resolvedAssetStatus === 'PROCESSING' ? (
         <InfoBanner
-          title="Processing is still explicit"
-          message="This demo waits for the Spring status endpoint to reach terminal success before transcript fetch becomes meaningful."
+          tone="warning"
+          title="Processing is still in progress"
+          message="The frontend keeps polling the Spring status endpoint. Search stays empty until transcript rows are ready and indexing is run explicitly."
+        />
+      ) : null}
+
+      {!statusError && resolvedAssetStatus === 'TRANSCRIPT_READY' ? (
+        <InfoBanner
+          tone="warning"
+          title="Transcript ready, indexing still required"
+          message={`${transcriptRowCount} transcript row${transcriptRowCount === 1 ? '' : 's'} loaded. Run the explicit indexing step to make this asset searchable.`}
+        />
+      ) : null}
+
+      {!statusError && resolvedAssetStatus === 'SEARCHABLE' ? (
+        <InfoBanner
+          tone="success"
+          title="Asset is searchable"
+          message="This asset has already been indexed successfully and can now appear in workspace-scoped search results."
         />
       ) : null}
 
       <div className="panel-block">
-        <div className="panel-block__header">
-          <h3>Transcript</h3>
+        <div className="action-card">
+          <div className="action-card__copy">
+            <p className="panel__eyebrow">Explicit indexing</p>
+            <h3>{resolvedAssetStatus === 'SEARCHABLE' ? 'Rebuild search documents' : 'Make this asset searchable'}</h3>
+            <p>{assetStatusDescription}</p>
+          </div>
           <Button
             type="button"
             tone={resolvedAssetStatus === 'SEARCHABLE' ? 'secondary' : 'primary'}
@@ -319,6 +381,18 @@ export function SelectedAssetPanel({
                 ? 'Re-index transcript'
                 : 'Index transcript'}
           </Button>
+        </div>
+
+        {isIndexing ? (
+          <InfoBanner
+            title="Indexing transcript"
+            message="Writing transcript rows through the Spring index endpoint so this asset can participate in workspace search."
+          />
+        ) : null}
+
+        <div className="panel-block__header">
+          <h3>Transcript</h3>
+          <span className="context-panel__hint">Transcript rows are shown only when Spring says they are ready</span>
         </div>
 
         {transcriptLoading ? <LoadingBlock label="Loading transcript rows..." /> : null}
@@ -347,6 +421,7 @@ export function SelectedAssetPanel({
 
       {indexResponse ? (
         <InfoBanner
+          tone="success"
           title="Indexing complete"
           message={`Indexed ${indexResponse.indexedDocumentCount} transcript rows for this asset.`}
         />
