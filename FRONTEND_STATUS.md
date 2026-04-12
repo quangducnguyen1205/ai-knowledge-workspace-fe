@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-This repo contains the separate demo-focused frontend for AI Knowledge Workspace. It provides a single-shell UI for the current Spring-owned product flow: workspace selection, asset upload, status polling, transcript retrieval, explicit indexing, search, and transcript-context follow-up.
+This repo contains the separate demo-focused frontend for AI Knowledge Workspace. It provides a single-shell UI for the current Spring-owned product flow: workspace selection, asset upload, status polling, transcript retrieval, explicit indexing, search, and transcript-context follow-up. The frontend depends only on the Spring product API in Repo B and does not call Repo A directly.
 
 ## 2. Current Stack
 
@@ -52,7 +52,17 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 - Expected backend URL: `http://localhost:8081`
 - Current Docker runtime behavior: the container runs the Vite dev server, exposes port `5173`, bind-mounts the source tree, keeps `node_modules` inside the container, and proxies `/api` requests to the host Spring backend
 
-## 6. Current Limitations / Intentionally Deferred
+## 6. Manual Verification Notes
+
+- Dockerized frontend build has passed successfully
+- Happy-path search and transcript-context follow-up were manually verified in the browser
+- Workspace switching and creation were manually verified
+- Processing -> transcript_ready -> searchable flow was manually verified
+- Failed asset flow was manually verified
+- Invalid or rejected upload flow was manually verified
+- Search empty state for nonsense queries was manually verified
+
+## 7. Current Limitations / Intentionally Deferred
 
 - No auth or collaboration
 - No chatbot/RAG or assistant behavior
@@ -64,7 +74,7 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 - No advanced search filters beyond the current workspace-scoped query flow
 - Conflict and validation handling is still intentionally lightweight and frontend-only
 
-## 7. Quick Status Summary
+## 8. Quick Status Summary
 
 - Separate frontend repo is scaffolded and running as a Vite + React + TypeScript demo app
 - Current UI already covers workspace, upload, status, transcript, explicit indexing, search, and transcript context
