@@ -42,6 +42,13 @@ type IndexActionState = {
   canIndex: boolean;
 };
 
+type AssetLifecycleState = {
+  step: string;
+  summary: string;
+  nextAction: string;
+  tone: 'info' | 'success' | 'warning';
+};
+
 function getAssetStatusDescription(status: AssetStatus | null): string {
   switch (status) {
     case 'PROCESSING':
@@ -199,6 +206,67 @@ function getIndexActionState(input: {
     buttonLabel: 'Indexing unavailable',
     buttonTone: 'ghost',
     canIndex: false,
+  };
+}
+
+function getAssetLifecycleState(input: {
+  resolvedAssetStatus: AssetStatus | null;
+  processingJobStatus?: ProcessingJobStatus;
+  transcriptRows?: TranscriptRow[];
+  transcriptError: unknown;
+}): AssetLifecycleState {
+  const transcriptRowCount = input.transcriptRows?.length ?? 0;
+
+  if (input.resolvedAssetStatus === 'SEARCHABLE') {
+    return {
+      step: 'Searchable',
+      summary: 'This asset has completed the current lifecycle and can participate in workspace-scoped search.',
+      nextAction: 'Use the search panel on the right to run a query and open one hit in transcript context.',
+      tone: 'success',
+    };
+  }
+
+  if (transcriptRowCount > 0) {
+    return {
+      step: 'Ready to index',
+      summary: `${transcriptRowCount} transcript row${transcriptRowCount === 1 ? '' : 's'} loaded for the selected asset.`,
+      nextAction: 'Run the explicit indexing action below to make this asset searchable.',
+      tone: 'warning',
+    };
+  }
+
+  if (input.resolvedAssetStatus === 'FAILED' || input.processingJobStatus === 'FAILED') {
+    return {
+      step: 'Failed',
+      summary: 'This asset cannot continue through the current demo path because backend processing failed.',
+      nextAction: 'Select another asset in the workspace or upload a new file.',
+      tone: 'warning',
+    };
+  }
+
+  if (isApiClientError(input.transcriptError) && input.transcriptError.status === 409) {
+    return {
+      step: 'Transcript pending',
+      summary: 'Processing finished, but transcript rows are still unavailable through Spring.',
+      nextAction: 'Stay on this asset until transcript rows appear. Indexing remains unavailable for now.',
+      tone: 'warning',
+    };
+  }
+
+  if (input.resolvedAssetStatus === 'PROCESSING' || !isTerminalProcessing(input.processingJobStatus)) {
+    return {
+      step: 'Processing',
+      summary: 'Spring is still processing this asset, so the transcript and indexing steps are not ready yet.',
+      nextAction: 'Wait for processing to finish, then review transcript readiness in this panel.',
+      tone: 'warning',
+    };
+  }
+
+  return {
+    step: 'Uploaded',
+    summary: 'The asset is selected and waiting for the next backend readiness signal.',
+    nextAction: 'Keep the asset selected so status, transcript, and indexing state stay in sync.',
+    tone: 'info',
   };
 }
 
@@ -477,6 +545,12 @@ export function SelectedAssetPanel({
     transcriptRows,
     transcriptError,
   });
+  const lifecycleState = getAssetLifecycleState({
+    resolvedAssetStatus,
+    processingJobStatus: statusResponse?.processingJobStatus,
+    transcriptRows,
+    transcriptError,
+  });
   const statusPairs = useMemo(
     () => [
       ['Workspace', workspaceName],
@@ -516,40 +590,17 @@ export function SelectedAssetPanel({
 
       {statusError ? <ErrorBanner error={statusError} /> : null}
 
-      {!statusError && resolvedAssetStatus === 'PROCESSING' ? (
+      {!statusError ? (
         <InfoBanner
-          tone="warning"
-          title="Processing is still in progress"
-          message="The frontend keeps polling the Spring status endpoint. Search stays empty until transcript rows are ready and indexing is run explicitly."
-        />
-      ) : null}
-
-      {!statusError && resolvedAssetStatus === 'TRANSCRIPT_READY' ? (
-        <InfoBanner
-          tone="warning"
-          title="Transcript ready, indexing still required"
-          message={`${transcriptRowCount} transcript row${transcriptRowCount === 1 ? '' : 's'} loaded. Run the explicit indexing step to make this asset searchable.`}
-        />
-      ) : null}
-
-      {!statusError && resolvedAssetStatus === 'SEARCHABLE' ? (
-        <InfoBanner
-          tone="success"
-          title="Asset is searchable"
-          message="This asset has already been indexed successfully and can now appear in workspace-scoped search results."
-        />
-      ) : null}
-
-      {!statusError && resolvedAssetStatus === 'FAILED' ? (
-        <InfoBanner
-          tone="warning"
-          title="Processing failed"
-          message="Spring marked this asset as failed, so transcript inspection and explicit indexing are unavailable for this item."
+          tone={lifecycleState.tone}
+          title={`Current asset step: ${lifecycleState.step}`}
+          message={lifecycleState.summary}
+          detail={`Next: ${lifecycleState.nextAction}`}
         />
       ) : null}
 
       <div className="panel-block">
-        <div className="action-card">
+        <div className={`action-card ${!indexActionState.canIndex ? 'action-card--muted' : ''}`}>
           <div className="action-card__copy">
             <p className="panel__eyebrow">Explicit indexing</p>
             <h3>{indexActionState.title}</h3>

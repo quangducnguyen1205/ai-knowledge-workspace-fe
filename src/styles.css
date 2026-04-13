@@ -119,6 +119,63 @@ code {
   margin-top: 16px;
 }
 
+.hero__path {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+  padding: 14px 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(31, 41, 55, 0.08);
+  background: rgba(255, 255, 255, 0.64);
+}
+
+.hero__path-label {
+  margin: 0;
+  font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.hero__path-list {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.hero-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.hero-step__index {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(19, 111, 99, 0.12);
+  color: var(--primary-dark);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.hero__guide {
+  margin-top: 16px;
+}
+
 .hero-chip {
   display: inline-flex;
   align-items: center;
@@ -458,6 +515,19 @@ code {
   box-shadow: 0 0 0 3px rgba(19, 111, 99, 0.12);
 }
 
+.search-result--disabled,
+.search-result:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+.search-result--disabled:hover,
+.search-result:disabled:hover {
+  transform: none;
+  border-color: var(--border);
+  box-shadow: none;
+}
+
 .asset-card__summary {
   margin: 0;
   color: var(--text-muted);
@@ -559,6 +629,11 @@ code {
   background: linear-gradient(135deg, rgba(19, 111, 99, 0.07), rgba(255, 255, 255, 0.92));
 }
 
+.action-card--muted {
+  border-color: rgba(31, 41, 55, 0.12);
+  background: linear-gradient(135deg, rgba(31, 41, 55, 0.04), rgba(255, 255, 255, 0.9));
+}
+
 .action-card__copy {
   display: grid;
   gap: 6px;
@@ -635,6 +710,10 @@ code {
   font-size: 0.88rem;
 }
 
+.search-result__action--active {
+  color: #2e4cc8;
+}
+
 .context-panel {
   display: grid;
   gap: 12px;
@@ -654,8 +733,27 @@ code {
   border: 1px solid rgba(124, 158, 255, 0.18);
 }
 
+.context-window__selected--pending {
+  border-style: dashed;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.context-window__label {
+  margin: 0;
+  font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
 .context-window__selected span {
   color: var(--text-muted);
+}
+
+.context-window__selected-copy {
+  margin: 4px 0 0;
+  color: var(--text);
 }
 
 .hit-pill {

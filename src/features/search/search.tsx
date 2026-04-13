@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   getTranscriptContext,
@@ -64,6 +64,8 @@ export function useTranscriptContextQuery(params: TranscriptContextParams | null
 
 export function SearchPanel({
   workspaceName,
+  searchableAssetCount,
+  resetToken,
   activeQuery,
   searchResponse,
   searchError,
@@ -76,6 +78,8 @@ export function SearchPanel({
   onSelectResult,
 }: {
   workspaceName: string;
+  searchableAssetCount: number;
+  resetToken: number;
   activeQuery: string | null;
   searchResponse?: SearchResponse;
   searchError: unknown;
@@ -88,12 +92,46 @@ export function SearchPanel({
   onSelectResult: (result: SearchResult) => void;
 }) {
   const [searchInput, setSearchInput] = useState('');
+  const searchEnabled = searchableAssetCount > 0;
+  const hasSearchResults = Boolean(searchResponse?.results.length);
+  const searchPromptState = !activeQuery
+    ? {
+        title: 'Search inside the active workspace',
+        description: 'Run a query after at least one asset reaches SEARCHABLE. Results stay scoped to the workspace selected above.',
+      }
+    : hasSearchResults
+      ? {
+          title: 'Choose a result to open context',
+          description: 'Click one enabled result card above to fetch the surrounding transcript rows for that hit.',
+        }
+      : {
+          title: 'No transcript context selected yet',
+          description: 'Run a query that returns at least one result, then open a hit to inspect transcript context.',
+      };
+  const contextEmptyState = !activeQuery
+    ? {
+        title: 'Search first, then open context',
+        description: 'Run a workspace-scoped search to choose one result and fetch its transcript context window.',
+      }
+    : hasSearchResults
+      ? {
+          title: 'Choose a result to open context',
+          description: 'Click one enabled result card above to fetch the surrounding transcript rows for that hit.',
+        }
+      : {
+          title: 'No transcript context available yet',
+          description: 'The current query returned no hits in this workspace, so there is no transcript context to open.',
+        };
+
+  useEffect(() => {
+    setSearchInput('');
+  }, [resetToken, workspaceName]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmedQuery = searchInput.trim();
 
-    if (!trimmedQuery) {
+    if (!trimmedQuery || !searchEnabled) {
       return;
     }
 
@@ -111,9 +149,14 @@ export function SearchPanel({
               type="text"
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="binary trees, paging, consensus, normalization..."
+              placeholder={
+                searchEnabled
+                  ? 'binary trees, paging, consensus, normalization...'
+                  : 'Index one asset in this workspace to enable search'
+              }
+              disabled={!searchEnabled}
             />
-            <Button type="submit" disabled={!searchInput.trim() || isSearching}>
+            <Button type="submit" disabled={!searchEnabled || !searchInput.trim() || isSearching}>
               {isSearching ? 'Searching...' : 'Search'}
             </Button>
           </div>
@@ -123,7 +166,16 @@ export function SearchPanel({
       <InfoBanner
         title={`Search scope: ${workspaceName}`}
         message="Only searchable assets inside the active workspace are considered by this search panel."
+        detail={`${searchableAssetCount} searchable asset${searchableAssetCount === 1 ? '' : 's'} currently available.`}
       />
+
+      {!searchEnabled ? (
+        <InfoBanner
+          tone="warning"
+          title="Search unlocks after indexing"
+          message="This workspace does not have any SEARCHABLE assets yet. Finish the transcript and explicit indexing steps first."
+        />
+      ) : null}
 
       {searchError ? <ErrorBanner error={searchError} /> : null}
 
@@ -135,10 +187,7 @@ export function SearchPanel({
           </span>
         </div>
       ) : (
-        <EmptyState
-          title="Search inside the active workspace"
-          description="Run a query after at least one asset reaches SEARCHABLE. Results stay scoped to the workspace selected above."
-        />
+        <EmptyState title={searchPromptState.title} description={searchPromptState.description} />
       )}
 
       {isSearching ? <LoadingBlock label="Searching Spring-owned transcript rows..." /> : null}
@@ -154,6 +203,7 @@ export function SearchPanel({
         <ul className="search-results">
           {searchResponse.results.map((result) => {
             const lookupId = resolveTranscriptLookupId(result);
+            const hasContextAction = Boolean(lookupId);
             const isSelected =
               selectedResult?.assetId === result.assetId &&
               selectedResult?.transcriptRowId === result.transcriptRowId &&
@@ -163,8 +213,10 @@ export function SearchPanel({
               <li key={`${result.assetId}-${lookupId ?? 'no-row'}-${result.segmentIndex ?? 'na'}`}>
                 <button
                   type="button"
-                  className={`search-result ${isSelected ? 'search-result--selected' : ''}`}
-                  onClick={() => onSelectResult(result)}
+                  className={`search-result ${isSelected ? 'search-result--selected' : ''} ${!hasContextAction ? 'search-result--disabled' : ''}`}
+                  onClick={hasContextAction ? () => onSelectResult(result) : undefined}
+                  disabled={!hasContextAction}
+                  aria-pressed={isSelected}
                 >
                   <div className="search-result__header">
                     <strong>{result.assetTitle}</strong>
@@ -178,8 +230,8 @@ export function SearchPanel({
                   </div>
                   <div className="search-result__footer">
                     <span className="search-result__scope">Scoped to the active workspace</span>
-                    <span className="search-result__action">
-                      {lookupId ? 'Open transcript context' : 'Context unavailable'}
+                    <span className={`search-result__action ${isSelected ? 'search-result__action--active' : ''}`}>
+                      {!hasContextAction ? 'Context unavailable' : isSelected ? 'Context shown below' : 'Open transcript context'}
                     </span>
                   </div>
                 </button>
@@ -195,24 +247,33 @@ export function SearchPanel({
           <span className="context-panel__hint">Separate follow-up view, window = 2</span>
         </div>
 
+        {selectedResult ? (
+          <div className={`context-window__selected ${isContextLoading ? 'context-window__selected--pending' : ''}`}>
+            <p className="context-window__label">
+              {contextResponse
+                ? 'Opened from selected result'
+                : isContextLoading
+                  ? 'Loading selected result'
+                  : contextError
+                    ? 'Selected result with context error'
+                    : 'Selected result'}
+            </p>
+            <strong>{selectedResult.assetTitle}</strong>
+            <span>
+              Matched <code>{activeQuery ?? 'current query'}</code> inside {workspaceName}
+            </span>
+            <p className="context-window__selected-copy">{selectedResult.text}</p>
+          </div>
+        ) : null}
+
         {isContextLoading ? <LoadingBlock label="Loading transcript context..." compact /> : null}
         {!isContextLoading && contextError ? <ErrorBanner error={contextError} /> : null}
         {!isContextLoading && !contextError && !contextResponse ? (
-          <EmptyState
-            title="Open a search result"
-            description="Click a result above to fetch a focused transcript window around that hit."
-          />
+          <EmptyState title={contextEmptyState.title} description={contextEmptyState.description} />
         ) : null}
 
         {contextResponse ? (
           <div className="context-window">
-            {selectedResult ? (
-              <div className="context-window__selected">
-                <strong>{selectedResult.assetTitle}</strong>
-                <span>Matched query inside {workspaceName}</span>
-              </div>
-            ) : null}
-
             <div className="context-window__meta">
               <span>Hit segment: {contextResponse.hitSegmentIndex ?? 'n/a'}</span>
               <span>Window size: {contextResponse.window}</span>
