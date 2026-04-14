@@ -22,9 +22,13 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 - List workspace-scoped assets and select one asset for inspection
 - Poll product-side asset status until the processing job becomes terminal
 - Fetch transcript rows only when the asset is actually ready through Spring
+- Show the selected asset lifecycle as a clearer current step plus next action
 - Trigger transcript indexing as an explicit user action
+- Keep search disabled until the active workspace has at least one SEARCHABLE asset
 - Search within the selected workspace only
 - Open a separate transcript-context view for a chosen search result
+- Keep the shell focused on the golden path: workspace -> upload -> processing -> transcript -> index -> search -> context
+- Reset search/context state when workspace selection changes, upload completes, indexing completes, or refreshed results no longer match the selected hit
 - Keep indexing unavailable while assets are still processing, failed, or missing transcript rows
 - Show friendlier demo-facing messages for transcript 409 states and upload validation rejections
 - Current UI structure: top workspace bar plus three panels for assets, selected asset/transcript, and search/context
@@ -55,6 +59,7 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 ## 6. Manual Verification Notes
 
 - Dockerized frontend build has passed successfully
+- Dockerized local-dev startup has also been rechecked, with the Vite app serving on `http://localhost:5173`
 - Happy-path search and transcript-context follow-up were manually verified in the browser
 - Workspace switching and creation were manually verified
 - Processing -> transcript_ready -> searchable flow was manually verified
@@ -78,6 +83,8 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 
 - Separate frontend repo is scaffolded and running as a Vite + React + TypeScript demo app
 - Current UI already covers workspace, upload, status, transcript, explicit indexing, search, and transcript context
+- Selected asset lifecycle and next-step guidance are now clearer in the shell
+- Search/context state is more tightly synced to workspace, upload, indexing, and refreshed results
 - Demo-safety cleanup now prevents misleading indexing and uses clearer upload/transcript failure copy
 - Docker-first local development is set up and is the recommended way to run the app
 - The frontend currently depends only on the Spring product API surface

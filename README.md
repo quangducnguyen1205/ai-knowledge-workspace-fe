@@ -10,6 +10,9 @@ This repo is the separate frontend for the AI Knowledge Workspace demo. It is in
 - transcript retrieval
 - explicit indexing
 - search and transcript-context follow-up
+- selected asset lifecycle guidance with a clearer current step and next action
+- search disabled until the active workspace has at least one searchable asset
+- search/context state kept in sync across workspace switch, upload completion, indexing completion, and refreshed results
 
 ## Local Setup
 
@@ -35,7 +38,7 @@ Recently verified in the browser:
 - invalid or rejected upload flow
 - empty search results for nonsense queries
 
-Dockerized frontend build has also passed successfully.
+Dockerized frontend build has also passed successfully, and the Docker local-dev path has recently been rechecked with the app serving on `http://localhost:5173`.
 
 ## Environment Notes
 
