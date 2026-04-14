@@ -15,6 +15,15 @@ export type AssetSummary = {
   createdAt: string;
 };
 
+export type AssetListEnvelope = {
+  items: AssetSummary[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  hasNext: boolean;
+};
+
 export type AssetUploadResponse = {
   assetId: string;
   processingJobId: string;
@@ -212,7 +221,15 @@ export async function createWorkspace(name: string): Promise<Workspace> {
 }
 
 export async function listAssets(workspaceId: string): Promise<AssetSummary[]> {
-  return request<AssetSummary[]>(`/api/assets${buildQueryString({ workspaceId })}`);
+  const response = await request<AssetSummary[] | AssetListEnvelope>(
+    `/api/assets${buildQueryString({ workspaceId })}`,
+  );
+
+  if (Array.isArray(response)) {
+    return response;
+  }
+
+  return response.items;
 }
 
 export async function uploadAsset(input: UploadAssetInput): Promise<AssetUploadResponse> {
@@ -260,4 +277,3 @@ export async function getTranscriptContext(
     })}`,
   );
 }
-
