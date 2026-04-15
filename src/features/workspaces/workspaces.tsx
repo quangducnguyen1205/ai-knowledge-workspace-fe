@@ -1,9 +1,17 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { backendDisplayUrl, createWorkspace, listWorkspaces, usingProxy, type Workspace } from '../../lib/api';
+import {
+  ApiClientError,
+  backendDisplayUrl,
+  createAuthSession,
+  createWorkspace,
+  listWorkspaces,
+  usingProxy,
+  type Workspace,
+} from '../../lib/api';
 import { Button, ErrorBanner, formatDateTime } from '../../lib/ui';
 
-const workspaceKeys = {
+export const workspaceKeys = {
   all: ['workspaces'] as const,
 };
 
@@ -26,34 +34,93 @@ export function useCreateWorkspaceMutation() {
   });
 }
 
+export function useAuthSessionMutation() {
+  return useMutation({
+    mutationFn: createAuthSession,
+  });
+}
+
+type FriendlySessionErrorCopy = {
+  title: string;
+  message: string;
+  detail?: string;
+};
+
+function getFriendlySessionErrorCopy(error: unknown): FriendlySessionErrorCopy | null {
+  if (!(error instanceof ApiClientError)) {
+    return null;
+  }
+
+  if (error.status === 400 && error.code === 'INVALID_CURRENT_USER_ID') {
+    return {
+      title: 'Current user was rejected',
+      message: 'Use a non-empty current user ID that fits within the backend length limit, then try switching again.',
+      detail: `Backend detail: ${error.code}`,
+    };
+  }
+
+  if (error.status === 0) {
+    return {
+      title: 'Current user could not reach Spring',
+      message: 'The frontend could not contact the Spring backend, so the visible workspace scope did not change.',
+    };
+  }
+
+  return {
+    title: 'Current user update failed',
+    message: 'Spring did not confirm the current user switch, so the existing visible scope stays in place.',
+    detail: error.code ? `Backend detail: ${error.code} - ${error.message}` : `Backend detail: ${error.message}`,
+  };
+}
+
 export function WorkspaceBar({
   workspaces,
   selectedWorkspace,
   selectedWorkspaceId,
   isLoading,
+  activeUserId,
+  pendingUserId,
+  sessionError,
+  sessionSuccessUserId,
   createError,
   createSuccessId,
   onSelectWorkspace,
+  onSetCurrentUser,
   onCreateWorkspace,
+  isSettingCurrentUser,
   isCreating,
 }: {
   workspaces: Workspace[];
   selectedWorkspace: Workspace | null;
   selectedWorkspaceId: string | null;
   isLoading: boolean;
+  activeUserId: string | null;
+  pendingUserId: string | null;
+  sessionError: unknown;
+  sessionSuccessUserId?: string;
   createError: unknown;
   createSuccessId?: string;
   onSelectWorkspace: (workspaceId: string) => void;
+  onSetCurrentUser: (userId: string) => void;
   onCreateWorkspace: (name: string) => void;
+  isSettingCurrentUser: boolean;
   isCreating: boolean;
 }) {
   const [workspaceName, setWorkspaceName] = useState('');
+  const [userId, setUserId] = useState('');
+  const sessionErrorCopy = getFriendlySessionErrorCopy(sessionError);
 
   useEffect(() => {
     if (createSuccessId) {
       setWorkspaceName('');
     }
   }, [createSuccessId]);
+
+  useEffect(() => {
+    if (sessionSuccessUserId) {
+      setUserId(sessionSuccessUserId);
+    }
+  }, [sessionSuccessUserId]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -64,6 +131,17 @@ export function WorkspaceBar({
     }
 
     onCreateWorkspace(trimmedName);
+  }
+
+  function handleSessionSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmedUserId = userId.trim();
+
+    if (!trimmedUserId) {
+      return;
+    }
+
+    onSetCurrentUser(trimmedUserId);
   }
 
   return (
@@ -82,16 +160,49 @@ export function WorkspaceBar({
               {selectedWorkspace ? `Created ${formatDateTime(selectedWorkspace.createdAt)}` : 'Waiting for workspace data'}
             </span>
             <span>{isLoading ? 'Refreshing workspace scope...' : 'Assets and search are scoped here'}</span>
+            <span>
+              Current user:{' '}
+              {pendingUserId ? `switching to ${pendingUserId}` : activeUserId ?? 'using backend fallback scope'}
+            </span>
           </div>
         </div>
 
-        <div className="pill">
-          <span className="pill__label">Backend</span>
-          <span className="pill__value">{usingProxy ? `proxy -> ${backendDisplayUrl}` : backendDisplayUrl}</span>
+        <div className="workspace-bar__pills">
+          <div className="pill">
+            <span className="pill__label">Current user</span>
+            <span className="pill__value">
+              {pendingUserId ? `Switching to ${pendingUserId}...` : activeUserId ?? 'Backend fallback'}
+            </span>
+          </div>
+
+          <div className="pill">
+            <span className="pill__label">Backend</span>
+            <span className="pill__value">{usingProxy ? `proxy -> ${backendDisplayUrl}` : backendDisplayUrl}</span>
+          </div>
         </div>
       </div>
 
       <div className="workspace-bar__cluster">
+        <form className="workspace-session" onSubmit={handleSessionSubmit}>
+          <label className="field field--grow">
+            <span className="field__label">Current user</span>
+            <input
+              className="field__input"
+              type="text"
+              value={userId}
+              onChange={(event) => setUserId(event.target.value)}
+              placeholder="student-a, demo-owner, reviewer-1..."
+              maxLength={255}
+            />
+            <span className="field__hint">
+              Calls <code>POST /api/auth/session</code>, then refreshes visible workspace and asset scope.
+            </span>
+          </label>
+          <Button type="submit" tone="ghost" disabled={isSettingCurrentUser || !userId.trim()}>
+            {isSettingCurrentUser ? 'Switching...' : activeUserId ? 'Switch user' : 'Set user'}
+          </Button>
+        </form>
+
         <label className="field">
           <span className="field__label">Workspace scope</span>
           <select
@@ -129,6 +240,15 @@ export function WorkspaceBar({
         </form>
       </div>
 
+      {sessionError ? (
+        <ErrorBanner
+          error={sessionError}
+          className="workspace-bar__error"
+          title={sessionErrorCopy?.title}
+          message={sessionErrorCopy?.message}
+          detail={sessionErrorCopy?.detail}
+        />
+      ) : null}
       {createError ? <ErrorBanner error={createError} className="workspace-bar__error" /> : null}
     </div>
   );

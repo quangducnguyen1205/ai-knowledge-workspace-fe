@@ -25,8 +25,10 @@ import {
 } from '../features/search/search';
 import {
   WorkspaceBar,
+  useAuthSessionMutation,
   useCreateWorkspaceMutation,
   useWorkspacesQuery,
+  workspaceKeys,
 } from '../features/workspaces/workspaces';
 
 function canLoadTranscript(assetStatus: AssetStatus | null, processingJobStatus?: string): boolean {
@@ -52,12 +54,30 @@ export function AppShell() {
   const [isTransitionPending, startTransition] = useTransition();
 
   const workspacesQuery = useWorkspacesQuery();
+  const authSessionMutation = useAuthSessionMutation();
   const createWorkspaceMutation = useCreateWorkspaceMutation();
+  const [activeSessionUserId, setActiveSessionUserId] = useState<string | null>(null);
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
   const [preferredWorkspaceId, setPreferredWorkspaceId] = useState<string | null>(null);
+  const [workspaceScopeRefreshAfter, setWorkspaceScopeRefreshAfter] = useState<number | null>(null);
 
   useEffect(() => {
     const workspaces = workspacesQuery.data ?? [];
+    if (workspaceScopeRefreshAfter !== null) {
+      if (workspacesQuery.dataUpdatedAt <= workspaceScopeRefreshAfter) {
+        return;
+      }
+
+      if (!workspaces.length) {
+        setWorkspaceScopeRefreshAfter(null);
+        return;
+      }
+
+      startTransition(() => setSelectedWorkspaceId(workspaces[0].id));
+      setWorkspaceScopeRefreshAfter(null);
+      return;
+    }
+
     if (!workspaces.length) {
       return;
     }
@@ -76,7 +96,14 @@ export function AppShell() {
     }
 
     startTransition(() => setSelectedWorkspaceId(workspaces[0].id));
-  }, [preferredWorkspaceId, selectedWorkspaceId, startTransition, workspacesQuery.data]);
+  }, [
+    preferredWorkspaceId,
+    selectedWorkspaceId,
+    startTransition,
+    workspaceScopeRefreshAfter,
+    workspacesQuery.data,
+    workspacesQuery.dataUpdatedAt,
+  ]);
 
   const selectedWorkspace = useMemo(
     () => workspacesQuery.data?.find((workspace) => workspace.id === selectedWorkspaceId) ?? null,
@@ -424,6 +451,38 @@ export function AppShell() {
     startTransition(() => setSelectedWorkspaceId(workspaceId));
   }
 
+  function clearSessionScopedState() {
+    const previousSelectedAssetId = selectedAssetIdRef.current;
+
+    if (previousSelectedAssetId) {
+      queryClient.removeQueries({ queryKey: assetKeys.status(previousSelectedAssetId) });
+      queryClient.removeQueries({ queryKey: assetKeys.transcript(previousSelectedAssetId) });
+    }
+
+    setPreferredWorkspaceId(null);
+    setSelectedAssetId(null);
+    setPreferredAssetId(null);
+    setStatusPollingEnabled(false);
+    setSubmittedSearch(null);
+    setSelectedSearchResult(null);
+    setSearchResetToken((current) => current + 1);
+    startTransition(() => setSelectedWorkspaceId(null));
+
+    queryClient.removeQueries({ queryKey: searchKeys.all });
+  }
+
+  function handleSetCurrentUser(userId: string) {
+    authSessionMutation.mutate(userId, {
+      onSuccess: async (response) => {
+        setActiveSessionUserId(response.userId);
+        setWorkspaceScopeRefreshAfter(workspacesQuery.dataUpdatedAt);
+        clearSessionScopedState();
+
+        await queryClient.refetchQueries({ queryKey: workspaceKeys.all, type: 'active' });
+      },
+    });
+  }
+
   function handleUpload(input: { file: File; title?: string }) {
     if (!selectedWorkspaceId) {
       return;
@@ -597,6 +656,7 @@ export function AppShell() {
     renameMutation.error && renameMutation.variables?.assetId === selectedAssetId ? renameMutation.error : null;
   const isRenamingSelectedAsset =
     renameMutation.isPending && renameMutation.variables?.assetId === selectedAssetId;
+  const pendingSessionUserId = authSessionMutation.isPending ? authSessionMutation.variables ?? null : null;
 
   if (workspacesQuery.isLoading) {
     return (
@@ -615,6 +675,20 @@ export function AppShell() {
   }
 
   if (!selectedWorkspace) {
+    if (workspacesQuery.isFetching || workspaceScopeRefreshAfter !== null || (workspacesQuery.data?.length ?? 0) > 0) {
+      return (
+        <div className="app-shell app-shell--centered">
+          <LoadingBlock
+            label={
+              pendingSessionUserId
+                ? `Refreshing visible scope for ${pendingSessionUserId}...`
+                : 'Refreshing visible workspace scope...'
+            }
+          />
+        </div>
+      );
+    }
+
     return (
       <div className="app-shell app-shell--centered">
         <EmptyState
@@ -661,11 +735,17 @@ export function AppShell() {
           workspaces={workspacesQuery.data ?? []}
           selectedWorkspace={selectedWorkspace}
           selectedWorkspaceId={selectedWorkspaceId}
-          isLoading={workspacesQuery.isLoading || isTransitionPending}
+          isLoading={workspacesQuery.isLoading || workspacesQuery.isFetching || isTransitionPending}
+          activeUserId={activeSessionUserId}
+          pendingUserId={pendingSessionUserId}
+          sessionError={authSessionMutation.error}
+          sessionSuccessUserId={authSessionMutation.data?.userId}
           createError={createWorkspaceMutation.error}
           createSuccessId={createWorkspaceMutation.data?.id}
           onSelectWorkspace={handleSelectWorkspace}
+          onSetCurrentUser={handleSetCurrentUser}
           onCreateWorkspace={handleCreateWorkspace}
+          isSettingCurrentUser={authSessionMutation.isPending}
           isCreating={createWorkspaceMutation.isPending}
         />
       </header>

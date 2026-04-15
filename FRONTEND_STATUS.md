@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-This repo contains the separate demo-focused frontend for AI Knowledge Workspace. It provides a single-shell UI for the current Spring-owned product flow: workspace selection, asset upload, status polling, transcript retrieval, explicit indexing, search, and transcript-context follow-up. The frontend depends only on the Spring product API in Repo B and does not call Repo A directly.
+This repo contains the separate demo-focused frontend for AI Knowledge Workspace. It provides a single-shell UI for the current Spring-owned product flow: minimal current-user session entry, workspace selection, asset upload, status polling, transcript retrieval, explicit indexing, search, and transcript-context follow-up. The frontend depends only on the Spring product API in Repo B and does not call Repo A directly.
 
 ## 2. Current Stack
 
@@ -17,6 +17,7 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 ## 3. Implemented Demo Flow
 
 - Load workspaces from Spring and keep one visible workspace selected in the UI
+- Set the current user through a small top-bar control that calls Spring session entry and refreshes visible scope
 - Create a workspace from the top bar and switch the demo scope to it
 - Upload one media file into the selected workspace
 - List workspace-scoped assets and select one asset for inspection
@@ -38,6 +39,7 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 ## 4. Backend API Surface Used
 
 - `GET /api/workspaces`
+- `POST /api/auth/session`
 - `POST /api/workspaces`
 - `GET /api/assets`
 - `POST /api/assets/upload`
@@ -66,6 +68,7 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 - Dockerized local-dev startup has also been rechecked, with the Vite app serving on `http://localhost:5173`
 - Happy-path search and transcript-context follow-up were manually verified in the browser
 - Workspace switching and creation were manually verified
+- Current-user session entry now exists in the shell, but live multi-user verification still depends on a running Spring backend with ownership data
 - Processing -> transcript_ready -> searchable flow was manually verified
 - Failed asset flow was manually verified
 - Invalid or rejected upload flow was manually verified
@@ -73,7 +76,7 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 
 ## 7. Current Limitations / Intentionally Deferred
 
-- No auth or collaboration
+- No full auth platform, collaboration, or account-management UI
 - No chatbot/RAG or assistant behavior
 - No media player or timestamp seek UX
 - No transcript timestamps invented on the frontend

@@ -4,6 +4,10 @@ export type Workspace = {
   createdAt: string;
 };
 
+export type AuthSessionResponse = {
+  userId: string;
+};
+
 export type AssetStatus = 'PROCESSING' | 'TRANSCRIPT_READY' | 'SEARCHABLE' | 'FAILED';
 export type ProcessingJobStatus = 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED';
 
@@ -89,6 +93,10 @@ export type SearchResponse = {
 
 type CreateWorkspacePayload = {
   name: string;
+};
+
+type CreateAuthSessionPayload = {
+  userId: string;
 };
 
 export type UploadAssetInput = {
@@ -195,6 +203,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   try {
     response = await fetch(buildUrl(path), {
+      credentials: 'include',
       ...init,
       headers: {
         Accept: 'application/json',
@@ -220,6 +229,18 @@ export function isApiClientError(error: unknown): error is ApiClientError {
 
 export async function listWorkspaces(): Promise<Workspace[]> {
   return request<Workspace[]>('/api/workspaces');
+}
+
+export async function createAuthSession(userId: string): Promise<AuthSessionResponse> {
+  const payload: CreateAuthSessionPayload = { userId };
+
+  return request<AuthSessionResponse>('/api/auth/session', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function createWorkspace(name: string): Promise<Workspace> {

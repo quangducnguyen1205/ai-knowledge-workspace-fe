@@ -208,6 +208,13 @@ code {
   flex-wrap: wrap;
 }
 
+.workspace-bar__pills {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+
 .workspace-bar__cluster {
   display: flex;
   gap: 14px;
@@ -220,6 +227,14 @@ code {
 }
 
 .workspace-create {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+  flex: 1;
+  min-width: 280px;
+}
+
+.workspace-session {
   display: flex;
   gap: 12px;
   align-items: end;
@@ -886,8 +901,10 @@ code {
     padding: 18px;
   }
 
+  .workspace-session,
   .workspace-create,
   .workspace-bar__cluster,
+  .workspace-bar__pills,
   .search-form,
   .workspace-bar__top,
   .action-card,
