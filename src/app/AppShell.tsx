@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ApiClientError, type AssetStatus, type SearchResult } from '../lib/api';
+import { ApiClientError, type AssetStatus, type AssetSummary, type SearchResult } from '../lib/api';
 import { EmptyState, ErrorBanner, InfoBanner, LoadingBlock } from '../lib/ui';
 import {
   AssetsPanel,
@@ -8,6 +8,7 @@ import {
   assetKeys,
   deriveAssetStatus,
   isTerminalProcessing,
+  useDeleteAssetMutation,
   useAssetStatusQuery,
   useAssetTranscriptQuery,
   useAssetsQuery,
@@ -84,14 +85,25 @@ export function AppShell() {
   const assetsQuery = useAssetsQuery(selectedWorkspaceId);
   const uploadMutation = useUploadAssetMutation();
   const indexMutation = useIndexAssetMutation();
+  const deleteMutation = useDeleteAssetMutation();
 
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [preferredAssetId, setPreferredAssetId] = useState<string | null>(null);
+  const selectedAssetIdRef = useRef<string | null>(null);
+  const preferredAssetIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     setSelectedAssetId(null);
     setPreferredAssetId(null);
   }, [selectedWorkspaceId]);
+
+  useEffect(() => {
+    selectedAssetIdRef.current = selectedAssetId;
+  }, [selectedAssetId]);
+
+  useEffect(() => {
+    preferredAssetIdRef.current = preferredAssetId;
+  }, [preferredAssetId]);
 
   useEffect(() => {
     const assets = assetsQuery.data ?? [];
@@ -207,6 +219,11 @@ export function AppShell() {
   const [submittedSearch, setSubmittedSearch] = useState<string | null>(null);
   const [selectedSearchResult, setSelectedSearchResult] = useState<SearchResult | null>(null);
   const [searchResetToken, setSearchResetToken] = useState(0);
+  const selectedSearchResultRef = useRef<SearchResult | null>(null);
+
+  useEffect(() => {
+    selectedSearchResultRef.current = selectedSearchResult;
+  }, [selectedSearchResult]);
 
   useEffect(() => {
     setSubmittedSearch(null);
@@ -437,6 +454,70 @@ export function AppShell() {
     });
   }
 
+  function clearDeletedAssetState(assetId: string) {
+    if (selectedAssetIdRef.current === assetId) {
+      setSelectedAssetId(null);
+      setStatusPollingEnabled(false);
+      queryClient.removeQueries({ queryKey: assetKeys.status(assetId) });
+      queryClient.removeQueries({ queryKey: assetKeys.transcript(assetId) });
+    }
+
+    if (preferredAssetIdRef.current === assetId) {
+      setPreferredAssetId(null);
+    }
+
+    if (selectedSearchResultRef.current?.assetId === assetId) {
+      setSelectedSearchResult(null);
+    }
+
+    queryClient.removeQueries({ queryKey: ['search', 'context', assetId] });
+  }
+
+  function handleDeleteAsset(asset: AssetSummary) {
+    if (deleteMutation.isPending) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete "${asset.title}" from ${selectedWorkspace?.name ?? 'this workspace'}?\n\nThis removes the asset through Spring and refreshes the workspace list.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    deleteMutation.mutate(
+      {
+        assetId: asset.assetId,
+        workspaceId: asset.workspaceId,
+      },
+      {
+        onSuccess: async (_response, variables) => {
+          clearDeletedAssetState(variables.assetId);
+
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: assetKeys.list(variables.workspaceId) }),
+            queryClient.invalidateQueries({ queryKey: ['search', 'results', variables.workspaceId] }),
+          ]);
+        },
+        onError: async (error, variables) => {
+          if (error instanceof ApiClientError && error.status === 404) {
+            clearDeletedAssetState(variables.assetId);
+
+            await Promise.all([
+              queryClient.invalidateQueries({ queryKey: assetKeys.list(variables.workspaceId) }),
+              queryClient.invalidateQueries({ queryKey: ['search', 'results', variables.workspaceId] }),
+            ]);
+          }
+        },
+      },
+    );
+  }
+
+  const visibleDeleteError =
+    deleteMutation.error && deleteMutation.variables?.workspaceId === selectedWorkspaceId ? deleteMutation.error : null;
+  const deletingAssetId = deleteMutation.isPending ? deleteMutation.variables?.assetId ?? null : null;
+
   if (workspacesQuery.isLoading) {
     return (
       <div className="app-shell app-shell--centered">
@@ -515,11 +596,15 @@ export function AppShell() {
           assets={displayAssets}
           selectedAssetId={selectedAssetId}
           assetsError={assetsQuery.error}
+          deleteError={visibleDeleteError}
+          deleteBusy={deleteMutation.isPending}
+          deletingAssetId={deletingAssetId}
           assetsLoading={assetsQuery.isLoading}
           uploadError={uploadMutation.error}
           uploadSuccessId={uploadMutation.data?.assetId}
           isUploading={uploadMutation.isPending}
           onSelectAsset={setSelectedAssetId}
+          onDeleteAsset={handleDeleteAsset}
           onUpload={handleUpload}
         />
 

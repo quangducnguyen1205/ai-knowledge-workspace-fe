@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ApiClientError,
+  deleteAsset,
   getAssetStatus,
   getAssetTranscript,
   indexAssetTranscript,
@@ -32,6 +33,11 @@ type FriendlyMessageCopy = {
   title: string;
   message: string;
   detail?: string;
+};
+
+type DeleteAssetInput = {
+  assetId: string;
+  workspaceId: string;
 };
 
 type IndexActionState = {
@@ -106,6 +112,48 @@ function getFriendlyUploadErrorCopy(error: unknown): FriendlyMessageCopy | null 
   }
 
   return null;
+}
+
+function getFriendlyDeleteErrorCopy(error: unknown): (FriendlyMessageCopy & { tone: 'warning' | 'error' }) | null {
+  if (!isApiClientError(error)) {
+    return null;
+  }
+
+  if (error.status === 404) {
+    return {
+      tone: 'warning',
+      title: 'Asset already removed',
+      message: 'Spring says this asset no longer exists. The frontend will refresh the workspace list and clear any stale selected state that still points to it.',
+      detail: getTechnicalDetail(error),
+    };
+  }
+
+  if (
+    (error.status === 503 && error.code === 'ELASTICSEARCH_UNAVAILABLE') ||
+    (error.status === 502 && error.code === 'ELASTICSEARCH_INTEGRATION_ERROR')
+  ) {
+    return {
+      tone: 'error',
+      title: 'Delete could not finish',
+      message: 'Spring could not complete asset deletion because the search integration is unavailable right now. The asset stays visible until the backend confirms removal.',
+      detail: getTechnicalDetail(error),
+    };
+  }
+
+  if (error.status === 0) {
+    return {
+      tone: 'error',
+      title: 'Delete could not reach Spring',
+      message: 'The frontend could not contact the Spring backend, so this asset was not removed.',
+    };
+  }
+
+  return {
+    tone: 'error',
+    title: 'Delete failed',
+    message: 'Spring did not confirm asset deletion. The frontend will keep the current list until the backend says the asset is gone.',
+    detail: getTechnicalDetail(error),
+  };
 }
 
 function getTranscriptConflictCopy(
@@ -310,6 +358,12 @@ export function useUploadAssetMutation() {
   });
 }
 
+export function useDeleteAssetMutation() {
+  return useMutation({
+    mutationFn: ({ assetId }: DeleteAssetInput) => deleteAsset(assetId),
+  });
+}
+
 export function useAssetStatusQuery(assetId: string | null, pollingEnabled: boolean) {
   return useQuery({
     queryKey: assetId ? assetKeys.status(assetId) : ['assets', 'status', 'empty'],
@@ -350,28 +404,37 @@ export function AssetsPanel({
   assets,
   selectedAssetId,
   assetsError,
+  deleteError,
+  deleteBusy,
+  deletingAssetId,
   assetsLoading,
   uploadError,
   uploadSuccessId,
   isUploading,
   onSelectAsset,
+  onDeleteAsset,
   onUpload,
 }: {
   workspaceName: string;
   assets: AssetSummary[];
   selectedAssetId: string | null;
   assetsError: unknown;
+  deleteError: unknown;
+  deleteBusy: boolean;
+  deletingAssetId: string | null;
   assetsLoading: boolean;
   uploadError: unknown;
   uploadSuccessId?: string;
   isUploading: boolean;
   onSelectAsset: (assetId: string) => void;
+  onDeleteAsset: (asset: AssetSummary) => void;
   onUpload: (input: { file: File; title?: string }) => void;
 }) {
   const [title, setTitle] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const uploadErrorCopy = getFriendlyUploadErrorCopy(uploadError);
+  const deleteErrorCopy = getFriendlyDeleteErrorCopy(deleteError);
 
   useEffect(() => {
     if (uploadSuccessId) {
@@ -466,6 +529,22 @@ export function AssetsPanel({
 
         {assetsLoading ? <LoadingBlock label="Loading workspace assets..." compact /> : null}
         {!assetsLoading && assetsError ? <ErrorBanner error={assetsError} /> : null}
+        {!assetsLoading && !assetsError && deleteErrorCopy?.tone === 'warning' ? (
+          <InfoBanner
+            tone="warning"
+            title={deleteErrorCopy.title}
+            message={deleteErrorCopy.message}
+            detail={deleteErrorCopy.detail}
+          />
+        ) : null}
+        {!assetsLoading && !assetsError && deleteErrorCopy?.tone === 'error' ? (
+          <ErrorBanner
+            error={deleteError}
+            title={deleteErrorCopy.title}
+            message={deleteErrorCopy.message}
+            detail={deleteErrorCopy.detail}
+          />
+        ) : null}
 
         {!assetsLoading && !assetsError && assets.length === 0 ? (
           <EmptyState
@@ -478,9 +557,10 @@ export function AssetsPanel({
           <ul className="asset-list__items">
             {assets.map((asset) => {
               const isSelected = asset.assetId === selectedAssetId;
+              const isDeleting = deletingAssetId === asset.assetId;
 
               return (
-                <li key={asset.assetId}>
+                <li key={asset.assetId} className="asset-row">
                   <button
                     type="button"
                     className={`asset-card ${isSelected ? 'asset-card--selected' : ''}`}
@@ -496,6 +576,15 @@ export function AssetsPanel({
                     </div>
                     <p className="asset-card__summary">{getAssetStatusDescription(asset.assetStatus)}</p>
                   </button>
+                  <Button
+                    type="button"
+                    tone="ghost"
+                    className="asset-row__delete"
+                    onClick={() => onDeleteAsset(asset)}
+                    disabled={deleteBusy}
+                  >
+                    {isDeleting ? 'Deleting...' : 'Delete'}
+                  </Button>
                 </li>
               );
             })}

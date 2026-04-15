@@ -247,6 +247,12 @@ export async function uploadAsset(input: UploadAssetInput): Promise<AssetUploadR
   });
 }
 
+export async function deleteAsset(assetId: string): Promise<void> {
+  await request<void>(`/api/assets/${assetId}`, {
+    method: 'DELETE',
+  });
+}
+
 export async function getAssetStatus(assetId: string): Promise<AssetStatusResponse> {
   return request<AssetStatusResponse>(`/api/assets/${assetId}/status`);
 }
