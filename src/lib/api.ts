@@ -60,6 +60,15 @@ export type AssetIndexResponse = {
   indexedDocumentCount: number;
 };
 
+export type AssetRecordResponse = {
+  id: string;
+  title: string;
+  status: AssetStatus;
+  workspaceId: string;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
 export type SearchResult = {
   assetId: string;
   assetTitle: string;
@@ -86,6 +95,11 @@ export type UploadAssetInput = {
   workspaceId: string;
   file: File;
   title?: string;
+};
+
+export type UpdateAssetTitleInput = {
+  assetId: string;
+  title: string;
 };
 
 type ApiErrorPayload = {
@@ -250,6 +264,16 @@ export async function uploadAsset(input: UploadAssetInput): Promise<AssetUploadR
 export async function deleteAsset(assetId: string): Promise<void> {
   await request<void>(`/api/assets/${assetId}`, {
     method: 'DELETE',
+  });
+}
+
+export async function updateAssetTitle(input: UpdateAssetTitleInput): Promise<AssetRecordResponse> {
+  return request<AssetRecordResponse>(`/api/assets/${input.assetId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ title: input.title }),
   });
 }
 

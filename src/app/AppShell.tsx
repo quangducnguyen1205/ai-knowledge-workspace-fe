@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ApiClientError, type AssetStatus, type AssetSummary, type SearchResult } from '../lib/api';
+import { ApiClientError, type AssetStatus, type AssetSummary, type SearchResponse, type SearchResult } from '../lib/api';
 import { EmptyState, ErrorBanner, InfoBanner, LoadingBlock } from '../lib/ui';
 import {
   AssetsPanel,
@@ -9,6 +9,7 @@ import {
   deriveAssetStatus,
   isTerminalProcessing,
   useDeleteAssetMutation,
+  useRenameAssetMutation,
   useAssetStatusQuery,
   useAssetTranscriptQuery,
   useAssetsQuery,
@@ -86,6 +87,7 @@ export function AppShell() {
   const uploadMutation = useUploadAssetMutation();
   const indexMutation = useIndexAssetMutation();
   const deleteMutation = useDeleteAssetMutation();
+  const renameMutation = useRenameAssetMutation();
 
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [preferredAssetId, setPreferredAssetId] = useState<string | null>(null);
@@ -234,6 +236,12 @@ export function AppShell() {
   useEffect(() => {
     uploadMutation.reset();
   }, [selectedWorkspaceId, uploadMutation.reset]);
+
+  useEffect(() => {
+    if (!renameMutation.isPending) {
+      renameMutation.reset();
+    }
+  }, [renameMutation.isPending, renameMutation.reset, selectedAssetId]);
 
   const searchQuery = useSearchQuery(
     submittedSearch && selectedWorkspaceId ? { query: submittedSearch, workspaceId: selectedWorkspaceId } : null,
@@ -454,7 +462,27 @@ export function AppShell() {
     });
   }
 
-  function clearDeletedAssetState(assetId: string) {
+  function updateSearchResultTitles(assetId: string, title: string) {
+    queryClient.setQueriesData<SearchResponse>({ queryKey: ['search', 'results'] }, (current) => {
+      if (!current?.results?.length) {
+        return current;
+      }
+
+      let didChange = false;
+      const results = current.results.map((result) => {
+        if (result.assetId !== assetId || result.assetTitle === title) {
+          return result;
+        }
+
+        didChange = true;
+        return { ...result, assetTitle: title };
+      });
+
+      return didChange ? { ...current, results } : current;
+    });
+  }
+
+  function clearAssetDependentState(assetId: string) {
     if (selectedAssetIdRef.current === assetId) {
       setSelectedAssetId(null);
       setStatusPollingEnabled(false);
@@ -493,7 +521,7 @@ export function AppShell() {
       },
       {
         onSuccess: async (_response, variables) => {
-          clearDeletedAssetState(variables.assetId);
+          clearAssetDependentState(variables.assetId);
 
           await Promise.all([
             queryClient.invalidateQueries({ queryKey: assetKeys.list(variables.workspaceId) }),
@@ -502,7 +530,55 @@ export function AppShell() {
         },
         onError: async (error, variables) => {
           if (error instanceof ApiClientError && error.status === 404) {
-            clearDeletedAssetState(variables.assetId);
+            clearAssetDependentState(variables.assetId);
+
+            await Promise.all([
+              queryClient.invalidateQueries({ queryKey: assetKeys.list(variables.workspaceId) }),
+              queryClient.invalidateQueries({ queryKey: ['search', 'results', variables.workspaceId] }),
+            ]);
+          }
+        },
+      },
+    );
+  }
+
+  function handleRenameAsset(title: string) {
+    if (!selectedAsset) {
+      return;
+    }
+
+    renameMutation.mutate(
+      {
+        assetId: selectedAsset.assetId,
+        workspaceId: selectedAsset.workspaceId,
+        title,
+      },
+      {
+        onSuccess: (response, variables) => {
+          queryClient.setQueryData<AssetSummary[] | undefined>(assetKeys.list(variables.workspaceId), (current) =>
+            current?.map((asset) =>
+              asset.assetId === variables.assetId
+                ? {
+                    ...asset,
+                    title: response.title,
+                    assetStatus: response.status,
+                    workspaceId: response.workspaceId || asset.workspaceId,
+                    createdAt: response.createdAt ?? asset.createdAt,
+                  }
+                : asset,
+            ),
+          );
+
+          updateSearchResultTitles(variables.assetId, response.title);
+          setSelectedSearchResult((current) =>
+            current?.assetId === variables.assetId ? { ...current, assetTitle: response.title } : current,
+          );
+        },
+        onError: async (error, variables) => {
+          if (error instanceof ApiClientError && error.status === 404) {
+            if (selectedAssetIdRef.current === variables.assetId) {
+              clearAssetDependentState(variables.assetId);
+            }
 
             await Promise.all([
               queryClient.invalidateQueries({ queryKey: assetKeys.list(variables.workspaceId) }),
@@ -517,6 +593,10 @@ export function AppShell() {
   const visibleDeleteError =
     deleteMutation.error && deleteMutation.variables?.workspaceId === selectedWorkspaceId ? deleteMutation.error : null;
   const deletingAssetId = deleteMutation.isPending ? deleteMutation.variables?.assetId ?? null : null;
+  const visibleRenameError =
+    renameMutation.error && renameMutation.variables?.assetId === selectedAssetId ? renameMutation.error : null;
+  const isRenamingSelectedAsset =
+    renameMutation.isPending && renameMutation.variables?.assetId === selectedAssetId;
 
   if (workspacesQuery.isLoading) {
     return (
@@ -620,7 +700,11 @@ export function AppShell() {
           indexError={indexMutation.error}
           indexResponse={indexMutation.data?.assetId === selectedAssetId ? indexMutation.data : undefined}
           isIndexing={indexMutation.isPending}
+          isRenaming={Boolean(isRenamingSelectedAsset)}
+          renameError={visibleRenameError}
           onIndex={handleIndexAsset}
+          onRename={handleRenameAsset}
+          onResetRename={() => renameMutation.reset()}
         />
 
         <SearchPanel

@@ -20,6 +20,7 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 - Create a workspace from the top bar and switch the demo scope to it
 - Upload one media file into the selected workspace
 - List workspace-scoped assets and select one asset for inspection
+- Rename the currently selected asset title inline from the selected-asset panel
 - Delete one asset from the active workspace with a simple confirmation step
 - Poll product-side asset status until the processing job becomes terminal
 - Fetch transcript rows only when the asset is actually ready through Spring
@@ -40,6 +41,7 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 - `POST /api/workspaces`
 - `GET /api/assets`
 - `POST /api/assets/upload`
+- `PATCH /api/assets/{assetId}`
 - `DELETE /api/assets/{assetId}`
 - `GET /api/assets/{assetId}/status`
 - `GET /api/assets/{assetId}/transcript`
@@ -77,7 +79,7 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 - No transcript timestamps invented on the frontend
 - No routing beyond the current single-shell demo
 - No heavy design system or production-polished UI
-- No edit asset management
+- No broader edit asset management beyond the current selected-asset rename action
 - No bulk delete, undo, or archive flow
 - No advanced search filters beyond the current workspace-scoped query flow
 - Conflict and validation handling is still intentionally lightweight and frontend-only
@@ -86,6 +88,7 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 
 - Separate frontend repo is scaffolded and running as a Vite + React + TypeScript demo app
 - Current UI already covers workspace, upload, status, transcript, explicit indexing, search, and transcript context
+- The selected-asset panel now includes a minimal inline rename flow that keeps list and search titles in sync on success
 - Asset rows now include a minimal delete action that refreshes the workspace list and clears only dependent stale state
 - Selected asset lifecycle and next-step guidance are now clearer in the shell
 - Search/context state is more tightly synced to workspace, upload, indexing, and refreshed results

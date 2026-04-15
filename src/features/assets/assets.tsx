@@ -8,6 +8,7 @@ import {
   indexAssetTranscript,
   isApiClientError,
   listAssets,
+  updateAssetTitle,
   uploadAsset,
   type AssetIndexResponse,
   type AssetStatus,
@@ -15,6 +16,7 @@ import {
   type AssetSummary,
   type ProcessingJobStatus,
   type TranscriptRow,
+  type UpdateAssetTitleInput,
 } from '../../lib/api';
 import { Button, EmptyState, ErrorBanner, InfoBanner, LoadingBlock, Section, formatDateTime } from '../../lib/ui';
 
@@ -37,6 +39,10 @@ type FriendlyMessageCopy = {
 
 type DeleteAssetInput = {
   assetId: string;
+  workspaceId: string;
+};
+
+type RenameAssetInput = UpdateAssetTitleInput & {
   workspaceId: string;
 };
 
@@ -152,6 +158,57 @@ function getFriendlyDeleteErrorCopy(error: unknown): (FriendlyMessageCopy & { to
     tone: 'error',
     title: 'Delete failed',
     message: 'Spring did not confirm asset deletion. The frontend will keep the current list until the backend says the asset is gone.',
+    detail: getTechnicalDetail(error),
+  };
+}
+
+function getFriendlyRenameErrorCopy(error: unknown): (FriendlyMessageCopy & { tone: 'warning' | 'error' }) | null {
+  if (!isApiClientError(error)) {
+    return null;
+  }
+
+  if (error.status === 400 && error.code === 'INVALID_ASSET_TITLE') {
+    return {
+      tone: 'warning',
+      title: 'Title was rejected',
+      message: 'Use a non-empty title that fits within the current backend length limit, then try saving again.',
+      detail: getTechnicalDetail(error),
+    };
+  }
+
+  if (error.status === 404) {
+    return {
+      tone: 'warning',
+      title: 'Asset no longer exists',
+      message: 'Spring could not find this asset anymore. The frontend will refresh the workspace list and clear stale selected state if needed.',
+      detail: getTechnicalDetail(error),
+    };
+  }
+
+  if (
+    (error.status === 503 && error.code === 'ELASTICSEARCH_UNAVAILABLE') ||
+    (error.status === 502 && error.code === 'ELASTICSEARCH_INTEGRATION_ERROR')
+  ) {
+    return {
+      tone: 'error',
+      title: 'Rename could not finish',
+      message: 'Spring could not sync this title update right now, so the old title stays in place until the backend confirms the change.',
+      detail: getTechnicalDetail(error),
+    };
+  }
+
+  if (error.status === 0) {
+    return {
+      tone: 'error',
+      title: 'Rename could not reach Spring',
+      message: 'The frontend could not contact the Spring backend, so this title was not updated.',
+    };
+  }
+
+  return {
+    tone: 'error',
+    title: 'Rename failed',
+    message: 'Spring did not confirm the title update, so the old title is still being shown.',
     detail: getTechnicalDetail(error),
   };
 }
@@ -361,6 +418,12 @@ export function useUploadAssetMutation() {
 export function useDeleteAssetMutation() {
   return useMutation({
     mutationFn: ({ assetId }: DeleteAssetInput) => deleteAsset(assetId),
+  });
+}
+
+export function useRenameAssetMutation() {
+  return useMutation({
+    mutationFn: ({ assetId, title }: RenameAssetInput) => updateAssetTitle({ assetId, title }),
   });
 }
 
@@ -607,7 +670,11 @@ export function SelectedAssetPanel({
   indexError,
   indexResponse,
   isIndexing,
+  isRenaming,
+  renameError,
   onIndex,
+  onRename,
+  onResetRename,
 }: {
   asset: AssetSummary | null;
   workspaceName: string;
@@ -620,14 +687,21 @@ export function SelectedAssetPanel({
   indexError: unknown;
   indexResponse?: AssetIndexResponse;
   isIndexing: boolean;
+  isRenaming: boolean;
+  renameError: unknown;
   onIndex: () => void;
+  onRename: (title: string) => void;
+  onResetRename: () => void;
 }) {
   const transcriptRowCount = transcriptRows?.length ?? 0;
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [draftTitle, setDraftTitle] = useState('');
   const transcriptConflictCopy = getTranscriptConflictCopy(
     transcriptError,
     resolvedAssetStatus,
     statusResponse?.processingJobStatus,
   );
+  const renameErrorCopy = getFriendlyRenameErrorCopy(renameError);
   const indexActionState = getIndexActionState({
     resolvedAssetStatus,
     processingJobStatus: statusResponse?.processingJobStatus,
@@ -651,6 +725,17 @@ export function SelectedAssetPanel({
     [asset, resolvedAssetStatus, statusResponse?.processingJobStatus, transcriptRowCount, workspaceName],
   );
 
+  useEffect(() => {
+    if (!asset) {
+      setDraftTitle('');
+      setIsEditingTitle(false);
+      return;
+    }
+
+    setDraftTitle(asset.title);
+    setIsEditingTitle(false);
+  }, [asset?.assetId, asset?.title]);
+
   if (!asset) {
     return (
       <Section title="Selected Asset" eyebrow="Details">
@@ -663,11 +748,102 @@ export function SelectedAssetPanel({
   }
 
   return (
-    <Section
-      title={asset.title}
-      eyebrow={workspaceName}
-      actions={<StatusBadge status={resolvedAssetStatus} />}
-    >
+    <Section title="Selected Asset" eyebrow={workspaceName} actions={<StatusBadge status={resolvedAssetStatus} />}>
+      <div className="selected-asset-title">
+        <div className="selected-asset-title__copy">
+          <p className="panel__eyebrow">Current asset title</p>
+          {!isEditingTitle ? <h3>{asset.title}</h3> : null}
+          {!isEditingTitle ? (
+            <p className="selected-asset-title__hint">
+              Keep the title readable here so it also stays clear in the asset list and search results.
+            </p>
+          ) : null}
+        </div>
+
+        {!isEditingTitle ? (
+          <Button
+            type="button"
+            tone="ghost"
+            className="button--inline"
+            onClick={() => {
+              onResetRename();
+              setDraftTitle(asset.title);
+              setIsEditingTitle(true);
+            }}
+            disabled={isRenaming}
+          >
+            Rename
+          </Button>
+        ) : (
+          <form
+            className="selected-asset-title__form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const normalizedTitle = draftTitle.trim();
+
+              if (normalizedTitle === asset.title.trim()) {
+                onResetRename();
+                setDraftTitle(asset.title);
+                setIsEditingTitle(false);
+                return;
+              }
+
+              onRename(normalizedTitle);
+            }}
+          >
+            <input
+              className="field__input"
+              type="text"
+              value={draftTitle}
+              onChange={(event) => {
+                if (renameError) {
+                  onResetRename();
+                }
+                setDraftTitle(event.target.value);
+              }}
+              maxLength={255}
+              autoFocus
+              disabled={isRenaming}
+            />
+            <div className="selected-asset-title__actions">
+              <Button type="submit" className="button--inline" disabled={isRenaming}>
+                {isRenaming ? 'Saving...' : 'Save'}
+              </Button>
+              <Button
+                type="button"
+                tone="ghost"
+                className="button--inline"
+                onClick={() => {
+                  onResetRename();
+                  setDraftTitle(asset.title);
+                  setIsEditingTitle(false);
+                }}
+                disabled={isRenaming}
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        )}
+      </div>
+
+      {renameErrorCopy?.tone === 'warning' ? (
+        <InfoBanner
+          tone="warning"
+          title={renameErrorCopy.title}
+          message={renameErrorCopy.message}
+          detail={renameErrorCopy.detail}
+        />
+      ) : null}
+      {renameErrorCopy?.tone === 'error' ? (
+        <ErrorBanner
+          error={renameError}
+          title={renameErrorCopy.title}
+          message={renameErrorCopy.message}
+          detail={renameErrorCopy.detail}
+        />
+      ) : null}
+
       <div className="detail-grid">
         {statusPairs.map(([label, value]) => (
           <div key={label} className="detail-grid__item">
