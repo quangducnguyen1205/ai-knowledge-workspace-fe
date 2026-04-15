@@ -238,10 +238,10 @@ export function AppShell() {
   }, [selectedWorkspaceId, uploadMutation.reset]);
 
   useEffect(() => {
-    if (!renameMutation.isPending) {
+    if (!renameMutation.isPending && renameMutation.variables?.assetId !== selectedAssetId) {
       renameMutation.reset();
     }
-  }, [renameMutation.isPending, renameMutation.reset, selectedAssetId]);
+  }, [renameMutation.isPending, renameMutation.reset, renameMutation.variables?.assetId, selectedAssetId]);
 
   const searchQuery = useSearchQuery(
     submittedSearch && selectedWorkspaceId ? { query: submittedSearch, workspaceId: selectedWorkspaceId } : null,
