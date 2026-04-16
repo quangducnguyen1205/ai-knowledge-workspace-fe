@@ -139,7 +139,7 @@ export function AuthEntrySurface({
   const productHighlights = [
     {
       title: 'Upload source material',
-      description: 'Bring lectures, recordings, and documents into one workspace.',
+      description: 'Bring lecture videos into one workspace.',
     },
     {
       title: 'Review the transcript',
@@ -178,8 +178,8 @@ export function AuthEntrySurface({
             <p className="hero__eyebrow">AI Knowledge Workspace</p>
             <h1>Search-first workspaces for long-form knowledge.</h1>
             <p>
-              Upload a lecture, recording, or document, review the transcript, explicitly index it, and search the
-              exact passage you need inside the right workspace.
+              Upload a lecture video, review the transcript, explicitly index it, and search the exact passage you
+              need inside the right workspace.
             </p>
           </div>
 

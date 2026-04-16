@@ -20,7 +20,7 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 - Read the authenticated product user honestly through `GET /api/me`, then hand off into the existing shell
 - Present the post-auth shell with a compact app header plus live context cards for authenticated account, active workspace, selected asset, and search state
 - Create a workspace from the top bar and switch the demo scope to it
-- Upload one media file into the selected workspace
+- Upload one lecture video into the selected workspace
 - List workspace-scoped assets and select one asset for inspection
 - Rename the currently selected asset title inline from the selected-asset panel
 - Delete one asset from the active workspace with a simple confirmation step

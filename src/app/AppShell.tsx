@@ -860,7 +860,7 @@ export function AppShell() {
           <div className="workspace-empty__card">
             <EmptyState
               title="No workspace yet"
-              description="Create a workspace above to start uploading lectures, videos, or documents and prepare them for search."
+              description="Create a workspace above to start uploading lecture videos and prepare them for search."
             />
           </div>
           <div className="workspace-empty__grid">
@@ -872,7 +872,7 @@ export function AppShell() {
             <div className="workspace-empty__step">
               <span className="workspace-empty__step-label">Step 2</span>
               <strong>Upload an asset</strong>
-              <p>Add a lecture, recording, or document as the source material for transcript review.</p>
+              <p>Add a lecture video as the source material for transcript review.</p>
             </div>
             <div className="workspace-empty__step">
               <span className="workspace-empty__step-label">Step 3</span>

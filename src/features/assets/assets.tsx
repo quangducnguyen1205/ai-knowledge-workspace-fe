@@ -120,7 +120,19 @@ function getFriendlyUploadErrorCopy(error: unknown): FriendlyMessageCopy | null 
     return {
       title: 'Upload was rejected',
       message:
-        'This file could not be accepted for processing. Try a supported lecture, recording, or document file and confirm the active workspace is still valid.',
+        'This file could not be accepted for processing. Try a supported lecture video file and confirm the active workspace is still valid.',
+      detail: getTechnicalDetail(error),
+    };
+  }
+
+  if (
+    (error.status === 502 && error.code === 'FASTAPI_INTEGRATION_ERROR') ||
+    (error.status === 504 && error.code === 'FASTAPI_CONNECTIVITY_ERROR')
+  ) {
+    return {
+      title: 'Upload could not start processing',
+      message:
+        'The current processing path could not accept this file right now. Use a supported lecture video file and try again.',
       detail: getTechnicalDetail(error),
     };
   }
@@ -605,7 +617,7 @@ export function AssetsPanel({
       <div className="upload-card">
         <div className="upload-card__copy">
           <p className="panel__eyebrow">Add source material</p>
-          <h3>Upload a lecture, recording, or document</h3>
+          <h3>Upload a lecture video</h3>
           <p>Every uploaded asset moves through transcript review, explicit indexing, and focused workspace search.</p>
         </div>
 
@@ -629,9 +641,9 @@ export function AssetsPanel({
               className="field__input field__input--file"
               type="file"
               onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-              accept="video/*,audio/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,.pdf,.doc,.docx,.txt,.md"
+              accept="video/*,.mp4,.mov,.m4v,.webm,.avi"
             />
-            <span className="field__hint">Supported examples: video, audio, PDF, Word, plain text, and markdown files.</span>
+            <span className="field__hint">Use a lecture video file for the current product flow. MP4 works well for local smoke checks.</span>
           </label>
 
           <div className="upload-card__actions">
@@ -702,7 +714,7 @@ export function AssetsPanel({
         {!assetsLoading && !assetsError && assets.length === 0 ? (
           <EmptyState
             title="No assets yet"
-            description="Upload a lecture, video, or document to start transcript review and prepare this workspace for search."
+            description="Upload a lecture video to start transcript review and prepare this workspace for search."
           />
         ) : null}
 
