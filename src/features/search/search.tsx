@@ -96,27 +96,27 @@ export function SearchPanel({
   const hasSearchResults = Boolean(searchResponse?.results.length);
   const searchPromptState = !activeQuery
     ? {
-        title: 'Search inside the active workspace',
-        description: 'Run a query after at least one asset reaches SEARCHABLE. Results stay scoped to the workspace selected above.',
+        title: 'Search this workspace',
+        description: 'Run a query after at least one asset is indexed. Results stay scoped to the active workspace.',
       }
     : hasSearchResults
       ? {
           title: 'Choose a result to open context',
-          description: 'Click one enabled result card above to fetch the surrounding transcript rows for that hit.',
+          description: 'Choose a result to inspect the surrounding transcript rows for that hit.',
         }
       : {
           title: 'No transcript context selected yet',
-          description: 'Run a query that returns at least one result, then open a hit to inspect transcript context.',
+          description: 'Run a query with at least one hit, then open a result to inspect transcript context.',
       };
   const contextEmptyState = !activeQuery
     ? {
         title: 'Search first, then open context',
-        description: 'Run a workspace-scoped search to choose one result and fetch its transcript context window.',
+        description: 'Run a workspace search to choose one result and open its transcript context window.',
       }
     : hasSearchResults
       ? {
           title: 'Choose a result to open context',
-          description: 'Click one enabled result card above to fetch the surrounding transcript rows for that hit.',
+          description: 'Choose one enabled result card above to inspect the surrounding transcript rows for that hit.',
         }
       : {
           title: 'No transcript context available yet',
@@ -139,7 +139,15 @@ export function SearchPanel({
   }
 
   return (
-    <Section title="Search + Context" eyebrow={workspaceName}>
+    <Section
+      title="Workspace Search"
+      eyebrow={workspaceName}
+      actions={
+        <span className="panel-pill">
+          {searchableAssetCount} searchable {searchableAssetCount === 1 ? 'asset' : 'assets'}
+        </span>
+      }
+    >
       <form className="stack" onSubmit={handleSubmit}>
         <label className="field">
           <span className="field__label">Search transcript text</span>
@@ -151,7 +159,7 @@ export function SearchPanel({
               onChange={(event) => setSearchInput(event.target.value)}
               placeholder={
                 searchEnabled
-                  ? 'binary trees, paging, consensus, normalization...'
+                  ? 'consensus, paging, normalization, binary trees...'
                   : 'Index one asset in this workspace to enable search'
               }
               disabled={!searchEnabled}
@@ -165,7 +173,7 @@ export function SearchPanel({
 
       <InfoBanner
         title={`Search scope: ${workspaceName}`}
-        message="Only searchable assets inside the active workspace are considered by this search panel."
+        message="Only indexed assets inside the active workspace are considered by this search panel."
         detail={`${searchableAssetCount} searchable asset${searchableAssetCount === 1 ? '' : 's'} currently available.`}
       />
 
@@ -173,7 +181,7 @@ export function SearchPanel({
         <InfoBanner
           tone="warning"
           title="Search unlocks after indexing"
-          message="This workspace does not have any SEARCHABLE assets yet. Finish the transcript and explicit indexing steps first."
+          message="This workspace does not have any searchable assets yet. Finish transcript review and explicit indexing first."
         />
       ) : null}
 
@@ -190,12 +198,12 @@ export function SearchPanel({
         <EmptyState title={searchPromptState.title} description={searchPromptState.description} />
       )}
 
-      {isSearching ? <LoadingBlock label="Searching Spring-owned transcript rows..." /> : null}
+      {isSearching ? <LoadingBlock label="Searching transcript content..." /> : null}
 
       {!isSearching && activeQuery && !searchError && !searchResponse?.results.length ? (
         <EmptyState
           title="No matches in this workspace"
-          description="Try a different term after the asset reaches SEARCHABLE and indexing has completed."
+          description="Try a different phrase, broader topic, or another indexed asset in this workspace."
         />
       ) : null}
 
@@ -244,7 +252,7 @@ export function SearchPanel({
       <div className="context-panel">
         <div className="panel-block__header">
           <h3>Transcript context</h3>
-          <span className="context-panel__hint">Separate follow-up view, window = 2</span>
+          <span className="context-panel__hint">Context window: 2 rows around the hit</span>
         </div>
 
         {selectedResult ? (

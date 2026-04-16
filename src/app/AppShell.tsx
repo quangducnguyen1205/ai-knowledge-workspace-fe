@@ -332,21 +332,23 @@ export function AppShell() {
     const selectedAssetValue = selectedAsset ? selectedAsset.title : 'No asset selected';
     const selectedAssetDetail = selectedAsset
       ? `${resolvedAssetStatus ?? selectedAsset.assetStatus} in ${selectedWorkspace?.name ?? 'the active workspace'}`
-      : 'Choose one asset from the left panel to inspect transcript readiness and explicit indexing.';
-    const searchValue = submittedSearch ? submittedSearch : 'No active query';
+      : 'Choose an asset to review transcript readiness, indexing state, and transcript content.';
+    const searchValue = submittedSearch ? submittedSearch : searchableAssetCount > 0 ? 'Ready for search' : 'Search locked';
     const searchDetail = selectedSearchResult
       ? `Context open for ${selectedSearchResult.assetTitle} in the active workspace.`
       : submittedSearch
         ? `${searchQuery.data?.resultCount ?? 0} current result${searchQuery.data?.resultCount === 1 ? '' : 's'} inside ${
             selectedWorkspace?.name ?? 'the active workspace'
           }.`
-        : 'Run a workspace-scoped search after at least one asset becomes SEARCHABLE.';
+        : searchableAssetCount > 0
+          ? 'Search is available for indexed assets in the active workspace.'
+          : 'Index at least one transcript to unlock search.';
 
     return [
       {
-        label: 'Authenticated account',
+        label: 'Signed-in account',
         value: currentUser?.email ?? 'Unknown account',
-        detail: 'Driven by the current Spring-authenticated session via GET /api/me.',
+        detail: 'This session controls access to workspaces, assets, and search scope.',
       },
       {
         label: 'Active workspace',
@@ -354,12 +356,12 @@ export function AppShell() {
         detail: `${visibleWorkspaceCount} visible workspace${visibleWorkspaceCount === 1 ? '' : 's'} in this account.`,
       },
       {
-        label: 'Selected asset',
+        label: 'Focused asset',
         value: selectedAssetValue,
         detail: selectedAssetDetail,
       },
       {
-        label: 'Search + context',
+        label: 'Search state',
         value: searchValue,
         detail: searchDetail,
       },
@@ -372,6 +374,7 @@ export function AppShell() {
     selectedSearchResult,
     selectedWorkspace?.name,
     submittedSearch,
+    searchableAssetCount,
     workspacesQuery.data,
   ]);
 
@@ -579,7 +582,7 @@ export function AppShell() {
     }
 
     const confirmed = window.confirm(
-      `Delete "${asset.title}" from ${selectedWorkspace?.name ?? 'this workspace'}?\n\nThis removes the asset through Spring and refreshes the workspace list.`,
+      `Delete "${asset.title}" from ${selectedWorkspace?.name ?? 'this workspace'}?\n\nThis removes the asset and refreshes the workspace list.`,
     );
 
     if (!confirmed) {
@@ -716,44 +719,54 @@ export function AppShell() {
     );
   }
 
-  if (!selectedWorkspace) {
-    if (workspacesQuery.isFetching || workspaceScopeRefreshAfter !== null || (workspacesQuery.data?.length ?? 0) > 0) {
-      return (
-        <div className="app-shell app-shell--centered">
-          <LoadingBlock label="Refreshing visible workspace scope..." />
-        </div>
-      );
-    }
-
+  if (!selectedWorkspace && (workspacesQuery.isFetching || workspaceScopeRefreshAfter !== null || (workspacesQuery.data?.length ?? 0) > 0)) {
     return (
       <div className="app-shell app-shell--centered">
-        <EmptyState
-          title="No workspace scope yet"
-          description="Create a workspace to start the upload -> transcript -> index -> search demo."
-        />
+        <LoadingBlock label="Refreshing workspace scope..." />
       </div>
     );
   }
 
   return (
     <div className="app-shell">
-      <header className="app-header">
-        <div className="app-header__bar">
-          <div className="app-header__copy">
-            <p className="hero__eyebrow">AI Knowledge Workspace</p>
-            <h1>Lecture Search Workspace</h1>
-            <p>
-              A small authenticated workspace app for uploads, transcript review, explicit indexing, and scoped search.
-            </p>
+      <header className="shell-topbar">
+        <div className="shell-brand">
+          <div className="shell-brand__mark" aria-hidden="true">
+            AK
           </div>
-          <div className="app-header__chips">
-            <span className="app-chip">Search-first</span>
-            <span className="app-chip">Authenticated shell</span>
-            <span className="app-chip">Current scope: {selectedWorkspace.name}</span>
-            <span className="app-chip">
-              {searchableAssetCount} searchable asset{searchableAssetCount === 1 ? '' : 's'}
-            </span>
-            <span className="app-chip">Explicit indexing</span>
+          <div className="shell-brand__copy">
+            <p className="shell-brand__eyebrow">AI Knowledge Workspace</p>
+            <strong>Search-first transcript workspace</strong>
+          </div>
+        </div>
+
+        <div className="shell-topbar__actions">
+          <span className="shell-pill">Authenticated</span>
+          <span className="shell-pill">Search-first</span>
+          <div className="shell-user">
+            <span className="shell-user__label">Signed in</span>
+            <strong>{currentUser?.email ?? 'Unknown account'}</strong>
+          </div>
+        </div>
+      </header>
+
+      <section className={`workspace-overview ${!selectedWorkspace ? 'workspace-overview--empty' : ''}`}>
+        <div className="workspace-overview__copy">
+          <p className="hero__eyebrow">{selectedWorkspace ? 'Active workspace' : 'Workspace setup'}</p>
+          <h1>{selectedWorkspace ? selectedWorkspace.name : 'Create your first workspace'}</h1>
+          <p>
+            {selectedWorkspace
+              ? 'Upload source material, review the transcript, publish it to search, and open surrounding transcript context without leaving this workspace.'
+              : 'Start with a dedicated workspace so uploads, transcript review, explicit indexing, and search stay clearly scoped from the beginning.'}
+          </p>
+
+          <div className="workspace-overview__journey">
+            {['Upload', 'Process', 'Review transcript', 'Index', 'Search context'].map((step, index) => (
+              <div key={step} className="journey-step">
+                <span className="journey-step__index">{index + 1}</span>
+                <span>{step}</span>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -766,7 +779,9 @@ export function AppShell() {
             </div>
           ))}
         </div>
+      </section>
 
+      <header className="app-header">
         <WorkspaceBar
           workspaces={workspacesQuery.data ?? []}
           selectedWorkspace={selectedWorkspace}
@@ -783,62 +798,90 @@ export function AppShell() {
         />
       </header>
 
-      <main className="workspace-grid">
-        <AssetsPanel
-          workspaceName={selectedWorkspace.name}
-          assets={displayAssets}
-          selectedAssetId={selectedAssetId}
-          assetsError={assetsQuery.error}
-          deleteError={visibleDeleteError}
-          deleteBusy={deleteMutation.isPending}
-          deletingAssetId={deletingAssetId}
-          assetsLoading={assetsQuery.isLoading}
-          uploadError={uploadMutation.error}
-          uploadSuccessId={uploadMutation.data?.assetId}
-          isUploading={uploadMutation.isPending}
-          onSelectAsset={setSelectedAssetId}
-          onDeleteAsset={handleDeleteAsset}
-          onUpload={handleUpload}
-        />
+      {selectedWorkspace ? (
+        <main className="workspace-grid">
+          <AssetsPanel
+            workspaceName={selectedWorkspace.name}
+            assets={displayAssets}
+            selectedAssetId={selectedAssetId}
+            assetsError={assetsQuery.error}
+            deleteError={visibleDeleteError}
+            deleteBusy={deleteMutation.isPending}
+            deletingAssetId={deletingAssetId}
+            assetsLoading={assetsQuery.isLoading}
+            uploadError={uploadMutation.error}
+            uploadSuccessId={uploadMutation.data?.assetId}
+            isUploading={uploadMutation.isPending}
+            onSelectAsset={setSelectedAssetId}
+            onDeleteAsset={handleDeleteAsset}
+            onUpload={handleUpload}
+          />
 
-        <SelectedAssetPanel
-          asset={selectedAsset}
-          workspaceName={selectedWorkspace.name}
-          resolvedAssetStatus={resolvedAssetStatus}
-          statusResponse={assetStatusQuery.data}
-          statusError={assetStatusQuery.error}
-          transcriptRows={transcriptQuery.data}
-          transcriptError={transcriptQuery.error}
-          transcriptLoading={transcriptQuery.isLoading || transcriptQuery.isFetching}
-          indexError={indexMutation.error}
-          indexResponse={indexMutation.data?.assetId === selectedAssetId ? indexMutation.data : undefined}
-          isIndexing={indexMutation.isPending}
-          isRenaming={Boolean(isRenamingSelectedAsset)}
-          renameError={visibleRenameError}
-          onIndex={handleIndexAsset}
-          onRename={handleRenameAsset}
-          onResetRename={() => renameMutation.reset()}
-        />
+          <SelectedAssetPanel
+            asset={selectedAsset}
+            workspaceName={selectedWorkspace.name}
+            resolvedAssetStatus={resolvedAssetStatus}
+            statusResponse={assetStatusQuery.data}
+            statusError={assetStatusQuery.error}
+            transcriptRows={transcriptQuery.data}
+            transcriptError={transcriptQuery.error}
+            transcriptLoading={transcriptQuery.isLoading || transcriptQuery.isFetching}
+            indexError={indexMutation.error}
+            indexResponse={indexMutation.data?.assetId === selectedAssetId ? indexMutation.data : undefined}
+            isIndexing={indexMutation.isPending}
+            isRenaming={Boolean(isRenamingSelectedAsset)}
+            renameError={visibleRenameError}
+            onIndex={handleIndexAsset}
+            onRename={handleRenameAsset}
+            onResetRename={() => renameMutation.reset()}
+          />
 
-        <SearchPanel
-          workspaceName={selectedWorkspace.name}
-          searchableAssetCount={searchableAssetCount}
-          resetToken={searchResetToken}
-          activeQuery={submittedSearch}
-          searchResponse={searchQuery.data}
-          searchError={searchQuery.error}
-          isSearching={searchQuery.isLoading || searchQuery.isFetching}
-          contextResponse={contextQuery.data}
-          contextError={contextQuery.error}
-          isContextLoading={contextQuery.isLoading || contextQuery.isFetching}
-          selectedResult={selectedSearchResult}
-          onSearch={(query) => {
-            setSubmittedSearch(query);
-            setSelectedSearchResult(null);
-          }}
-          onSelectResult={setSelectedSearchResult}
-        />
-      </main>
+          <SearchPanel
+            workspaceName={selectedWorkspace.name}
+            searchableAssetCount={searchableAssetCount}
+            resetToken={searchResetToken}
+            activeQuery={submittedSearch}
+            searchResponse={searchQuery.data}
+            searchError={searchQuery.error}
+            isSearching={searchQuery.isLoading || searchQuery.isFetching}
+            contextResponse={contextQuery.data}
+            contextError={contextQuery.error}
+            isContextLoading={contextQuery.isLoading || contextQuery.isFetching}
+            selectedResult={selectedSearchResult}
+            onSearch={(query) => {
+              setSubmittedSearch(query);
+              setSelectedSearchResult(null);
+            }}
+            onSelectResult={setSelectedSearchResult}
+          />
+        </main>
+      ) : (
+        <main className="workspace-empty">
+          <div className="workspace-empty__card">
+            <EmptyState
+              title="No workspace yet"
+              description="Create a workspace above to start uploading lectures, videos, or documents and prepare them for search."
+            />
+          </div>
+          <div className="workspace-empty__grid">
+            <div className="workspace-empty__step">
+              <span className="workspace-empty__step-label">Step 1</span>
+              <strong>Create a focused workspace</strong>
+              <p>Name it around a course, topic, or project so search scope stays clear.</p>
+            </div>
+            <div className="workspace-empty__step">
+              <span className="workspace-empty__step-label">Step 2</span>
+              <strong>Upload an asset</strong>
+              <p>Add a lecture, recording, or document as the source material for transcript review.</p>
+            </div>
+            <div className="workspace-empty__step">
+              <span className="workspace-empty__step-label">Step 3</span>
+              <strong>Index when ready</strong>
+              <p>Explicit indexing keeps search intentional and makes the next action obvious for every asset.</p>
+            </div>
+          </div>
+        </main>
+      )}
     </div>
   );
 }

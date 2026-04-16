@@ -61,16 +61,24 @@ type AssetLifecycleState = {
   tone: 'info' | 'success' | 'warning';
 };
 
+type AssetLifecycleStepState = 'complete' | 'current' | 'upcoming' | 'failed';
+
+type AssetLifecycleStep = {
+  label: string;
+  description: string;
+  state: AssetLifecycleStepState;
+};
+
 function getAssetStatusDescription(status: AssetStatus | null): string {
   switch (status) {
     case 'PROCESSING':
-      return 'Upload accepted. Wait for transcript readiness before indexing.';
+      return 'Processing the source and preparing transcript content.';
     case 'TRANSCRIPT_READY':
-      return 'Transcript rows are available. Explicit indexing is the next step.';
+      return 'Transcript is ready for review. Index it to unlock workspace search.';
     case 'SEARCHABLE':
-      return 'Indexed successfully and eligible for workspace search.';
+      return 'Indexed and searchable inside this workspace.';
     case 'FAILED':
-      return 'Processing or transcript retrieval failed for this asset.';
+      return 'Processing failed for this asset.';
     default:
       return 'Asset state not available yet.';
   }
@@ -103,8 +111,8 @@ function getFriendlyUploadErrorCopy(error: unknown): FriendlyMessageCopy | null 
 
   if (error.status === 0) {
     return {
-      title: 'Upload could not reach Spring',
-      message: 'The frontend could not contact the Spring backend, so the upload never started.',
+      title: 'Upload is temporarily unavailable',
+      message: 'We could not reach the service, so the upload did not start.',
     };
   }
 
@@ -112,7 +120,7 @@ function getFriendlyUploadErrorCopy(error: unknown): FriendlyMessageCopy | null 
     return {
       title: 'Upload was rejected',
       message:
-        'Spring did not accept this file for processing. Try a supported audio or video file and confirm the selected workspace is still valid.',
+        'This file could not be accepted for processing. Try a supported lecture, recording, or document file and confirm the active workspace is still valid.',
       detail: getTechnicalDetail(error),
     };
   }
@@ -129,7 +137,7 @@ function getFriendlyDeleteErrorCopy(error: unknown): (FriendlyMessageCopy & { to
     return {
       tone: 'warning',
       title: 'Asset already removed',
-      message: 'Spring says this asset no longer exists. The frontend will refresh the workspace list and clear any stale selected state that still points to it.',
+      message: 'This asset no longer exists. The workspace list will refresh and clear any stale selection.',
       detail: getTechnicalDetail(error),
     };
   }
@@ -141,7 +149,7 @@ function getFriendlyDeleteErrorCopy(error: unknown): (FriendlyMessageCopy & { to
     return {
       tone: 'error',
       title: 'Delete could not finish',
-      message: 'Spring could not complete asset deletion because the search integration is unavailable right now. The asset stays visible until the backend confirms removal.',
+      message: 'The asset could not be removed because search infrastructure is unavailable right now. It will stay visible until deletion is confirmed.',
       detail: getTechnicalDetail(error),
     };
   }
@@ -149,15 +157,15 @@ function getFriendlyDeleteErrorCopy(error: unknown): (FriendlyMessageCopy & { to
   if (error.status === 0) {
     return {
       tone: 'error',
-      title: 'Delete could not reach Spring',
-      message: 'The frontend could not contact the Spring backend, so this asset was not removed.',
+      title: 'Delete is temporarily unavailable',
+      message: 'We could not reach the service, so this asset was not removed.',
     };
   }
 
   return {
     tone: 'error',
     title: 'Delete failed',
-    message: 'Spring did not confirm asset deletion. The frontend will keep the current list until the backend says the asset is gone.',
+    message: 'The asset was not removed. The current list stays in place until deletion is confirmed.',
     detail: getTechnicalDetail(error),
   };
 }
@@ -171,7 +179,7 @@ function getFriendlyRenameErrorCopy(error: unknown): (FriendlyMessageCopy & { to
     return {
       tone: 'warning',
       title: 'Title was rejected',
-      message: 'Use a non-empty title that fits within the current backend length limit, then try saving again.',
+      message: 'Use a clear non-empty title within the current length limit, then save again.',
       detail: getTechnicalDetail(error),
     };
   }
@@ -180,7 +188,7 @@ function getFriendlyRenameErrorCopy(error: unknown): (FriendlyMessageCopy & { to
     return {
       tone: 'warning',
       title: 'Asset no longer exists',
-      message: 'Spring could not find this asset anymore. The frontend will refresh the workspace list and clear stale selected state if needed.',
+      message: 'This asset could not be found anymore. The workspace list will refresh and clear stale selection if needed.',
       detail: getTechnicalDetail(error),
     };
   }
@@ -192,7 +200,7 @@ function getFriendlyRenameErrorCopy(error: unknown): (FriendlyMessageCopy & { to
     return {
       tone: 'error',
       title: 'Rename could not finish',
-      message: 'Spring could not sync this title update right now, so the old title stays in place until the backend confirms the change.',
+      message: 'The title could not be updated right now, so the previous title stays in place until the change is confirmed.',
       detail: getTechnicalDetail(error),
     };
   }
@@ -200,15 +208,15 @@ function getFriendlyRenameErrorCopy(error: unknown): (FriendlyMessageCopy & { to
   if (error.status === 0) {
     return {
       tone: 'error',
-      title: 'Rename could not reach Spring',
-      message: 'The frontend could not contact the Spring backend, so this title was not updated.',
+      title: 'Rename is temporarily unavailable',
+      message: 'We could not reach the service, so this title was not updated.',
     };
   }
 
   return {
     tone: 'error',
     title: 'Rename failed',
-    message: 'Spring did not confirm the title update, so the old title is still being shown.',
+    message: 'The title update was not confirmed, so the previous title is still shown.',
     detail: getTechnicalDetail(error),
   };
 }
@@ -225,23 +233,23 @@ function getTranscriptConflictCopy(
   if (resolvedAssetStatus === 'FAILED' || processingJobStatus === 'FAILED') {
     return {
       title: 'Transcript is unavailable for this asset',
-      message: 'Spring marked processing as failed, so there are no transcript rows available to inspect or index.',
+      message: 'Processing failed, so there are no transcript rows available to review or index.',
       detail: getTechnicalDetail(error),
     };
   }
 
   if (processingJobStatus === 'SUCCEEDED' || resolvedAssetStatus === 'TRANSCRIPT_READY') {
     return {
-      title: 'Transcript rows are still unavailable',
+      title: 'Transcript is still being prepared',
       message:
-        'The processing job finished, but Spring has not returned transcript rows for this asset yet. Indexing stays disabled until rows exist.',
+        'Processing finished, but transcript rows are not available yet. Indexing stays disabled until the transcript is ready.',
       detail: getTechnicalDetail(error),
     };
   }
 
   return {
     title: 'Transcript is still being prepared',
-    message: 'Spring has not exposed transcript rows for this asset yet. Wait for processing to finish before indexing.',
+    message: 'Transcript rows are not available yet. Wait for processing to finish before indexing.',
     detail: getTechnicalDetail(error),
   };
 }
@@ -258,7 +266,7 @@ function getIndexActionState(input: {
     return {
       title: 'Rebuild search documents',
       description:
-        'This asset is already searchable. Re-index only if you want Spring search documents refreshed from the current transcript rows.',
+        'This asset is already searchable. Re-index only if you want search documents refreshed from the current transcript.',
       buttonLabel: 'Re-index transcript',
       buttonTone: 'secondary',
       canIndex: true,
@@ -268,7 +276,7 @@ function getIndexActionState(input: {
   if (transcriptRowCount > 0) {
     return {
       title: 'Make this asset searchable',
-      description: `${transcriptRowCount} transcript row${transcriptRowCount === 1 ? '' : 's'} loaded. Run the explicit indexing step to publish this asset into workspace search.`,
+      description: `${transcriptRowCount} transcript row${transcriptRowCount === 1 ? '' : 's'} loaded. Publish this transcript to workspace search when you are ready.`,
       buttonLabel: 'Index transcript',
       buttonTone: 'primary',
       canIndex: true,
@@ -278,7 +286,7 @@ function getIndexActionState(input: {
   if (input.resolvedAssetStatus === 'FAILED' || input.processingJobStatus === 'FAILED') {
     return {
       title: 'Indexing unavailable',
-      description: 'Processing failed for this asset, so Spring has no transcript rows available to index.',
+      description: 'Processing failed for this asset, so there is no transcript available to index.',
       buttonLabel: 'Indexing unavailable',
       buttonTone: 'ghost',
       canIndex: false,
@@ -288,7 +296,7 @@ function getIndexActionState(input: {
   if (input.resolvedAssetStatus === 'PROCESSING' || !isTerminalProcessing(input.processingJobStatus)) {
     return {
       title: 'Indexing unavailable',
-      description: 'Wait for Spring to finish processing and expose transcript rows before indexing becomes a valid action.',
+      description: 'Wait for processing to finish and the transcript to load before indexing becomes available.',
       buttonLabel: 'Waiting for transcript',
       buttonTone: 'ghost',
       canIndex: false,
@@ -298,7 +306,7 @@ function getIndexActionState(input: {
   if (isApiClientError(input.transcriptError) && input.transcriptError.status === 409) {
     return {
       title: 'Indexing unavailable',
-      description: 'Spring did not return transcript rows for this asset, so indexing stays disabled for now.',
+      description: 'Transcript rows are still unavailable for this asset, so indexing stays disabled for now.',
       buttonLabel: 'Transcript unavailable',
       buttonTone: 'ghost',
       canIndex: false,
@@ -307,7 +315,7 @@ function getIndexActionState(input: {
 
   return {
     title: 'Indexing unavailable',
-    description: 'Transcript rows must be available before this frontend can call the explicit index action.',
+    description: 'Transcript rows must be available before indexing can begin.',
     buttonLabel: 'Indexing unavailable',
     buttonTone: 'ghost',
     canIndex: false,
@@ -325,8 +333,8 @@ function getAssetLifecycleState(input: {
   if (input.resolvedAssetStatus === 'SEARCHABLE') {
     return {
       step: 'Searchable',
-      summary: 'This asset has completed the current lifecycle and can participate in workspace-scoped search.',
-      nextAction: 'Use the search panel on the right to run a query and open one hit in transcript context.',
+      summary: 'This asset is indexed and can now participate in workspace search.',
+      nextAction: 'Run a search and open transcript context around the most relevant hit.',
       tone: 'success',
     };
   }
@@ -334,8 +342,8 @@ function getAssetLifecycleState(input: {
   if (transcriptRowCount > 0) {
     return {
       step: 'Ready to index',
-      summary: `${transcriptRowCount} transcript row${transcriptRowCount === 1 ? '' : 's'} loaded for the selected asset.`,
-      nextAction: 'Run the explicit indexing action below to make this asset searchable.',
+      summary: `${transcriptRowCount} transcript row${transcriptRowCount === 1 ? '' : 's'} loaded for this asset.`,
+      nextAction: 'Review the transcript, then run the explicit indexing action to unlock search.',
       tone: 'warning',
     };
   }
@@ -343,7 +351,7 @@ function getAssetLifecycleState(input: {
   if (input.resolvedAssetStatus === 'FAILED' || input.processingJobStatus === 'FAILED') {
     return {
       step: 'Failed',
-      summary: 'This asset cannot continue through the current demo path because backend processing failed.',
+      summary: 'This asset cannot continue because processing failed.',
       nextAction: 'Select another asset in the workspace or upload a new file.',
       tone: 'warning',
     };
@@ -352,7 +360,7 @@ function getAssetLifecycleState(input: {
   if (isApiClientError(input.transcriptError) && input.transcriptError.status === 409) {
     return {
       step: 'Transcript pending',
-      summary: 'Processing finished, but transcript rows are still unavailable through Spring.',
+      summary: 'Processing finished, but transcript rows are still unavailable.',
       nextAction: 'Stay on this asset until transcript rows appear. Indexing remains unavailable for now.',
       tone: 'warning',
     };
@@ -361,18 +369,84 @@ function getAssetLifecycleState(input: {
   if (input.resolvedAssetStatus === 'PROCESSING' || !isTerminalProcessing(input.processingJobStatus)) {
     return {
       step: 'Processing',
-      summary: 'Spring is still processing this asset, so the transcript and indexing steps are not ready yet.',
-      nextAction: 'Wait for processing to finish, then review transcript readiness in this panel.',
+      summary: 'This asset is still being processed, so transcript review and indexing are not ready yet.',
+      nextAction: 'Keep this asset selected to watch for transcript readiness and the next action.',
       tone: 'warning',
     };
   }
 
   return {
     step: 'Uploaded',
-    summary: 'The asset is selected and waiting for the next backend readiness signal.',
+    summary: 'The asset is selected and waiting for its first processing update.',
     nextAction: 'Keep the asset selected so status, transcript, and indexing state stay in sync.',
     tone: 'info',
   };
+}
+
+function getLifecycleSteps(input: {
+  resolvedAssetStatus: AssetStatus | null;
+  processingJobStatus?: ProcessingJobStatus;
+  transcriptRows?: TranscriptRow[];
+  transcriptError: unknown;
+}): AssetLifecycleStep[] {
+  const transcriptRowCount = input.transcriptRows?.length ?? 0;
+  const processingFailed = input.resolvedAssetStatus === 'FAILED' || input.processingJobStatus === 'FAILED';
+  const processingComplete =
+    !processingFailed &&
+    (isTerminalProcessing(input.processingJobStatus) ||
+      input.resolvedAssetStatus === 'TRANSCRIPT_READY' ||
+      input.resolvedAssetStatus === 'SEARCHABLE' ||
+      transcriptRowCount > 0);
+  const transcriptReady =
+    transcriptRowCount > 0 || input.resolvedAssetStatus === 'TRANSCRIPT_READY' || input.resolvedAssetStatus === 'SEARCHABLE';
+  const transcriptPending =
+    !processingFailed &&
+    !transcriptReady &&
+    ((isApiClientError(input.transcriptError) && input.transcriptError.status === 409) ||
+      input.processingJobStatus === 'SUCCEEDED');
+
+  return [
+    {
+      label: 'Uploaded',
+      description: 'Asset saved to the workspace.',
+      state: 'complete',
+    },
+    {
+      label: 'Processing',
+      description: processingFailed
+        ? 'Processing failed.'
+        : processingComplete
+          ? 'Processing finished.'
+          : 'Preparing transcript content.',
+      state: processingFailed ? 'failed' : processingComplete ? 'complete' : 'current',
+    },
+    {
+      label: 'Transcript',
+      description: transcriptReady
+        ? `${transcriptRowCount || 1} row${transcriptRowCount === 1 ? '' : 's'} ready.`
+        : transcriptPending
+          ? 'Waiting for transcript rows.'
+          : 'Transcript not ready yet.',
+      state: processingFailed ? 'upcoming' : transcriptReady ? 'complete' : transcriptPending ? 'current' : 'upcoming',
+    },
+    {
+      label: 'Search',
+      description:
+        input.resolvedAssetStatus === 'SEARCHABLE'
+          ? 'Indexed and searchable.'
+          : transcriptReady
+            ? 'Ready to index.'
+            : 'Search is locked.',
+      state:
+        input.resolvedAssetStatus === 'SEARCHABLE'
+          ? 'complete'
+          : processingFailed
+            ? 'upcoming'
+            : transcriptReady
+              ? 'current'
+              : 'upcoming',
+    },
+  ];
 }
 
 export function deriveAssetStatus(
@@ -523,63 +597,79 @@ export function AssetsPanel({
   }
 
   return (
-    <Section title="Assets" eyebrow={workspaceName}>
-      <form className="stack" onSubmit={handleSubmit}>
-        <label className="field">
-          <span className="field__label">Optional title</span>
-          <input
-            className="field__input"
-            type="text"
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            placeholder="Leave blank to use the filename"
-            maxLength={255}
-          />
-        </label>
+    <Section
+      title="Asset Library"
+      eyebrow={workspaceName}
+      actions={<span className="panel-pill">{assets.length} {assets.length === 1 ? 'asset' : 'assets'}</span>}
+    >
+      <div className="upload-card">
+        <div className="upload-card__copy">
+          <p className="panel__eyebrow">Add source material</p>
+          <h3>Upload a lecture, recording, or document</h3>
+          <p>Every uploaded asset moves through transcript review, explicit indexing, and focused workspace search.</p>
+        </div>
 
-        <label className="field">
-          <span className="field__label">Media file</span>
-          <input
-            ref={fileInputRef}
-            className="field__input field__input--file"
-            type="file"
-            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-            accept="video/*,audio/*"
-          />
-        </label>
+        <form className="stack" onSubmit={handleSubmit}>
+          <label className="field">
+            <span className="field__label">Asset title</span>
+            <input
+              className="field__input"
+              type="text"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder="Leave blank to use the filename"
+              maxLength={255}
+            />
+          </label>
 
-        <Button type="submit" disabled={isUploading || !file}>
-          {isUploading ? `Uploading to ${workspaceName}...` : 'Upload into workspace'}
-        </Button>
+          <label className="field">
+            <span className="field__label">Source file</span>
+            <input
+              ref={fileInputRef}
+              className="field__input field__input--file"
+              type="file"
+              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+              accept="video/*,audio/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,.pdf,.doc,.docx,.txt,.md"
+            />
+            <span className="field__hint">Supported examples: video, audio, PDF, Word, plain text, and markdown files.</span>
+          </label>
 
-        {file ? (
-          <div className="selected-file">
-            <strong>Selected file</strong>
-            <span>{file.name}</span>
+          <div className="upload-card__actions">
+            <Button type="submit" disabled={isUploading || !file}>
+              {isUploading ? `Uploading to ${workspaceName}...` : 'Upload to workspace'}
+            </Button>
+            <span className="upload-card__hint">Uploaded assets appear in the library first, then move through processing.</span>
           </div>
-        ) : null}
 
-        {isUploading ? (
-          <InfoBanner
-            title="Uploading asset"
-            message={`Sending the selected file into ${workspaceName}. The asset should appear here first, then status polling continues.`}
-          />
-        ) : null}
+          {file ? (
+            <div className="selected-file">
+              <strong>Selected file</strong>
+              <span>{file.name}</span>
+            </div>
+          ) : null}
 
-        {uploadError ? (
-          <ErrorBanner
-            error={uploadError}
-            title={uploadErrorCopy?.title}
-            message={uploadErrorCopy?.message}
-            detail={uploadErrorCopy?.detail}
-          />
-        ) : null}
-      </form>
+          {isUploading ? (
+            <InfoBanner
+              title="Upload in progress"
+              message={`Adding the selected file to ${workspaceName}. It will appear in the library and continue processing in place.`}
+            />
+          ) : null}
+
+          {uploadError ? (
+            <ErrorBanner
+              error={uploadError}
+              title={uploadErrorCopy?.title}
+              message={uploadErrorCopy?.message}
+              detail={uploadErrorCopy?.detail}
+            />
+          ) : null}
+        </form>
+      </div>
 
       <div className="asset-list">
         <div className="asset-list__meta">
           <strong>{assets.length}</strong>
-          <span>{assets.length === 1 ? 'asset in active workspace' : 'assets in active workspace'}</span>
+          <span>{assets.length === 1 ? 'asset in this workspace' : 'assets in this workspace'}</span>
         </div>
 
         <div className="status-legend">
@@ -612,7 +702,7 @@ export function AssetsPanel({
         {!assetsLoading && !assetsError && assets.length === 0 ? (
           <EmptyState
             title="No assets yet"
-            description="Upload one lecture or recording into this workspace to start processing, transcript review, and search preparation."
+            description="Upload a lecture, video, or document to start transcript review and prepare this workspace for search."
           />
         ) : null}
 
@@ -714,6 +804,12 @@ export function SelectedAssetPanel({
     transcriptRows,
     transcriptError,
   });
+  const lifecycleSteps = getLifecycleSteps({
+    resolvedAssetStatus,
+    processingJobStatus: statusResponse?.processingJobStatus,
+    transcriptRows,
+    transcriptError,
+  });
   const statusPairs = useMemo(
     () => [
       ['Workspace', workspaceName],
@@ -738,24 +834,24 @@ export function SelectedAssetPanel({
 
   if (!asset) {
     return (
-      <Section title="Selected Asset" eyebrow="Details">
+      <Section title="Transcript Review" eyebrow="Asset details">
         <EmptyState
           title="Pick an asset"
-          description="Choose an uploaded item from the left panel to inspect status, transcript rows, and indexing."
+          description="Choose an uploaded asset to review status, read the transcript, and control when it becomes searchable."
         />
       </Section>
     );
   }
 
   return (
-    <Section title="Selected Asset" eyebrow={workspaceName} actions={<StatusBadge status={resolvedAssetStatus} />}>
+    <Section title="Transcript Review" eyebrow={workspaceName} actions={<StatusBadge status={resolvedAssetStatus} />}>
       <div className="selected-asset-title">
         <div className="selected-asset-title__copy">
-          <p className="panel__eyebrow">Current asset title</p>
+          <p className="panel__eyebrow">Selected asset</p>
           {!isEditingTitle ? <h3>{asset.title}</h3> : null}
           {!isEditingTitle ? (
             <p className="selected-asset-title__hint">
-              Keep the title readable here so it also stays clear in the asset list and search results.
+              Keep the title clear here so it stays readable in the library and search results.
             </p>
           ) : null}
         </div>
@@ -853,6 +949,18 @@ export function SelectedAssetPanel({
         ))}
       </div>
 
+      <div className="lifecycle-rail">
+        {lifecycleSteps.map((step, index) => (
+          <div key={step.label} className={`lifecycle-step lifecycle-step--${step.state}`}>
+            <span className="lifecycle-step__index">{index + 1}</span>
+            <div className="lifecycle-step__copy">
+              <strong>{step.label}</strong>
+              <p>{step.description}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
       {statusError ? <ErrorBanner error={statusError} /> : null}
 
       {!statusError ? (
@@ -884,13 +992,13 @@ export function SelectedAssetPanel({
         {isIndexing ? (
           <InfoBanner
             title="Indexing transcript"
-            message="Writing transcript rows through the Spring index endpoint so this asset can participate in workspace search."
+            message="Publishing transcript rows to workspace search so this asset becomes discoverable."
           />
         ) : null}
 
         <div className="panel-block__header">
           <h3>Transcript</h3>
-          <span className="context-panel__hint">Transcript rows are shown only when Spring says they are ready</span>
+          <span className="context-panel__hint">Transcript rows appear here as soon as they are ready</span>
         </div>
 
         {transcriptLoading ? <LoadingBlock label="Loading transcript rows..." /> : null}
@@ -906,7 +1014,7 @@ export function SelectedAssetPanel({
         {!transcriptLoading && !transcriptError && !transcriptRows?.length ? (
           <EmptyState
             title="Transcript not loaded yet"
-            description="Once the selected asset reaches terminal success, the frontend will fetch transcript rows through Spring."
+            description="Keep this asset selected. Transcript rows will appear here as soon as processing completes successfully."
           />
         ) : null}
 

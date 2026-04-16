@@ -1,12 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  backendDisplayUrl,
-  createWorkspace,
-  listWorkspaces,
-  usingProxy,
-  type Workspace,
-} from '../../lib/api';
+import { createWorkspace, listWorkspaces, type Workspace } from '../../lib/api';
 import { Button, ErrorBanner } from '../../lib/ui';
 import { getFriendlyLogoutErrorCopy } from '../auth/auth';
 
@@ -86,18 +80,20 @@ export function WorkspaceBar({
       <div className="workspace-bar__top">
         <div className={`workspace-bar__intro ${isLoading ? 'workspace-bar__intro--busy' : ''}`}>
           <div>
-            <span className="workspace-focus__eyebrow">Workspace controls</span>
-            <strong className="workspace-focus__title">Keep the active scope in sync</strong>
+            <span className="workspace-focus__eyebrow">Workspace shell</span>
+            <strong className="workspace-focus__title">
+              {selectedWorkspace ? selectedWorkspace.name : 'Create your first workspace'}
+            </strong>
           </div>
           <p className="workspace-bar__intro-copy">
-            Change workspace, create another owned workspace, or sign out without leaving the current search shell.
+            Keep uploads, transcript review, indexing, and search scoped to one workspace at a time.
           </p>
         </div>
 
         <div className="workspace-bar__pills">
           <div className="pill">
-            <span className="pill__label">Backend</span>
-            <span className="pill__value">{usingProxy ? `proxy -> ${backendDisplayUrl}` : backendDisplayUrl}</span>
+            <span className="pill__label">Visible workspaces</span>
+            <span className="pill__value">{workspaces.length}</span>
           </div>
 
           <Button type="button" tone="ghost" onClick={onLogout} disabled={isLoggingOut}>
@@ -124,8 +120,8 @@ export function WorkspaceBar({
           </select>
           <span className="field__hint">
             {selectedWorkspace
-              ? `Currently in ${selectedWorkspace.name}. Changing scope updates assets and search in place.`
-              : 'Changing workspace updates assets and search in place for the active session.'}
+              ? `Currently viewing ${selectedWorkspace.name}. Switching workspace updates assets, transcript state, and search in place.`
+              : 'Choose a workspace after you create one to start uploading and searching content.'}
           </span>
         </label>
 
@@ -140,10 +136,10 @@ export function WorkspaceBar({
               placeholder="Algorithms, Databases, Distributed Systems..."
               maxLength={255}
             />
-            <span className="field__hint">Create another owned scope for uploads, indexing, and search.</span>
+            <span className="field__hint">Use focused workspace names that make future search scope obvious.</span>
           </label>
           <Button type="submit" tone="secondary" disabled={isCreating || !workspaceName.trim()}>
-            {isCreating ? 'Creating...' : 'Add workspace'}
+            {isCreating ? 'Creating...' : 'Create workspace'}
           </Button>
         </form>
       </div>
