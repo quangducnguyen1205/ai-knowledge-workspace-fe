@@ -1,25 +1,26 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  ApiClientError,
   backendDisplayUrl,
-  createAuthSession,
   createWorkspace,
   listWorkspaces,
   usingProxy,
+  type AuthenticatedUser,
   type Workspace,
 } from '../../lib/api';
 import { Button, ErrorBanner, formatDateTime } from '../../lib/ui';
+import { getFriendlyLogoutErrorCopy } from '../auth/auth';
 
 export const workspaceKeys = {
   all: ['workspaces'] as const,
 };
 
-export function useWorkspacesQuery() {
+export function useWorkspacesQuery(enabled = true) {
   return useQuery({
     queryKey: workspaceKeys.all,
     queryFn: listWorkspaces,
     staleTime: 60_000,
+    enabled,
   });
 }
 
@@ -34,93 +35,45 @@ export function useCreateWorkspaceMutation() {
   });
 }
 
-export function useAuthSessionMutation() {
-  return useMutation({
-    mutationFn: createAuthSession,
-  });
-}
-
-type FriendlySessionErrorCopy = {
-  title: string;
-  message: string;
-  detail?: string;
-};
-
-function getFriendlySessionErrorCopy(error: unknown): FriendlySessionErrorCopy | null {
-  if (!(error instanceof ApiClientError)) {
-    return null;
-  }
-
-  if (error.status === 400 && error.code === 'INVALID_CURRENT_USER_ID') {
-    return {
-      title: 'Current user was rejected',
-      message: 'Use a non-empty current user ID that fits within the backend length limit, then try switching again.',
-      detail: `Backend detail: ${error.code}`,
-    };
-  }
-
-  if (error.status === 0) {
-    return {
-      title: 'Current user could not reach Spring',
-      message: 'The frontend could not contact the Spring backend, so the visible workspace scope did not change.',
-    };
-  }
-
-  return {
-    title: 'Current user update failed',
-    message: 'Spring did not confirm the current user switch, so the existing visible scope stays in place.',
-    detail: error.code ? `Backend detail: ${error.code} - ${error.message}` : `Backend detail: ${error.message}`,
-  };
-}
-
 export function WorkspaceBar({
   workspaces,
   selectedWorkspace,
   selectedWorkspaceId,
   isLoading,
-  activeUserId,
-  pendingUserId,
-  sessionError,
-  sessionSuccessUserId,
+  searchableAssetCount,
+  currentUser,
   createError,
+  logoutError,
   createSuccessId,
   onSelectWorkspace,
-  onSetCurrentUser,
   onCreateWorkspace,
-  isSettingCurrentUser,
   isCreating,
+  onLogout,
+  isLoggingOut,
 }: {
   workspaces: Workspace[];
   selectedWorkspace: Workspace | null;
   selectedWorkspaceId: string | null;
   isLoading: boolean;
-  activeUserId: string | null;
-  pendingUserId: string | null;
-  sessionError: unknown;
-  sessionSuccessUserId?: string;
+  searchableAssetCount: number;
+  currentUser: AuthenticatedUser;
   createError: unknown;
+  logoutError: unknown;
   createSuccessId?: string;
   onSelectWorkspace: (workspaceId: string) => void;
-  onSetCurrentUser: (userId: string) => void;
   onCreateWorkspace: (name: string) => void;
-  isSettingCurrentUser: boolean;
   isCreating: boolean;
+  onLogout: () => void;
+  isLoggingOut: boolean;
 }) {
   const [workspaceName, setWorkspaceName] = useState('');
-  const [userId, setUserId] = useState('');
-  const sessionErrorCopy = getFriendlySessionErrorCopy(sessionError);
+  const logoutErrorCopy = getFriendlyLogoutErrorCopy(logoutError);
 
   useEffect(() => {
     if (createSuccessId) {
       setWorkspaceName('');
     }
   }, [createSuccessId]);
-
-  useEffect(() => {
-    if (sessionSuccessUserId) {
-      setUserId(sessionSuccessUserId);
-    }
-  }, [sessionSuccessUserId]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -133,76 +86,66 @@ export function WorkspaceBar({
     onCreateWorkspace(trimmedName);
   }
 
-  function handleSessionSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const trimmedUserId = userId.trim();
-
-    if (!trimmedUserId) {
-      return;
-    }
-
-    onSetCurrentUser(trimmedUserId);
-  }
-
   return (
     <div className="workspace-bar">
       <div className="workspace-bar__top">
         <div className={`workspace-focus ${isLoading ? 'workspace-focus--busy' : ''}`}>
-          <span className="workspace-focus__eyebrow">Active workspace</span>
-          <div className="workspace-focus__main">
-            <strong>{selectedWorkspace?.name ?? 'Loading workspace...'}</strong>
-            <span>
-              {workspaces.length} workspace{workspaces.length === 1 ? '' : 's'} available
-            </span>
+          <div className="workspace-focus__header">
+            <div>
+              <span className="workspace-focus__eyebrow">App context</span>
+              <strong className="workspace-focus__title">Authenticated account + workspace scope</strong>
+            </div>
+            <span className="workspace-focus__status">{isLoading ? 'Refreshing scope' : 'Scope ready'}</span>
           </div>
+
+          <div className="workspace-focus__context">
+            <div className="workspace-context-card">
+              <span className="workspace-context-card__label">Authenticated user</span>
+              <strong>{currentUser.email}</strong>
+              <span>Read from Spring through the current authenticated session via <code>GET /api/me</code>.</span>
+            </div>
+
+            <div className="workspace-context-card">
+              <span className="workspace-context-card__label">Active workspace</span>
+              <strong>{selectedWorkspace?.name ?? 'Loading workspace...'}</strong>
+              <span>
+                {selectedWorkspace
+                  ? `${workspaces.length} visible workspace${workspaces.length === 1 ? '' : 's'} in this session`
+                  : 'Waiting for workspace data'}
+              </span>
+            </div>
+          </div>
+
           <div className="workspace-focus__meta">
             <span>
               {selectedWorkspace ? `Created ${formatDateTime(selectedWorkspace.createdAt)}` : 'Waiting for workspace data'}
             </span>
-            <span>{isLoading ? 'Refreshing workspace scope...' : 'Assets and search are scoped here'}</span>
             <span>
-              Current user:{' '}
-              {pendingUserId ? `switching to ${pendingUserId}` : activeUserId ?? 'using backend fallback scope'}
+              {isLoading
+                ? 'Refreshing workspace scope...'
+                : `${searchableAssetCount} searchable asset${searchableAssetCount === 1 ? '' : 's'} in the active workspace`}
             </span>
           </div>
         </div>
 
         <div className="workspace-bar__pills">
           <div className="pill">
-            <span className="pill__label">Current user</span>
-            <span className="pill__value">
-              {pendingUserId ? `Switching to ${pendingUserId}...` : activeUserId ?? 'Backend fallback'}
-            </span>
+            <span className="pill__label">Authenticated user</span>
+            <span className="pill__value">{currentUser.email}</span>
           </div>
 
           <div className="pill">
             <span className="pill__label">Backend</span>
             <span className="pill__value">{usingProxy ? `proxy -> ${backendDisplayUrl}` : backendDisplayUrl}</span>
           </div>
+
+          <Button type="button" tone="ghost" onClick={onLogout} disabled={isLoggingOut}>
+            {isLoggingOut ? 'Signing out...' : 'Sign out'}
+          </Button>
         </div>
       </div>
 
       <div className="workspace-bar__cluster">
-        <form className="workspace-session" onSubmit={handleSessionSubmit}>
-          <label className="field field--grow">
-            <span className="field__label">Current user</span>
-            <input
-              className="field__input"
-              type="text"
-              value={userId}
-              onChange={(event) => setUserId(event.target.value)}
-              placeholder="student-a, demo-owner, reviewer-1..."
-              maxLength={255}
-            />
-            <span className="field__hint">
-              Calls <code>POST /api/auth/session</code>, then refreshes visible workspace and asset scope.
-            </span>
-          </label>
-          <Button type="submit" tone="ghost" disabled={isSettingCurrentUser || !userId.trim()}>
-            {isSettingCurrentUser ? 'Switching...' : activeUserId ? 'Switch user' : 'Set user'}
-          </Button>
-        </form>
-
         <label className="field">
           <span className="field__label">Workspace scope</span>
           <select
@@ -218,7 +161,7 @@ export function WorkspaceBar({
               </option>
             ))}
           </select>
-          <span className="field__hint">Switching workspace refreshes asset listing and search scope.</span>
+          <span className="field__hint">Changing workspace updates assets and search in place for the active session.</span>
         </label>
 
         <form className="workspace-create" onSubmit={handleSubmit}>
@@ -232,7 +175,7 @@ export function WorkspaceBar({
               placeholder="Algorithms, Databases, Distributed Systems..."
               maxLength={255}
             />
-            <span className="field__hint">New workspaces become easy demo scopes for upload and search.</span>
+            <span className="field__hint">Create another owned scope for uploads, indexing, and search.</span>
           </label>
           <Button type="submit" tone="secondary" disabled={isCreating || !workspaceName.trim()}>
             {isCreating ? 'Creating...' : 'Add workspace'}
@@ -240,13 +183,13 @@ export function WorkspaceBar({
         </form>
       </div>
 
-      {sessionError ? (
+      {logoutError ? (
         <ErrorBanner
-          error={sessionError}
+          error={logoutError}
           className="workspace-bar__error"
-          title={sessionErrorCopy?.title}
-          message={sessionErrorCopy?.message}
-          detail={sessionErrorCopy?.detail}
+          title={logoutErrorCopy?.title}
+          message={logoutErrorCopy?.message}
+          detail={logoutErrorCopy?.detail}
         />
       ) : null}
       {createError ? <ErrorBanner error={createError} className="workspace-bar__error" /> : null}

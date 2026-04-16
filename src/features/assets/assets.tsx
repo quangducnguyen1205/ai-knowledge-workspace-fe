@@ -612,7 +612,7 @@ export function AssetsPanel({
         {!assetsLoading && !assetsError && assets.length === 0 ? (
           <EmptyState
             title="No assets yet"
-            description="Upload one lecture recording into this workspace to start the demo flow."
+            description="Upload one lecture or recording into this workspace to start processing, transcript review, and search preparation."
           />
         ) : null}
 

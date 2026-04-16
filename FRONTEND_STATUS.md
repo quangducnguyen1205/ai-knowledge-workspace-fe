@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-This repo contains the separate demo-focused frontend for AI Knowledge Workspace. It provides a single-shell UI for the current Spring-owned product flow: minimal current-user session entry, workspace selection, asset upload, status polling, transcript retrieval, explicit indexing, search, and transcript-context follow-up. The frontend depends only on the Spring product API in Repo B and does not call Repo A directly.
+This repo contains the separate demo-focused frontend for AI Knowledge Workspace. It provides a single-shell UI for the current Spring-owned product flow: minimal auth entry, workspace selection, asset upload, status polling, transcript retrieval, explicit indexing, search, and transcript-context follow-up. The frontend depends only on the Spring product API in Repo B and does not call Repo A directly.
 
 ## 2. Current Stack
 
@@ -16,8 +16,9 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 
 ## 3. Implemented Demo Flow
 
-- Load workspaces from Spring and keep one visible workspace selected in the UI
-- Set the current user through a small top-bar control that calls Spring session entry and refreshes visible scope
+- Enter the product through a small Spring session-based auth surface with Sign in and Create account
+- Read the authenticated product user honestly through `GET /api/me`, then hand off into the existing shell
+- Keep the authenticated user and active workspace visible as persistent shell context instead of broad walkthrough framing
 - Create a workspace from the top bar and switch the demo scope to it
 - Upload one media file into the selected workspace
 - List workspace-scoped assets and select one asset for inspection
@@ -32,14 +33,19 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 - Open a separate transcript-context view for a chosen search result
 - Keep the shell focused on the golden path: workspace -> upload -> processing -> transcript -> index -> search -> context
 - Reset search/context state when workspace selection changes, upload completes, indexing completes, or refreshed results no longer match the selected hit
+- Support logout from the authenticated shell without turning this into a full account-management UI
+- Restore the last valid workspace selection when it still matches the current authenticated visible scope
 - Keep indexing unavailable while assets are still processing, failed, or missing transcript rows
 - Show friendlier demo-facing messages for transcript 409 states and upload validation rejections
 - Current UI structure: top workspace bar plus three panels for assets, selected asset/transcript, and search/context
 
 ## 4. Backend API Surface Used
 
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
+- `GET /api/me`
 - `GET /api/workspaces`
-- `POST /api/auth/session`
 - `POST /api/workspaces`
 - `GET /api/assets`
 - `POST /api/assets/upload`
@@ -66,9 +72,10 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 
 - Dockerized frontend build has passed successfully
 - Dockerized local-dev startup has also been rechecked, with the Vite app serving on `http://localhost:5173`
+- Live register, login, logout, and `GET /api/me` checks were reverified against a running Spring backend through the frontend proxy path
+- Authenticated workspace, asset-list, and search reads were reverified against the live backend through the frontend proxy path
 - Happy-path search and transcript-context follow-up were manually verified in the browser
 - Workspace switching and creation were manually verified
-- Current-user session entry now exists in the shell, but live multi-user verification still depends on a running Spring backend with ownership data
 - Processing -> transcript_ready -> searchable flow was manually verified
 - Failed asset flow was manually verified
 - Invalid or rejected upload flow was manually verified
@@ -90,12 +97,15 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 ## 8. Quick Status Summary
 
 - Separate frontend repo is scaffolded and running as a Vite + React + TypeScript demo app
+- The app now enters through minimal register/login auth and reflects the authenticated user from `GET /api/me`
 - Current UI already covers workspace, upload, status, transcript, explicit indexing, search, and transcript context
 - The selected-asset panel now includes a minimal inline rename flow that keeps list and search titles in sync on success
 - Asset rows now include a minimal delete action that refreshes the workspace list and clears only dependent stale state
 - Selected asset lifecycle and next-step guidance are now clearer in the shell
+- The top shell now reads more like app context, with authenticated user and active workspace kept visible above the three panels
 - Search/context state is more tightly synced to workspace, upload, indexing, and refreshed results
 - Demo-safety cleanup now prevents misleading indexing and uses clearer upload/transcript failure copy
 - Docker-first local development is set up and is the recommended way to run the app
 - The frontend currently depends only on the Spring product API surface
+- The older local/dev auth-session shortcut is no longer the main FE auth UX
 - Scope is still intentionally narrow, debuggable, and demo-friendly

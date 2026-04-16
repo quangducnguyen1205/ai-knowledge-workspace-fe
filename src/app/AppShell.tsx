@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ApiClientError, type AssetStatus, type AssetSummary, type SearchResponse, type SearchResult } from '../lib/api';
-import { EmptyState, ErrorBanner, InfoBanner, LoadingBlock } from '../lib/ui';
+import { EmptyState, ErrorBanner, LoadingBlock } from '../lib/ui';
 import {
   AssetsPanel,
   SelectedAssetPanel,
@@ -24,12 +24,45 @@ import {
   useTranscriptContextQuery,
 } from '../features/search/search';
 import {
-  WorkspaceBar,
-  useAuthSessionMutation,
   useCreateWorkspaceMutation,
   useWorkspacesQuery,
+  WorkspaceBar,
   workspaceKeys,
 } from '../features/workspaces/workspaces';
+import {
+  AuthEntrySurface,
+  authKeys,
+  useCurrentUserQuery,
+  useLoginMutation,
+  useLogoutMutation,
+  useRegisterMutation,
+} from '../features/auth/auth';
+
+const lastWorkspaceSelectionStorageKey = 'akw:last-workspace-id';
+
+function readStoredWorkspaceSelection(): string | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    return window.localStorage.getItem(lastWorkspaceSelectionStorageKey)?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredWorkspaceSelection(workspaceId: string): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(lastWorkspaceSelectionStorageKey, workspaceId);
+  } catch {
+    // Ignore storage failures and keep the shell functional.
+  }
+}
 
 function canLoadTranscript(assetStatus: AssetStatus | null, processingJobStatus?: string): boolean {
   return (
@@ -39,26 +72,25 @@ function canLoadTranscript(assetStatus: AssetStatus | null, processingJobStatus?
   );
 }
 
-const goldenPathSteps = [
-  'Choose workspace',
-  'Upload asset',
-  'Wait for processing',
-  'Review transcript',
-  'Index explicitly',
-  'Search workspace',
-  'Open context',
-] as const;
-
 export function AppShell() {
   const queryClient = useQueryClient();
   const [isTransitionPending, startTransition] = useTransition();
 
-  const workspacesQuery = useWorkspacesQuery();
-  const authSessionMutation = useAuthSessionMutation();
+  const currentUserQuery = useCurrentUserQuery();
+  const registerMutation = useRegisterMutation();
+  const loginMutation = useLoginMutation();
+  const logoutMutation = useLogoutMutation();
+  const isAuthenticated = currentUserQuery.isSuccess;
+  const currentUser = currentUserQuery.data ?? null;
+  const isAuthRequired =
+    currentUserQuery.error instanceof ApiClientError &&
+    currentUserQuery.error.status === 401 &&
+    currentUserQuery.error.code === 'AUTHENTICATION_REQUIRED';
+
+  const workspacesQuery = useWorkspacesQuery(isAuthenticated);
   const createWorkspaceMutation = useCreateWorkspaceMutation();
-  const [activeSessionUserId, setActiveSessionUserId] = useState<string | null>(null);
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
-  const [preferredWorkspaceId, setPreferredWorkspaceId] = useState<string | null>(null);
+  const [preferredWorkspaceId, setPreferredWorkspaceId] = useState<string | null>(() => readStoredWorkspaceSelection());
   const [workspaceScopeRefreshAfter, setWorkspaceScopeRefreshAfter] = useState<number | null>(null);
 
   useEffect(() => {
@@ -73,7 +105,11 @@ export function AppShell() {
         return;
       }
 
-      startTransition(() => setSelectedWorkspaceId(workspaces[0].id));
+      const restoredWorkspace = preferredWorkspaceId
+        ? workspaces.find((workspace) => workspace.id === preferredWorkspaceId)
+        : null;
+
+      startTransition(() => setSelectedWorkspaceId(restoredWorkspace?.id ?? workspaces[0].id));
       setWorkspaceScopeRefreshAfter(null);
       return;
     }
@@ -270,6 +306,12 @@ export function AppShell() {
     }
   }, [renameMutation.isPending, renameMutation.reset, renameMutation.variables?.assetId, selectedAssetId]);
 
+  useEffect(() => {
+    if (selectedWorkspaceId) {
+      writeStoredWorkspaceSelection(selectedWorkspaceId);
+    }
+  }, [selectedWorkspaceId]);
+
   const searchQuery = useSearchQuery(
     submittedSearch && selectedWorkspaceId ? { query: submittedSearch, workspaceId: selectedWorkspaceId } : null,
   );
@@ -329,114 +371,6 @@ export function AppShell() {
     }
   }, [searchQuery.data?.results, selectedSearchResult]);
 
-  const heroGuide = useMemo(() => {
-    if (uploadMutation.isPending) {
-      return {
-        title: 'Current step: upload in progress',
-        message: `The selected file is being sent into ${selectedWorkspace?.name ?? 'the active workspace'}. Watch the left panel for the new asset, then keep following the status flow.`,
-        tone: 'info' as const,
-      };
-    }
-
-    if (!selectedAsset) {
-      return {
-        title: 'Current step: choose or upload an asset',
-        message: `Start inside ${selectedWorkspace?.name ?? 'the active workspace'} by uploading a file or selecting an existing asset from the left panel.`,
-        tone: 'info' as const,
-      };
-    }
-
-    if (resolvedAssetStatus === 'PROCESSING') {
-      return {
-        title: 'Current step: wait for processing',
-        message: 'The selected asset is still processing. Transcript rows and explicit indexing stay unavailable until Spring finishes this step.',
-        tone: 'warning' as const,
-      };
-    }
-
-    if (resolvedAssetStatus === 'FAILED') {
-      return {
-        title: 'Current step: switch assets or upload again',
-        message: 'This asset is not usable for the demo path. Pick another asset in the workspace or upload a new file to continue.',
-        tone: 'warning' as const,
-      };
-    }
-
-    if (resolvedAssetStatus === 'TRANSCRIPT_READY') {
-      return {
-        title: 'Current step: run explicit indexing',
-        message: 'Transcript rows are ready in the middle panel. Use the explicit indexing action there before searching the workspace.',
-        tone: 'warning' as const,
-      };
-    }
-
-    if (resolvedAssetStatus === 'SEARCHABLE' && !submittedSearch) {
-      return {
-        title: 'Current step: search the workspace',
-        message: `At least one asset is searchable in ${selectedWorkspace?.name ?? 'the active workspace'}. Run a query in the right panel to continue the demo.`,
-        tone: 'success' as const,
-      };
-    }
-
-    if (searchQuery.isFetching) {
-      return {
-        title: 'Current step: searching transcript rows',
-        message: 'Spring is searching indexed transcript rows inside the active workspace.',
-        tone: 'info' as const,
-      };
-    }
-
-    if (submittedSearch && !searchQuery.error && !searchQuery.data?.results.length) {
-      return {
-        title: 'Current step: refine the search query',
-        message: 'The current query did not return any transcript hits in this workspace. Try a different term or pick another searchable asset.',
-        tone: 'warning' as const,
-      };
-    }
-
-    if (submittedSearch && searchQuery.data?.results.length && !selectedSearchResult) {
-      return {
-        title: 'Current step: open one result in context',
-        message: 'Search results are ready in the right panel. Click one enabled result card to fetch its transcript context window.',
-        tone: 'info' as const,
-      };
-    }
-
-    if (selectedSearchResult && contextQuery.isFetching) {
-      return {
-        title: 'Current step: loading transcript context',
-        message: 'Spring is fetching the surrounding transcript rows for the selected search result.',
-        tone: 'info' as const,
-      };
-    }
-
-    if (selectedSearchResult && contextQuery.data) {
-      return {
-        title: 'Current step: review transcript context',
-        message: 'The right panel is showing the selected hit with nearby transcript rows. This completes the core demo path.',
-        tone: 'success' as const,
-      };
-    }
-
-    return {
-      title: 'Current step: continue the golden path',
-      message: 'Follow the panels from left to right: upload, wait for transcript readiness, index explicitly, then search and open one hit in context.',
-      tone: 'info' as const,
-    };
-  }, [
-    contextQuery.data,
-    contextQuery.isFetching,
-    resolvedAssetStatus,
-    searchQuery.data?.results.length,
-    searchQuery.error,
-    searchQuery.isFetching,
-    selectedAsset,
-    selectedSearchResult,
-    selectedWorkspace?.name,
-    submittedSearch,
-    uploadMutation.isPending,
-  ]);
-
   function handleCreateWorkspace(name: string) {
     createWorkspaceMutation.mutate(name, {
       onSuccess: (workspace) => {
@@ -446,7 +380,7 @@ export function AppShell() {
   }
 
   function handleSelectWorkspace(workspaceId: string) {
-    setPreferredWorkspaceId(null);
+    setPreferredWorkspaceId(workspaceId);
     setPreferredAssetId(null);
     startTransition(() => setSelectedWorkspaceId(workspaceId));
   }
@@ -459,7 +393,6 @@ export function AppShell() {
       queryClient.removeQueries({ queryKey: assetKeys.transcript(previousSelectedAssetId) });
     }
 
-    setPreferredWorkspaceId(null);
     setSelectedAssetId(null);
     setPreferredAssetId(null);
     setStatusPollingEnabled(false);
@@ -471,14 +404,47 @@ export function AppShell() {
     queryClient.removeQueries({ queryKey: searchKeys.all });
   }
 
-  function handleSetCurrentUser(userId: string) {
-    authSessionMutation.mutate(userId, {
-      onSuccess: async (response) => {
-        setActiveSessionUserId(response.userId);
-        setWorkspaceScopeRefreshAfter(workspacesQuery.dataUpdatedAt);
-        clearSessionScopedState();
+  function resetAuthMutations() {
+    registerMutation.reset();
+    loginMutation.reset();
+  }
 
-        await queryClient.refetchQueries({ queryKey: workspaceKeys.all, type: 'active' });
+  async function reconcileAuthBoundary() {
+    setWorkspaceScopeRefreshAfter(Date.now());
+    clearSessionScopedState();
+    queryClient.removeQueries({ queryKey: assetKeys.all });
+    queryClient.removeQueries({ queryKey: workspaceKeys.all });
+    await queryClient.refetchQueries({ queryKey: authKeys.currentUser, type: 'active' });
+  }
+
+  function handleRegister(input: { email: string; password: string }) {
+    registerMutation.mutate(input, {
+      onSuccess: async () => {
+        loginMutation.reset();
+        logoutMutation.reset();
+        await reconcileAuthBoundary();
+      },
+    });
+  }
+
+  function handleLogin(input: { email: string; password: string }) {
+    loginMutation.mutate(input, {
+      onSuccess: async () => {
+        registerMutation.reset();
+        logoutMutation.reset();
+        await reconcileAuthBoundary();
+      },
+    });
+  }
+
+  function handleLogout() {
+    logoutMutation.mutate(undefined, {
+      onSuccess: async () => {
+        setWorkspaceScopeRefreshAfter(null);
+        clearSessionScopedState();
+        queryClient.removeQueries({ queryKey: assetKeys.all });
+        queryClient.removeQueries({ queryKey: workspaceKeys.all });
+        await queryClient.refetchQueries({ queryKey: authKeys.currentUser, type: 'active' });
       },
     });
   }
@@ -656,12 +622,41 @@ export function AppShell() {
     renameMutation.error && renameMutation.variables?.assetId === selectedAssetId ? renameMutation.error : null;
   const isRenamingSelectedAsset =
     renameMutation.isPending && renameMutation.variables?.assetId === selectedAssetId;
-  const pendingSessionUserId = authSessionMutation.isPending ? authSessionMutation.variables ?? null : null;
+
+  if (currentUserQuery.isLoading) {
+    return (
+      <div className="app-shell app-shell--centered">
+        <LoadingBlock label="Checking authenticated session..." />
+      </div>
+    );
+  }
+
+  if (isAuthRequired) {
+    return (
+      <AuthEntrySurface
+        registerError={registerMutation.error}
+        loginError={loginMutation.error}
+        isRegistering={registerMutation.isPending}
+        isLoggingIn={loginMutation.isPending}
+        onRegister={handleRegister}
+        onLogin={handleLogin}
+        onResetErrors={resetAuthMutations}
+      />
+    );
+  }
+
+  if (currentUserQuery.error) {
+    return (
+      <div className="app-shell app-shell--centered">
+        <ErrorBanner error={currentUserQuery.error} />
+      </div>
+    );
+  }
 
   if (workspacesQuery.isLoading) {
     return (
       <div className="app-shell app-shell--centered">
-        <LoadingBlock label="Loading workspaces..." />
+        <LoadingBlock label="Loading authenticated workspace scope..." />
       </div>
     );
   }
@@ -678,13 +673,7 @@ export function AppShell() {
     if (workspacesQuery.isFetching || workspaceScopeRefreshAfter !== null || (workspacesQuery.data?.length ?? 0) > 0) {
       return (
         <div className="app-shell app-shell--centered">
-          <LoadingBlock
-            label={
-              pendingSessionUserId
-                ? `Refreshing visible scope for ${pendingSessionUserId}...`
-                : 'Refreshing visible workspace scope...'
-            }
-          />
+          <LoadingBlock label="Refreshing visible workspace scope..." />
         </div>
       );
     }
@@ -702,33 +691,25 @@ export function AppShell() {
   return (
     <div className="app-shell">
       <header className="hero">
-        <div className="hero__copy">
-          <p className="hero__eyebrow">AI Knowledge Workspace</p>
-          <h1>Spring-owned transcript recovery demo</h1>
-          <p>
-            One page, three panels, explicit indexing, and a separate transcript-context follow-up view. The UI always
-            keeps the active workspace visible so the backend scope stays obvious.
-          </p>
-          <div className="hero__path">
-            <p className="hero__path-label">Golden path</p>
-            <ol className="hero__path-list">
-              {goldenPathSteps.map((step, index) => (
-                <li key={step} className="hero-step">
-                  <span className="hero-step__index">{index + 1}</span>
-                  <span>{step}</span>
-                </li>
-              ))}
-            </ol>
+        <div className="hero__copy hero__copy--compact">
+          <div className="hero__headline">
+            <div>
+              <p className="hero__eyebrow">AI Knowledge Workspace</p>
+              <h1>Search-first lecture workspace</h1>
+              <p>
+                Stay inside one authenticated account and one active workspace while you upload media, index transcript
+                rows explicitly, search within scope, and reopen transcript context.
+              </p>
+            </div>
           </div>
           <div className="hero__chips">
-            <span className="hero-chip">Active workspace: {selectedWorkspace.name}</span>
-            <span className="hero-chip">Indexing stays explicit</span>
-            <span className="hero-chip">Search stays workspace-scoped</span>
+            <span className="hero-chip">Search-first</span>
+            <span className="hero-chip">Current scope: {selectedWorkspace.name}</span>
             <span className="hero-chip">
               {searchableAssetCount} searchable asset{searchableAssetCount === 1 ? '' : 's'}
             </span>
+            <span className="hero-chip">Explicit indexing</span>
           </div>
-          <InfoBanner title={heroGuide.title} message={heroGuide.message} tone={heroGuide.tone} className="hero__guide" />
         </div>
 
         <WorkspaceBar
@@ -736,17 +717,16 @@ export function AppShell() {
           selectedWorkspace={selectedWorkspace}
           selectedWorkspaceId={selectedWorkspaceId}
           isLoading={workspacesQuery.isLoading || workspacesQuery.isFetching || isTransitionPending}
-          activeUserId={activeSessionUserId}
-          pendingUserId={pendingSessionUserId}
-          sessionError={authSessionMutation.error}
-          sessionSuccessUserId={authSessionMutation.data?.userId}
+          searchableAssetCount={searchableAssetCount}
+          currentUser={currentUser!}
           createError={createWorkspaceMutation.error}
+          logoutError={logoutMutation.error}
           createSuccessId={createWorkspaceMutation.data?.id}
           onSelectWorkspace={handleSelectWorkspace}
-          onSetCurrentUser={handleSetCurrentUser}
           onCreateWorkspace={handleCreateWorkspace}
-          isSettingCurrentUser={authSessionMutation.isPending}
           isCreating={createWorkspaceMutation.isPending}
+          onLogout={handleLogout}
+          isLoggingOut={logoutMutation.isPending}
         />
       </header>
 
