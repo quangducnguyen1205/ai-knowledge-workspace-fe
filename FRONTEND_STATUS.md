@@ -18,7 +18,7 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 
 - Enter the product through a small Spring session-based auth surface with Sign in and Create account
 - Read the authenticated product user honestly through `GET /api/me`, then hand off into the existing shell
-- Keep the authenticated user and active workspace visible as persistent shell context instead of broad walkthrough framing
+- Present the post-auth shell with a compact app header plus live context cards for authenticated account, active workspace, selected asset, and search state
 - Create a workspace from the top bar and switch the demo scope to it
 - Upload one media file into the selected workspace
 - List workspace-scoped assets and select one asset for inspection
@@ -102,7 +102,7 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 - The selected-asset panel now includes a minimal inline rename flow that keeps list and search titles in sync on success
 - Asset rows now include a minimal delete action that refreshes the workspace list and clears only dependent stale state
 - Selected asset lifecycle and next-step guidance are now clearer in the shell
-- The top shell now reads more like app context, with authenticated user and active workspace kept visible above the three panels
+- The post-auth shell now reads more like a compact authenticated app surface, with live account/workspace/asset/search context above the three panels
 - Search/context state is more tightly synced to workspace, upload, indexing, and refreshed results
 - Demo-safety cleanup now prevents misleading indexing and uses clearer upload/transcript failure copy
 - Docker-first local development is set up and is the recommended way to run the app

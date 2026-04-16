@@ -5,10 +5,9 @@ import {
   createWorkspace,
   listWorkspaces,
   usingProxy,
-  type AuthenticatedUser,
   type Workspace,
 } from '../../lib/api';
-import { Button, ErrorBanner, formatDateTime } from '../../lib/ui';
+import { Button, ErrorBanner } from '../../lib/ui';
 import { getFriendlyLogoutErrorCopy } from '../auth/auth';
 
 export const workspaceKeys = {
@@ -40,8 +39,6 @@ export function WorkspaceBar({
   selectedWorkspace,
   selectedWorkspaceId,
   isLoading,
-  searchableAssetCount,
-  currentUser,
   createError,
   logoutError,
   createSuccessId,
@@ -55,8 +52,6 @@ export function WorkspaceBar({
   selectedWorkspace: Workspace | null;
   selectedWorkspaceId: string | null;
   isLoading: boolean;
-  searchableAssetCount: number;
-  currentUser: AuthenticatedUser;
   createError: unknown;
   logoutError: unknown;
   createSuccessId?: string;
@@ -89,51 +84,17 @@ export function WorkspaceBar({
   return (
     <div className="workspace-bar">
       <div className="workspace-bar__top">
-        <div className={`workspace-focus ${isLoading ? 'workspace-focus--busy' : ''}`}>
-          <div className="workspace-focus__header">
-            <div>
-              <span className="workspace-focus__eyebrow">App context</span>
-              <strong className="workspace-focus__title">Authenticated account + workspace scope</strong>
-            </div>
-            <span className="workspace-focus__status">{isLoading ? 'Refreshing scope' : 'Scope ready'}</span>
+        <div className={`workspace-bar__intro ${isLoading ? 'workspace-bar__intro--busy' : ''}`}>
+          <div>
+            <span className="workspace-focus__eyebrow">Workspace controls</span>
+            <strong className="workspace-focus__title">Keep the active scope in sync</strong>
           </div>
-
-          <div className="workspace-focus__context">
-            <div className="workspace-context-card">
-              <span className="workspace-context-card__label">Authenticated user</span>
-              <strong>{currentUser.email}</strong>
-              <span>Read from Spring through the current authenticated session via <code>GET /api/me</code>.</span>
-            </div>
-
-            <div className="workspace-context-card">
-              <span className="workspace-context-card__label">Active workspace</span>
-              <strong>{selectedWorkspace?.name ?? 'Loading workspace...'}</strong>
-              <span>
-                {selectedWorkspace
-                  ? `${workspaces.length} visible workspace${workspaces.length === 1 ? '' : 's'} in this session`
-                  : 'Waiting for workspace data'}
-              </span>
-            </div>
-          </div>
-
-          <div className="workspace-focus__meta">
-            <span>
-              {selectedWorkspace ? `Created ${formatDateTime(selectedWorkspace.createdAt)}` : 'Waiting for workspace data'}
-            </span>
-            <span>
-              {isLoading
-                ? 'Refreshing workspace scope...'
-                : `${searchableAssetCount} searchable asset${searchableAssetCount === 1 ? '' : 's'} in the active workspace`}
-            </span>
-          </div>
+          <p className="workspace-bar__intro-copy">
+            Change workspace, create another owned workspace, or sign out without leaving the current search shell.
+          </p>
         </div>
 
         <div className="workspace-bar__pills">
-          <div className="pill">
-            <span className="pill__label">Authenticated user</span>
-            <span className="pill__value">{currentUser.email}</span>
-          </div>
-
           <div className="pill">
             <span className="pill__label">Backend</span>
             <span className="pill__value">{usingProxy ? `proxy -> ${backendDisplayUrl}` : backendDisplayUrl}</span>
@@ -161,7 +122,11 @@ export function WorkspaceBar({
               </option>
             ))}
           </select>
-          <span className="field__hint">Changing workspace updates assets and search in place for the active session.</span>
+          <span className="field__hint">
+            {selectedWorkspace
+              ? `Currently in ${selectedWorkspace.name}. Changing scope updates assets and search in place.`
+              : 'Changing workspace updates assets and search in place for the active session.'}
+          </span>
         </label>
 
         <form className="workspace-create" onSubmit={handleSubmit}>

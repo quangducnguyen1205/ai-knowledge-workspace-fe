@@ -327,6 +327,53 @@ export function AppShell() {
         }
       : null,
   );
+  const shellContextCards = useMemo(() => {
+    const visibleWorkspaceCount = workspacesQuery.data?.length ?? 0;
+    const selectedAssetValue = selectedAsset ? selectedAsset.title : 'No asset selected';
+    const selectedAssetDetail = selectedAsset
+      ? `${resolvedAssetStatus ?? selectedAsset.assetStatus} in ${selectedWorkspace?.name ?? 'the active workspace'}`
+      : 'Choose one asset from the left panel to inspect transcript readiness and explicit indexing.';
+    const searchValue = submittedSearch ? submittedSearch : 'No active query';
+    const searchDetail = selectedSearchResult
+      ? `Context open for ${selectedSearchResult.assetTitle} in the active workspace.`
+      : submittedSearch
+        ? `${searchQuery.data?.resultCount ?? 0} current result${searchQuery.data?.resultCount === 1 ? '' : 's'} inside ${
+            selectedWorkspace?.name ?? 'the active workspace'
+          }.`
+        : 'Run a workspace-scoped search after at least one asset becomes SEARCHABLE.';
+
+    return [
+      {
+        label: 'Authenticated account',
+        value: currentUser?.email ?? 'Unknown account',
+        detail: 'Driven by the current Spring-authenticated session via GET /api/me.',
+      },
+      {
+        label: 'Active workspace',
+        value: selectedWorkspace?.name ?? 'No workspace selected',
+        detail: `${visibleWorkspaceCount} visible workspace${visibleWorkspaceCount === 1 ? '' : 's'} in this account.`,
+      },
+      {
+        label: 'Selected asset',
+        value: selectedAssetValue,
+        detail: selectedAssetDetail,
+      },
+      {
+        label: 'Search + context',
+        value: searchValue,
+        detail: searchDetail,
+      },
+    ];
+  }, [
+    currentUser?.email,
+    resolvedAssetStatus,
+    searchQuery.data?.resultCount,
+    selectedAsset,
+    selectedSearchResult,
+    selectedWorkspace?.name,
+    submittedSearch,
+    workspacesQuery.data,
+  ]);
 
   useEffect(() => {
     const uploadedAssetId = uploadMutation.data?.assetId;
@@ -690,26 +737,34 @@ export function AppShell() {
 
   return (
     <div className="app-shell">
-      <header className="hero">
-        <div className="hero__copy hero__copy--compact">
-          <div className="hero__headline">
-            <div>
-              <p className="hero__eyebrow">AI Knowledge Workspace</p>
-              <h1>Search-first lecture workspace</h1>
-              <p>
-                Stay inside one authenticated account and one active workspace while you upload media, index transcript
-                rows explicitly, search within scope, and reopen transcript context.
-              </p>
-            </div>
+      <header className="app-header">
+        <div className="app-header__bar">
+          <div className="app-header__copy">
+            <p className="hero__eyebrow">AI Knowledge Workspace</p>
+            <h1>Lecture Search Workspace</h1>
+            <p>
+              A small authenticated workspace app for uploads, transcript review, explicit indexing, and scoped search.
+            </p>
           </div>
-          <div className="hero__chips">
-            <span className="hero-chip">Search-first</span>
-            <span className="hero-chip">Current scope: {selectedWorkspace.name}</span>
-            <span className="hero-chip">
+          <div className="app-header__chips">
+            <span className="app-chip">Search-first</span>
+            <span className="app-chip">Authenticated shell</span>
+            <span className="app-chip">Current scope: {selectedWorkspace.name}</span>
+            <span className="app-chip">
               {searchableAssetCount} searchable asset{searchableAssetCount === 1 ? '' : 's'}
             </span>
-            <span className="hero-chip">Explicit indexing</span>
+            <span className="app-chip">Explicit indexing</span>
           </div>
+        </div>
+
+        <div className="app-context-grid">
+          {shellContextCards.map((card) => (
+            <div key={card.label} className="app-context-card">
+              <span className="app-context-card__label">{card.label}</span>
+              <strong>{card.value}</strong>
+              <span>{card.detail}</span>
+            </div>
+          ))}
         </div>
 
         <WorkspaceBar
@@ -717,8 +772,6 @@ export function AppShell() {
           selectedWorkspace={selectedWorkspace}
           selectedWorkspaceId={selectedWorkspaceId}
           isLoading={workspacesQuery.isLoading || workspacesQuery.isFetching || isTransitionPending}
-          searchableAssetCount={searchableAssetCount}
-          currentUser={currentUser!}
           createError={createWorkspaceMutation.error}
           logoutError={logoutMutation.error}
           createSuccessId={createWorkspaceMutation.data?.id}
