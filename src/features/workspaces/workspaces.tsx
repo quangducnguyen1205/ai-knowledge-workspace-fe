@@ -137,7 +137,7 @@ function getFriendlyWorkspaceDeleteErrorCopy(
     return {
       tone: 'warning',
       title: 'Workspace still contains assets',
-      message: 'Delete or move through the assets in this workspace first. Workspace deletion stays blocked until it is empty.',
+      message: 'Delete the assets in this workspace first. Workspace deletion stays blocked until it is empty.',
       detail: getTechnicalDetail(error),
     };
   }

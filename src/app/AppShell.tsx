@@ -194,6 +194,10 @@ export function AppShell() {
   }, [selectedAssetId]);
 
   useEffect(() => {
+    setAssetDetailSuccessNotice(null);
+  }, [selectedAssetId]);
+
+  useEffect(() => {
     preferredAssetIdRef.current = preferredAssetId;
   }, [preferredAssetId]);
 
@@ -464,6 +468,7 @@ export function AppShell() {
   }
 
   function handleSelectWorkspace(workspaceId: string) {
+    setWorkspaceSuccessNotice(null);
     setPreferredWorkspaceId(workspaceId);
     setPreferredAssetId(null);
     setSubmittedSearch(null);
@@ -1140,7 +1145,7 @@ export function AppShell() {
               </label>
 
               <Button type="button" tone="secondary" onClick={() => navigate({ name: 'settings' })}>
-                New workspace
+                Workspace settings
               </Button>
               <Button type="button" tone="ghost" onClick={handleLogout} disabled={logoutMutation.isPending}>
                 {logoutMutation.isPending ? 'Signing out...' : 'Sign out'}

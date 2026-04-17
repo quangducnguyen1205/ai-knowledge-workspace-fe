@@ -1531,6 +1531,14 @@ code {
     display: grid;
   }
 
+  .selected-asset-title {
+    display: grid;
+  }
+
+  .selected-asset-title__form {
+    min-width: 0;
+  }
+
   .auth-preview,
   .metric-grid,
   .app-context-grid,
