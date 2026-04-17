@@ -1,10 +1,17 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ApiClientError, type AssetStatus, type AssetSummary, type SearchResponse, type SearchResult } from '../lib/api';
-import { EmptyState, ErrorBanner, LoadingBlock } from '../lib/ui';
+import { type AssetStatus, ApiClientError, type AssetSummary, type SearchResponse, type SearchResult } from '../lib/api';
+import { Button, EmptyState, ErrorBanner, LoadingBlock } from '../lib/ui';
+import { useHashRoute, type AppRoute } from './router';
 import {
-  AssetsPanel,
-  SelectedAssetPanel,
+  useCurrentUserQuery,
+  AuthEntrySurface,
+  authKeys,
+  useLoginMutation,
+  useLogoutMutation,
+  useRegisterMutation,
+} from '../features/auth/auth';
+import {
   assetKeys,
   deriveAssetStatus,
   isTerminalProcessing,
@@ -16,13 +23,12 @@ import {
   useIndexAssetMutation,
   useUploadAssetMutation,
 } from '../features/assets/assets';
-import {
-  SearchPanel,
-  resolveTranscriptLookupId,
-  searchKeys,
-  useSearchQuery,
-  useTranscriptContextQuery,
-} from '../features/search/search';
+import { AssetLibraryScreen } from '../features/assets/library-screen';
+import { AssetDetailScreen } from '../features/assets/detail-screen';
+import { WorkspaceHomeScreen } from '../features/dashboard/dashboard';
+import { searchKeys, resolveTranscriptLookupId, useSearchQuery, useTranscriptContextQuery } from '../features/search/search';
+import { WorkspaceSearchScreen } from '../features/search/search-screen';
+import { SettingsScreen } from '../features/settings/settings';
 import {
   useCreateWorkspaceMutation,
   useDeleteWorkspaceMutation,
@@ -31,20 +37,19 @@ import {
   WorkspaceBar,
   workspaceKeys,
 } from '../features/workspaces/workspaces';
-import {
-  AuthEntrySurface,
-  authKeys,
-  useCurrentUserQuery,
-  useLoginMutation,
-  useLogoutMutation,
-  useRegisterMutation,
-} from '../features/auth/auth';
 
 const lastWorkspaceSelectionStorageKey = 'akw:last-workspace-id';
 
 type SuccessNotice = {
   title: string;
   message: string;
+};
+
+type ShellNavItem = {
+  label: string;
+  route: AppRoute;
+  disabled?: boolean;
+  isActive: boolean;
 };
 
 function readStoredWorkspaceSelection(): string | null {
@@ -81,6 +86,7 @@ function canLoadTranscript(assetStatus: AssetStatus | null, processingJobStatus?
 
 export function AppShell() {
   const queryClient = useQueryClient();
+  const [route, navigate] = useHashRoute();
   const [isTransitionPending, startTransition] = useTransition();
 
   const currentUserQuery = useCurrentUserQuery();
@@ -104,6 +110,7 @@ export function AppShell() {
 
   useEffect(() => {
     const workspaces = workspacesQuery.data ?? [];
+
     if (workspaceScopeRefreshAfter !== null) {
       if (workspacesQuery.dataUpdatedAt <= workspaceScopeRefreshAfter) {
         return;
@@ -130,7 +137,7 @@ export function AppShell() {
     if (preferredWorkspaceId) {
       const preferredWorkspace = workspaces.find((workspace) => workspace.id === preferredWorkspaceId);
       if (preferredWorkspace) {
-        startTransition(() => setSelectedWorkspaceId(preferredWorkspaceId));
+        startTransition(() => setSelectedWorkspaceId(preferredWorkspace.id));
         setPreferredWorkspaceId(null);
         return;
       }
@@ -187,12 +194,22 @@ export function AppShell() {
   }, [selectedAssetId]);
 
   useEffect(() => {
-    setAssetDetailSuccessNotice(null);
-  }, [selectedAssetId]);
-
-  useEffect(() => {
     preferredAssetIdRef.current = preferredAssetId;
   }, [preferredAssetId]);
+
+  const routedAssetId = route.name === 'asset' ? route.assetId : null;
+
+  useEffect(() => {
+    if (!routedAssetId) {
+      return;
+    }
+
+    if (routedAssetId === selectedAssetIdRef.current || routedAssetId === preferredAssetIdRef.current) {
+      return;
+    }
+
+    setPreferredAssetId(routedAssetId);
+  }, [routedAssetId]);
 
   useEffect(() => {
     const assets = assetsQuery.data ?? [];
@@ -200,7 +217,7 @@ export function AppShell() {
     if (preferredAssetId) {
       const preferredAsset = assets.find((asset) => asset.assetId === preferredAssetId);
       if (preferredAsset) {
-        startTransition(() => setSelectedAssetId(preferredAssetId));
+        startTransition(() => setSelectedAssetId(preferredAsset.assetId));
         setPreferredAssetId(null);
         return;
       }
@@ -288,6 +305,7 @@ export function AppShell() {
       ),
     [assetStatusQuery.data, indexMutation.data, selectedAsset, selectedAssetId, transcriptQuery.data],
   );
+
   const displayAssets = useMemo(() => {
     const assets = assetsQuery.data ?? [];
 
@@ -301,9 +319,19 @@ export function AppShell() {
         : asset,
     );
   }, [assetsQuery.data, resolvedAssetStatus, selectedAssetId]);
-  const searchableAssetCount = useMemo(() => {
-    return displayAssets.filter((asset) => asset.assetStatus === 'SEARCHABLE').length;
-  }, [displayAssets]);
+
+  const searchableAssetCount = useMemo(
+    () => displayAssets.filter((asset) => asset.assetStatus === 'SEARCHABLE').length,
+    [displayAssets],
+  );
+  const processingAssetCount = useMemo(
+    () => displayAssets.filter((asset) => asset.assetStatus === 'PROCESSING').length,
+    [displayAssets],
+  );
+  const transcriptReadyAssetCount = useMemo(
+    () => displayAssets.filter((asset) => asset.assetStatus === 'TRANSCRIPT_READY').length,
+    [displayAssets],
+  );
 
   const [submittedSearch, setSubmittedSearch] = useState<string | null>(null);
   const [selectedSearchResult, setSelectedSearchResult] = useState<SearchResult | null>(null);
@@ -351,56 +379,6 @@ export function AppShell() {
         }
       : null,
   );
-  const shellContextCards = useMemo(() => {
-    const visibleWorkspaceCount = workspacesQuery.data?.length ?? 0;
-    const selectedAssetValue = selectedAsset ? selectedAsset.title : 'No asset selected';
-    const selectedAssetDetail = selectedAsset
-      ? `${resolvedAssetStatus ?? selectedAsset.assetStatus} in ${selectedWorkspace?.name ?? 'the active workspace'}`
-      : 'Choose an asset to review transcript readiness, indexing state, and transcript content.';
-    const searchValue = submittedSearch ? submittedSearch : searchableAssetCount > 0 ? 'Ready for search' : 'Search locked';
-    const searchDetail = selectedSearchResult
-      ? `Context open for ${selectedSearchResult.assetTitle} in the active workspace.`
-      : submittedSearch
-        ? `${searchQuery.data?.resultCount ?? 0} current result${searchQuery.data?.resultCount === 1 ? '' : 's'} inside ${
-            selectedWorkspace?.name ?? 'the active workspace'
-          }.`
-        : searchableAssetCount > 0
-          ? 'Search is available for indexed assets in the active workspace.'
-          : 'Index at least one transcript to unlock search.';
-
-    return [
-      {
-        label: 'Signed-in account',
-        value: currentUser?.email ?? 'Unknown account',
-        detail: 'This session controls access to workspaces, assets, and search scope.',
-      },
-      {
-        label: 'Active workspace',
-        value: selectedWorkspace?.name ?? 'No workspace selected',
-        detail: `${visibleWorkspaceCount} visible workspace${visibleWorkspaceCount === 1 ? '' : 's'} in this account.`,
-      },
-      {
-        label: 'Focused asset',
-        value: selectedAssetValue,
-        detail: selectedAssetDetail,
-      },
-      {
-        label: 'Search state',
-        value: searchValue,
-        detail: searchDetail,
-      },
-    ];
-  }, [
-    currentUser?.email,
-    resolvedAssetStatus,
-    searchQuery.data?.resultCount,
-    selectedAsset,
-    selectedSearchResult,
-    selectedWorkspace?.name,
-    submittedSearch,
-    searchableAssetCount,
-    workspacesQuery.data,
-  ]);
 
   useEffect(() => {
     const uploadedAssetId = uploadMutation.data?.assetId;
@@ -445,6 +423,33 @@ export function AppShell() {
     }
   }, [searchQuery.data?.results, selectedSearchResult]);
 
+  useEffect(() => {
+    if (selectedWorkspace) {
+      return;
+    }
+
+    if (route.name === 'home' || route.name === 'settings') {
+      return;
+    }
+
+    navigate({ name: 'home' });
+  }, [navigate, route.name, selectedWorkspace]);
+
+  useEffect(() => {
+    if (route.name !== 'asset') {
+      return;
+    }
+
+    if (!selectedWorkspace || assetsQuery.isFetching) {
+      return;
+    }
+
+    const availableAssets = assetsQuery.data ?? [];
+    if (!availableAssets.length || !availableAssets.some((asset) => asset.assetId === route.assetId)) {
+      navigate({ name: 'library' });
+    }
+  }, [assetsQuery.data, assetsQuery.isFetching, navigate, route, selectedWorkspace]);
+
   function handleCreateWorkspace(name: string) {
     setWorkspaceSuccessNotice(null);
     createWorkspaceMutation.mutate(name, {
@@ -461,6 +466,9 @@ export function AppShell() {
   function handleSelectWorkspace(workspaceId: string) {
     setPreferredWorkspaceId(workspaceId);
     setPreferredAssetId(null);
+    setSubmittedSearch(null);
+    setSelectedSearchResult(null);
+    setSearchResetToken((current) => current + 1);
     startTransition(() => setSelectedWorkspaceId(workspaceId));
   }
 
@@ -528,6 +536,7 @@ export function AppShell() {
         onSuccess: async (_response, variables) => {
           setWorkspaceScopeRefreshAfter(Date.now());
           clearWorkspaceScopedState(variables.workspaceId);
+          navigate({ name: 'home' });
           setWorkspaceSuccessNotice({
             title: 'Workspace deleted',
             message: `Removed "${deletingWorkspaceName}" and refreshed the visible workspace scope.`,
@@ -607,9 +616,20 @@ export function AppShell() {
         clearSessionScopedState();
         queryClient.removeQueries({ queryKey: assetKeys.all });
         queryClient.removeQueries({ queryKey: workspaceKeys.all });
+        navigate({ name: 'home' });
         await queryClient.refetchQueries({ queryKey: authKeys.currentUser, type: 'active' });
       },
     });
+  }
+
+  function openAsset(assetId: string) {
+    if (!assetId) {
+      return;
+    }
+
+    setPreferredAssetId(assetId);
+    startTransition(() => setSelectedAssetId(assetId));
+    navigate({ name: 'asset', assetId });
   }
 
   function handleUpload(input: { file: File; title?: string }) {
@@ -627,6 +647,11 @@ export function AppShell() {
         onSuccess: (response) => {
           setPreferredAssetId(response.assetId);
           setStatusPollingEnabled(true);
+          setAssetLibrarySuccessNotice({
+            title: 'Upload accepted',
+            message: `Added "${input.title?.trim() || input.file.name}" to ${selectedWorkspace?.name ?? 'the active workspace'}.`,
+          });
+          navigate({ name: 'asset', assetId: response.assetId });
           void queryClient.invalidateQueries({ queryKey: assetKeys.list(response.workspaceId) });
         },
       },
@@ -712,6 +737,9 @@ export function AppShell() {
       {
         onSuccess: async (_response, variables) => {
           clearAssetDependentState(variables.assetId);
+          if (route.name === 'asset' && route.assetId === variables.assetId) {
+            navigate({ name: 'library' });
+          }
           setAssetLibrarySuccessNotice({
             title: 'Asset deleted',
             message: `Removed "${asset.title}" from ${selectedWorkspace?.name ?? 'the active workspace'}.`,
@@ -797,6 +825,44 @@ export function AppShell() {
   const isRenamingSelectedAsset =
     renameMutation.isPending && renameMutation.variables?.assetId === selectedAssetId;
 
+  const pageMeta = useMemo(() => {
+    switch (route.name) {
+      case 'library':
+        return {
+          title: 'Asset Library',
+          description: 'Upload lecture videos, inspect processing state, and keep the workspace inventory organized.',
+        };
+      case 'asset':
+        return {
+          title: selectedAsset?.title ?? 'Asset Detail',
+          description: 'Review processing, transcript readiness, explicit indexing, and searchability for a single asset.',
+        };
+      case 'search':
+        return {
+          title: 'Workspace Search',
+          description: 'Run workspace-scoped transcript search and inspect surrounding context around each hit.',
+        };
+      case 'settings':
+        return {
+          title: 'Settings',
+          description: 'Manage workspaces conservatively and review the authenticated account context.',
+        };
+      case 'home':
+      default:
+        return {
+          title: 'Workspace Home',
+          description: 'Track search readiness, recent assets, and the next best action for the current workspace.',
+        };
+    }
+  }, [route.name, selectedAsset?.title]);
+
+  const navItems: ShellNavItem[] = [
+    { label: 'Home', route: { name: 'home' }, isActive: route.name === 'home' },
+    { label: 'Library', route: { name: 'library' }, disabled: !selectedWorkspace, isActive: route.name === 'library' || route.name === 'asset' },
+    { label: 'Search', route: { name: 'search' }, disabled: !selectedWorkspace, isActive: route.name === 'search' },
+    { label: 'Settings', route: { name: 'settings' }, isActive: route.name === 'settings' },
+  ];
+
   if (currentUserQuery.isLoading) {
     return (
       <div className="app-shell app-shell--centered">
@@ -851,96 +917,29 @@ export function AppShell() {
     );
   }
 
-  return (
-    <div className="app-shell">
-      <header className="shell-topbar">
-        <div className="shell-brand">
-          <div className="shell-brand__mark" aria-hidden="true">
-            AK
-          </div>
-          <div className="shell-brand__copy">
-            <p className="shell-brand__eyebrow">AI Knowledge Workspace</p>
-            <strong>Search-first transcript workspace</strong>
-          </div>
-        </div>
+  let screenContent;
 
-        <div className="shell-topbar__actions">
-          <span className="shell-pill">Authenticated</span>
-          <span className="shell-pill">Search-first</span>
-          <div className="shell-user">
-            <span className="shell-user__label">Signed in</span>
-            <strong>{currentUser?.email ?? 'Unknown account'}</strong>
+  if (!selectedWorkspace) {
+    screenContent = (
+      <div className="screen-stack">
+        <div className="workspace-setup-card">
+          <EmptyState
+            title="No workspace yet"
+            description="Create a workspace in Settings to start uploading lecture videos and preparing them for transcript search."
+          />
+          <div className="workspace-setup-card__actions">
+            <Button type="button" onClick={() => navigate({ name: 'settings' })}>
+              Open settings
+            </Button>
           </div>
         </div>
-      </header>
-
-      <section className={`workspace-overview ${!selectedWorkspace ? 'workspace-overview--empty' : ''}`}>
-        <div className="workspace-overview__copy">
-          <p className="hero__eyebrow">{selectedWorkspace ? 'Active workspace' : 'Workspace setup'}</p>
-          <h1>{selectedWorkspace ? selectedWorkspace.name : 'Create your first workspace'}</h1>
-          <p>
-            {selectedWorkspace
-              ? 'Upload source material, review the transcript, publish it to search, and open surrounding transcript context without leaving this workspace.'
-              : 'Start with a dedicated workspace so uploads, transcript review, explicit indexing, and search stay clearly scoped from the beginning.'}
-          </p>
-
-          <div className="workspace-overview__journey">
-            {['Upload', 'Process', 'Review transcript', 'Index', 'Search context'].map((step, index) => (
-              <div key={step} className="journey-step">
-                <span className="journey-step__index">{index + 1}</span>
-                <span>{step}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="app-context-grid">
-          {shellContextCards.map((card) => (
-            <div key={card.label} className="app-context-card">
-              <span className="app-context-card__label">{card.label}</span>
-              <strong>{card.value}</strong>
-              <span>{card.detail}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <header className="app-header">
-        <WorkspaceBar
-          workspaces={workspacesQuery.data ?? []}
-          selectedWorkspace={selectedWorkspace}
-          selectedWorkspaceId={selectedWorkspaceId}
-          isLoading={workspacesQuery.isLoading || workspacesQuery.isFetching || isTransitionPending}
-          successNotice={workspaceSuccessNotice}
-          createError={createWorkspaceMutation.error}
-          renameError={
-            renameWorkspaceMutation.error &&
-            renameWorkspaceMutation.variables?.workspaceId === selectedWorkspaceId
-              ? renameWorkspaceMutation.error
-              : null
-          }
-          deleteError={
-            deleteWorkspaceMutation.error && deleteWorkspaceMutation.variables?.workspaceId === selectedWorkspaceId
-              ? deleteWorkspaceMutation.error
-              : null
-          }
-          logoutError={logoutMutation.error}
-          createSuccessId={createWorkspaceMutation.data?.id}
-          onSelectWorkspace={handleSelectWorkspace}
-          onCreateWorkspace={handleCreateWorkspace}
-          onRenameWorkspace={handleRenameWorkspace}
-          onDeleteWorkspace={handleDeleteWorkspace}
-          isCreating={createWorkspaceMutation.isPending}
-          isRenaming={renameWorkspaceMutation.isPending}
-          isDeleting={deleteWorkspaceMutation.isPending}
-          onLogout={handleLogout}
-          isLoggingOut={logoutMutation.isPending}
-        />
-      </header>
-
-      {selectedWorkspace ? (
-        <main className="workspace-grid">
-          <AssetsPanel
+      </div>
+    );
+  } else {
+    switch (route.name) {
+      case 'library':
+        screenContent = (
+          <AssetLibraryScreen
             workspaceName={selectedWorkspace.name}
             assets={displayAssets}
             selectedAssetId={selectedAssetId}
@@ -953,14 +952,20 @@ export function AppShell() {
             uploadError={uploadMutation.error}
             uploadSuccessId={uploadMutation.data?.assetId}
             isUploading={uploadMutation.isPending}
-            onSelectAsset={setSelectedAssetId}
+            onSelectAsset={openAsset}
             onDeleteAsset={handleDeleteAsset}
             onUpload={handleUpload}
+            onOpenSearch={() => navigate({ name: 'search' })}
+            onOpenSettings={() => navigate({ name: 'settings' })}
           />
-
-          <SelectedAssetPanel
-            asset={selectedAsset}
+        );
+        break;
+      case 'asset':
+        screenContent = (
+          <AssetDetailScreen
             workspaceName={selectedWorkspace.name}
+            assets={displayAssets}
+            asset={selectedAsset}
             successNotice={assetDetailSuccessNotice}
             resolvedAssetStatus={resolvedAssetStatus}
             statusResponse={assetStatusQuery.data}
@@ -973,12 +978,19 @@ export function AppShell() {
             isIndexing={indexMutation.isPending}
             isRenaming={Boolean(isRenamingSelectedAsset)}
             renameError={visibleRenameError}
+            searchableAssetCount={searchableAssetCount}
             onIndex={handleIndexAsset}
             onRename={handleRenameAsset}
             onResetRename={() => renameMutation.reset()}
+            onOpenLibrary={() => navigate({ name: 'library' })}
+            onOpenSearch={() => navigate({ name: 'search' })}
+            onOpenAsset={openAsset}
           />
-
-          <SearchPanel
+        );
+        break;
+      case 'search':
+        screenContent = (
+          <WorkspaceSearchScreen
             workspaceName={selectedWorkspace.name}
             searchableAssetCount={searchableAssetCount}
             resetToken={searchResetToken}
@@ -990,40 +1002,155 @@ export function AppShell() {
             contextError={contextQuery.error}
             isContextLoading={contextQuery.isLoading || contextQuery.isFetching}
             selectedResult={selectedSearchResult}
+            assets={displayAssets}
             onSearch={(query) => {
               setSubmittedSearch(query);
               setSelectedSearchResult(null);
             }}
             onSelectResult={setSelectedSearchResult}
+            onOpenAsset={openAsset}
+            onOpenLibrary={() => navigate({ name: 'library' })}
           />
-        </main>
-      ) : (
-        <main className="workspace-empty">
-          <div className="workspace-empty__card">
-            <EmptyState
-              title="No workspace yet"
-              description="Create a workspace above to start uploading lecture videos and prepare them for search."
-            />
+        );
+        break;
+      case 'settings':
+        screenContent = (
+          <SettingsScreen
+            currentUserEmail={currentUser?.email ?? 'Unknown account'}
+            selectedWorkspaceName={selectedWorkspace.name}
+            workspaceManagement={
+              <WorkspaceBar
+                workspaces={workspacesQuery.data ?? []}
+                selectedWorkspace={selectedWorkspace}
+                selectedWorkspaceId={selectedWorkspaceId}
+                isLoading={workspacesQuery.isLoading || workspacesQuery.isFetching || isTransitionPending}
+                successNotice={workspaceSuccessNotice}
+                createError={createWorkspaceMutation.error}
+                renameError={
+                  renameWorkspaceMutation.error &&
+                  renameWorkspaceMutation.variables?.workspaceId === selectedWorkspaceId
+                    ? renameWorkspaceMutation.error
+                    : null
+                }
+                deleteError={
+                  deleteWorkspaceMutation.error && deleteWorkspaceMutation.variables?.workspaceId === selectedWorkspaceId
+                    ? deleteWorkspaceMutation.error
+                    : null
+                }
+                logoutError={logoutMutation.error}
+                createSuccessId={createWorkspaceMutation.data?.id}
+                onSelectWorkspace={handleSelectWorkspace}
+                onCreateWorkspace={handleCreateWorkspace}
+                onRenameWorkspace={handleRenameWorkspace}
+                onDeleteWorkspace={handleDeleteWorkspace}
+                isCreating={createWorkspaceMutation.isPending}
+                isRenaming={renameWorkspaceMutation.isPending}
+                isDeleting={deleteWorkspaceMutation.isPending}
+                onLogout={handleLogout}
+                isLoggingOut={logoutMutation.isPending}
+              />
+            }
+          />
+        );
+        break;
+      case 'home':
+      default:
+        screenContent = (
+          <WorkspaceHomeScreen
+            workspaceName={selectedWorkspace.name}
+            currentUserEmail={currentUser?.email ?? 'Unknown account'}
+            assets={displayAssets}
+            selectedAsset={selectedAsset}
+            searchableAssetCount={searchableAssetCount}
+            activeQuery={submittedSearch}
+            onOpenLibrary={() => navigate({ name: 'library' })}
+            onOpenSearch={() => navigate({ name: 'search' })}
+            onOpenAsset={openAsset}
+            onOpenSettings={() => navigate({ name: 'settings' })}
+          />
+        );
+        break;
+    }
+  }
+
+  return (
+    <div className="app-shell app-shell--product">
+      <div className="product-shell">
+        <aside className="product-sidebar">
+          <div className="product-brand">
+            <div className="product-brand__mark" aria-hidden="true">
+              AK
+            </div>
+            <div className="product-brand__copy">
+              <span className="product-brand__eyebrow">AI Knowledge Workspace</span>
+              <strong>Pre-AI product shell</strong>
+            </div>
           </div>
-          <div className="workspace-empty__grid">
-            <div className="workspace-empty__step">
-              <span className="workspace-empty__step-label">Step 1</span>
-              <strong>Create a focused workspace</strong>
-              <p>Name it around a course, topic, or project so search scope stays clear.</p>
-            </div>
-            <div className="workspace-empty__step">
-              <span className="workspace-empty__step-label">Step 2</span>
-              <strong>Upload an asset</strong>
-              <p>Add a lecture video as the source material for transcript review.</p>
-            </div>
-            <div className="workspace-empty__step">
-              <span className="workspace-empty__step-label">Step 3</span>
-              <strong>Index when ready</strong>
-              <p>Explicit indexing keeps search intentional and makes the next action obvious for every asset.</p>
-            </div>
+
+          <div className="product-sidebar__workspace">
+            <span className="product-sidebar__label">Current workspace</span>
+            <strong>{selectedWorkspace?.name ?? 'No workspace yet'}</strong>
+            <span>{selectedWorkspace ? `${processingAssetCount} processing, ${transcriptReadyAssetCount} transcript ready, ${searchableAssetCount} searchable` : 'Create a workspace to start the product flow.'}</span>
           </div>
-        </main>
-      )}
+
+          <nav className="product-nav" aria-label="Product navigation">
+            {navItems.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                className={`product-nav__button ${item.isActive ? 'product-nav__button--active' : ''}`}
+                onClick={() => navigate(item.route)}
+                disabled={item.disabled}
+              >
+                {item.label}
+              </button>
+            ))}
+          </nav>
+
+          <div className="product-sidebar__footer">
+            <span className="product-sidebar__label">Signed in as</span>
+            <strong>{currentUser?.email ?? 'Unknown account'}</strong>
+          </div>
+        </aside>
+
+        <div className="product-main">
+          <header className="product-topbar">
+            <div className="product-topbar__copy">
+              <p className="hero__eyebrow">{selectedWorkspace?.name ?? 'Workspace setup'}</p>
+              <h1>{pageMeta.title}</h1>
+              <p>{pageMeta.description}</p>
+            </div>
+
+            <div className="product-topbar__actions">
+              <label className="product-workspace-switcher">
+                <span className="product-workspace-switcher__label">Workspace</span>
+                <select
+                  className="field__input"
+                  value={selectedWorkspaceId ?? ''}
+                  onChange={(event) => handleSelectWorkspace(event.target.value)}
+                  disabled={workspacesQuery.isFetching || (workspacesQuery.data?.length ?? 0) === 0}
+                >
+                  {(workspacesQuery.data ?? []).length === 0 ? <option value="">No workspace yet</option> : null}
+                  {(workspacesQuery.data ?? []).map((workspace) => (
+                    <option key={workspace.id} value={workspace.id}>
+                      {workspace.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <Button type="button" tone="secondary" onClick={() => navigate({ name: 'settings' })}>
+                New workspace
+              </Button>
+              <Button type="button" tone="ghost" onClick={handleLogout} disabled={logoutMutation.isPending}>
+                {logoutMutation.isPending ? 'Signing out...' : 'Sign out'}
+              </Button>
+            </div>
+          </header>
+
+          <main className="product-content">{screenContent}</main>
+        </div>
+      </div>
     </div>
   );
 }

@@ -2,7 +2,17 @@
 
 ## 1. Purpose
 
-This repo contains the separate demo-focused frontend for AI Knowledge Workspace. It provides a single-shell UI for the current Spring-owned product flow: minimal auth entry, workspace selection, asset upload, status polling, transcript retrieval, explicit indexing, search, and transcript-context follow-up. The frontend depends only on the Spring product API in Repo B and does not call Repo A directly.
+This repo now implements a small product-grade frontend for AI Knowledge Workspace before any future AI expansion. The frontend stays grounded in the real Spring-owned backend contract and focuses on the current authenticated product flow:
+
+- auth
+- workspace selection and management
+- lecture video upload
+- processing and transcript review
+- explicit indexing
+- workspace-scoped search
+- transcript context
+
+It is intentionally not a chatbot surface, not a RAG shell, and not an AI assistant experience.
 
 ## 2. Current Stack
 
@@ -10,40 +20,42 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 - React 18
 - TypeScript
 - TanStack Query for server state, polling, and cache invalidation
-- Plain CSS with a single-shell demo layout
-- Runtime approach: Vite dev server serving the frontend, with `/api` requests proxied to the Spring backend
-- Docker/dev setup: Docker-first local development using `docker compose`, Vite running inside the container, repo bind-mounted for live iteration, and `host.docker.internal:8081` used as the backend target from inside Docker
+- Plain CSS with a custom product shell and screen layouts
+- Lightweight hash-based routing implemented locally in the app
+- Docker-first local development with `/api` requests proxied to the Spring backend
 
-## 3. Implemented Demo Flow
+## 3. Current Product IA
 
-- Enter the product through a small Spring session-based auth surface with Sign in and Create account
-- Read the authenticated product user honestly through `GET /api/me`, then hand off into the existing shell
-- Present the post-auth shell with a compact app header plus live context cards for authenticated account, active workspace, selected asset, and search state
-- Create a workspace from the top bar and switch the demo scope to it
-- Rename the current workspace from the same shell controls
-- Delete the current workspace when backend rules allow it, then reconcile safely to another visible workspace
-- Show lightweight success feedback for workspace create, rename, and delete actions
-- Upload one lecture video into the selected workspace
-- List workspace-scoped assets and select one asset for inspection
-- Rename the currently selected asset title inline from the selected-asset panel
-- Delete one asset from the active workspace with a simple confirmation step
-- Show lightweight success feedback for asset rename and delete actions
-- Poll product-side asset status until the processing job becomes terminal
-- Fetch transcript rows only when the asset is actually ready through Spring
-- Show the selected asset lifecycle as a clearer current step plus next action
-- Trigger transcript indexing as an explicit user action
-- Keep search disabled until the active workspace has at least one SEARCHABLE asset
-- Search within the selected workspace only
-- Open a separate transcript-context view for a chosen search result
-- Keep the shell focused on the golden path: workspace -> upload -> processing -> transcript -> index -> search -> context
-- Reset search/context state when workspace selection changes, upload completes, indexing completes, or refreshed results no longer match the selected hit
-- Support logout from the authenticated shell without turning this into a full account-management UI
-- Restore the last valid workspace selection when it still matches the current authenticated visible scope
-- Keep indexing unavailable while assets are still processing, failed, or missing transcript rows
-- Show friendlier demo-facing messages for transcript 409 states and upload validation rejections
-- Current UI structure: top workspace bar plus three panels for assets, selected asset/transcript, and search/context
+The frontend now behaves like a routed web app instead of a single giant shell:
 
-## 4. Backend API Surface Used
+- Auth entry
+- Workspace home
+- Asset library
+- Asset detail / transcript review
+- Workspace search
+- Settings / workspace management
+
+## 4. Implemented Product Flow
+
+- Sign in or create account through the authenticated product entry surface
+- Resolve the signed-in user through `GET /api/me`
+- Load the visible owned workspace scope
+- Switch workspaces from the persistent app shell
+- Create, rename, and conservatively delete workspaces through Settings
+- Land in a workspace home screen with readiness summaries and next actions
+- Open a dedicated asset library screen
+- Upload lecture videos into the active workspace
+- Review library-wide asset status in a full browse/manage screen
+- Open a dedicated asset detail screen for transcript review
+- Rename and delete assets
+- Poll processing state until terminal
+- Load transcript rows only when the backend says they are ready
+- Explicitly index transcript rows to unlock search
+- Open a dedicated workspace search screen
+- Search only within the active workspace
+- Open transcript context around a selected result
+
+## 5. Backend API Surface Used
 
 - `POST /api/auth/register`
 - `POST /api/auth/login`
@@ -63,7 +75,7 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 - `GET /api/search`
 - `GET /api/assets/{assetId}/transcript/context`
 
-## 5. Local Run Path
+## 6. Local Run Path
 
 - Recommended path: Docker
 - Main commands:
@@ -72,50 +84,35 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
   - `docker compose down`
 - Expected frontend URL: `http://localhost:5173`
 - Expected backend URL: `http://localhost:8081`
-- Current Docker runtime behavior: the container runs the Vite dev server, exposes port `5173`, bind-mounts the source tree, keeps `node_modules` inside the container, and proxies `/api` requests to the host Spring backend
 
-## 6. Manual Verification Notes
+## 7. Verification Notes
 
-- Dockerized frontend build has passed successfully
-- Dockerized local-dev startup has also been rechecked, with the Vite app serving on `http://localhost:5173`
-- Live register, login, logout, and `GET /api/me` checks were reverified against a running Spring backend through the frontend proxy path
-- Authenticated workspace, asset-list, and search reads were reverified against the live backend through the frontend proxy path
-- Workspace rename and delete were reverified live through the frontend proxy path against the running Spring backend
-- Happy-path search and transcript-context follow-up were manually verified in the browser
-- Workspace switching, creation, rename, and conservative delete behavior were manually verified
-- Processing -> transcript_ready -> searchable flow was manually verified
-- Failed asset flow was manually verified
-- Invalid or rejected upload flow was manually verified
-- Search empty state for nonsense queries was manually verified
+- Dockerized production build passed with `docker compose run --rm frontend npm run build`
+- Auth boundary, workspace queries, asset queries, transcript flow, explicit indexing, and search remain backend-aligned
+- The new routed shell compiles cleanly without adding external router dependencies
 
-## 7. Current Limitations / Intentionally Deferred
+## 8. Design / Product Notes
 
-- No full auth platform, collaboration, or account-management UI
-- No chatbot/RAG or assistant behavior
-- No media player or timestamp seek UX
-- No transcript timestamps invented on the frontend
-- No routing beyond the current single-shell demo
-- No heavy design system or production-polished UI
-- No broader edit asset management beyond the current selected-asset rename action
-- No bulk delete, undo, or archive flow
-- No advanced search filters beyond the current workspace-scoped query flow
-- Conflict and validation handling is still intentionally lightweight and frontend-only
+- The UI now uses a persistent app shell with navigation instead of a demo hero plus three fixed panels
+- Routing is hash-based to stay compatible with the current frontend setup and avoid new backend/server route assumptions
+- Upload copy and accepted file input remain lecture-video-first to match the current real product path
+- Search stays disabled until explicit indexing produces searchable assets
+- No assistant/chat UI, no fake AI affordances, and no unsupported media seek behavior were added
 
-## 8. Quick Status Summary
+## 9. Intentionally Deferred
 
-- Separate frontend repo is scaffolded and running as a Vite + React + TypeScript demo app
-- The app now enters through minimal register/login auth and reflects the authenticated user from `GET /api/me`
-- Current UI already covers workspace, upload, status, transcript, explicit indexing, search, and transcript context
-- Workspace controls now cover create, rename, and conservative delete inside the authenticated shell
-- Workspace and asset mutations now show lightweight success feedback without changing the single-shell structure
-- The selected-asset panel now includes a minimal inline rename flow that keeps list and search titles in sync on success
-- Asset rows now include a minimal delete action that refreshes the workspace list and clears only dependent stale state
-- Workspace delete now clears dependent stale state and safely falls forward to another visible workspace after backend confirmation
-- Selected asset lifecycle and next-step guidance are now clearer in the shell
-- The post-auth shell now reads more like a compact authenticated app surface, with live account/workspace/asset/search context above the three panels
-- Search/context state is more tightly synced to workspace, upload, indexing, and refreshed results
-- Demo-safety cleanup now prevents misleading indexing and uses clearer upload/transcript failure copy
-- Docker-first local development is set up and is the recommended way to run the app
-- The frontend currently depends only on the Spring product API surface
-- The older local/dev auth-session shortcut is no longer the main FE auth UX
-- Scope is still intentionally narrow, debuggable, and demo-friendly
+- Chat or assistant flows
+- Timestamp seek or media playback controls
+- Collaboration features
+- Cross-workspace asset movement
+- Advanced search filters
+- Analytics dashboards
+- Broader auth-platform features beyond the current supported backend path
+
+## 10. Quick Summary
+
+- The frontend now feels like a small real product rather than a single-shell demo
+- Navigation, layout hierarchy, empty states, and success/error handling are stronger and more realistic
+- Workspace management is now a first-class settings workflow
+- Asset review and search each have dedicated screens
+- Scope remains tightly pre-AI and honest to the backend contract
