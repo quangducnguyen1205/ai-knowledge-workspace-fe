@@ -100,6 +100,11 @@ type CreateWorkspacePayload = {
   name: string;
 };
 
+export type UpdateWorkspaceNameInput = {
+  workspaceId: string;
+  name: string;
+};
+
 type CreateAuthSessionPayload = {
   userId: string;
 };
@@ -292,6 +297,22 @@ export async function createWorkspace(name: string): Promise<Workspace> {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(payload),
+  });
+}
+
+export async function updateWorkspaceName(input: UpdateWorkspaceNameInput): Promise<Workspace> {
+  return request<Workspace>(`/api/workspaces/${input.workspaceId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ name: input.name }),
+  });
+}
+
+export async function deleteWorkspace(workspaceId: string): Promise<void> {
+  await request<void>(`/api/workspaces/${workspaceId}`, {
+    method: 'DELETE',
   });
 }
 

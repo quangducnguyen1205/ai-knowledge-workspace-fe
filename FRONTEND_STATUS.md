@@ -20,6 +20,8 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 - Read the authenticated product user honestly through `GET /api/me`, then hand off into the existing shell
 - Present the post-auth shell with a compact app header plus live context cards for authenticated account, active workspace, selected asset, and search state
 - Create a workspace from the top bar and switch the demo scope to it
+- Rename the current workspace from the same shell controls
+- Delete the current workspace when backend rules allow it, then reconcile safely to another visible workspace
 - Upload one lecture video into the selected workspace
 - List workspace-scoped assets and select one asset for inspection
 - Rename the currently selected asset title inline from the selected-asset panel
@@ -47,6 +49,8 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 - `GET /api/me`
 - `GET /api/workspaces`
 - `POST /api/workspaces`
+- `PATCH /api/workspaces/{workspaceId}`
+- `DELETE /api/workspaces/{workspaceId}`
 - `GET /api/assets`
 - `POST /api/assets/upload`
 - `PATCH /api/assets/{assetId}`
@@ -75,7 +79,7 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 - Live register, login, logout, and `GET /api/me` checks were reverified against a running Spring backend through the frontend proxy path
 - Authenticated workspace, asset-list, and search reads were reverified against the live backend through the frontend proxy path
 - Happy-path search and transcript-context follow-up were manually verified in the browser
-- Workspace switching and creation were manually verified
+- Workspace switching, creation, rename, and conservative delete behavior were manually verified
 - Processing -> transcript_ready -> searchable flow was manually verified
 - Failed asset flow was manually verified
 - Invalid or rejected upload flow was manually verified
@@ -99,8 +103,10 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 - Separate frontend repo is scaffolded and running as a Vite + React + TypeScript demo app
 - The app now enters through minimal register/login auth and reflects the authenticated user from `GET /api/me`
 - Current UI already covers workspace, upload, status, transcript, explicit indexing, search, and transcript context
+- Workspace controls now cover create, rename, and conservative delete inside the authenticated shell
 - The selected-asset panel now includes a minimal inline rename flow that keeps list and search titles in sync on success
 - Asset rows now include a minimal delete action that refreshes the workspace list and clears only dependent stale state
+- Workspace delete now clears dependent stale state and safely falls forward to another visible workspace after backend confirmation
 - Selected asset lifecycle and next-step guidance are now clearer in the shell
 - The post-auth shell now reads more like a compact authenticated app surface, with live account/workspace/asset/search context above the three panels
 - Search/context state is more tightly synced to workspace, upload, indexing, and refreshed results

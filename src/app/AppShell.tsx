@@ -25,6 +25,8 @@ import {
 } from '../features/search/search';
 import {
   useCreateWorkspaceMutation,
+  useDeleteWorkspaceMutation,
+  useRenameWorkspaceMutation,
   useWorkspacesQuery,
   WorkspaceBar,
   workspaceKeys,
@@ -89,6 +91,8 @@ export function AppShell() {
 
   const workspacesQuery = useWorkspacesQuery(isAuthenticated);
   const createWorkspaceMutation = useCreateWorkspaceMutation();
+  const renameWorkspaceMutation = useRenameWorkspaceMutation();
+  const deleteWorkspaceMutation = useDeleteWorkspaceMutation();
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
   const [preferredWorkspaceId, setPreferredWorkspaceId] = useState<string | null>(() => readStoredWorkspaceSelection());
   const [workspaceScopeRefreshAfter, setWorkspaceScopeRefreshAfter] = useState<number | null>(null);
@@ -433,6 +437,72 @@ export function AppShell() {
     setPreferredWorkspaceId(workspaceId);
     setPreferredAssetId(null);
     startTransition(() => setSelectedWorkspaceId(workspaceId));
+  }
+
+  function clearWorkspaceScopedState(workspaceId: string) {
+    const previousSelectedAssetId = selectedAssetIdRef.current;
+
+    if (previousSelectedAssetId) {
+      queryClient.removeQueries({ queryKey: assetKeys.status(previousSelectedAssetId) });
+      queryClient.removeQueries({ queryKey: assetKeys.transcript(previousSelectedAssetId) });
+    }
+
+    queryClient.removeQueries({ queryKey: assetKeys.list(workspaceId) });
+    queryClient.removeQueries({ queryKey: ['search', 'results', workspaceId] });
+    queryClient.removeQueries({ queryKey: searchKeys.all });
+
+    setPreferredWorkspaceId(null);
+    setSelectedAssetId(null);
+    setPreferredAssetId(null);
+    setStatusPollingEnabled(false);
+    setSubmittedSearch(null);
+    setSelectedSearchResult(null);
+    setSearchResetToken((current) => current + 1);
+    startTransition(() => setSelectedWorkspaceId(null));
+  }
+
+  function handleRenameWorkspace(input: { workspaceId: string; name: string }) {
+    renameWorkspaceMutation.mutate(input, {
+      onError: async (error, variables) => {
+        if (error instanceof ApiClientError && error.status === 404) {
+          setWorkspaceScopeRefreshAfter(Date.now());
+          clearWorkspaceScopedState(variables.workspaceId);
+          await queryClient.invalidateQueries({ queryKey: workspaceKeys.all });
+        }
+      },
+    });
+  }
+
+  function handleDeleteWorkspace() {
+    if (!selectedWorkspace || deleteWorkspaceMutation.isPending) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete workspace "${selectedWorkspace.name}"?\n\nOnly empty non-default workspaces can be removed. This will refresh the visible workspace scope.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    deleteWorkspaceMutation.mutate(
+      { workspaceId: selectedWorkspace.id },
+      {
+        onSuccess: async (_response, variables) => {
+          setWorkspaceScopeRefreshAfter(Date.now());
+          clearWorkspaceScopedState(variables.workspaceId);
+          await queryClient.invalidateQueries({ queryKey: workspaceKeys.all });
+        },
+        onError: async (error, variables) => {
+          if (error instanceof ApiClientError && error.status === 404) {
+            setWorkspaceScopeRefreshAfter(Date.now());
+            clearWorkspaceScopedState(variables.workspaceId);
+            await queryClient.invalidateQueries({ queryKey: workspaceKeys.all });
+          }
+        },
+      },
+    );
   }
 
   function clearSessionScopedState() {
@@ -788,11 +858,26 @@ export function AppShell() {
           selectedWorkspaceId={selectedWorkspaceId}
           isLoading={workspacesQuery.isLoading || workspacesQuery.isFetching || isTransitionPending}
           createError={createWorkspaceMutation.error}
+          renameError={
+            renameWorkspaceMutation.error &&
+            renameWorkspaceMutation.variables?.workspaceId === selectedWorkspaceId
+              ? renameWorkspaceMutation.error
+              : null
+          }
+          deleteError={
+            deleteWorkspaceMutation.error && deleteWorkspaceMutation.variables?.workspaceId === selectedWorkspaceId
+              ? deleteWorkspaceMutation.error
+              : null
+          }
           logoutError={logoutMutation.error}
           createSuccessId={createWorkspaceMutation.data?.id}
           onSelectWorkspace={handleSelectWorkspace}
           onCreateWorkspace={handleCreateWorkspace}
+          onRenameWorkspace={handleRenameWorkspace}
+          onDeleteWorkspace={handleDeleteWorkspace}
           isCreating={createWorkspaceMutation.isPending}
+          isRenaming={renameWorkspaceMutation.isPending}
+          isDeleting={deleteWorkspaceMutation.isPending}
           onLogout={handleLogout}
           isLoggingOut={logoutMutation.isPending}
         />
