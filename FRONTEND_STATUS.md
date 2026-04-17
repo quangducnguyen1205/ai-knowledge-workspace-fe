@@ -22,10 +22,12 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 - Create a workspace from the top bar and switch the demo scope to it
 - Rename the current workspace from the same shell controls
 - Delete the current workspace when backend rules allow it, then reconcile safely to another visible workspace
+- Show lightweight success feedback for workspace create, rename, and delete actions
 - Upload one lecture video into the selected workspace
 - List workspace-scoped assets and select one asset for inspection
 - Rename the currently selected asset title inline from the selected-asset panel
 - Delete one asset from the active workspace with a simple confirmation step
+- Show lightweight success feedback for asset rename and delete actions
 - Poll product-side asset status until the processing job becomes terminal
 - Fetch transcript rows only when the asset is actually ready through Spring
 - Show the selected asset lifecycle as a clearer current step plus next action
@@ -78,6 +80,7 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 - Dockerized local-dev startup has also been rechecked, with the Vite app serving on `http://localhost:5173`
 - Live register, login, logout, and `GET /api/me` checks were reverified against a running Spring backend through the frontend proxy path
 - Authenticated workspace, asset-list, and search reads were reverified against the live backend through the frontend proxy path
+- Workspace rename and delete were reverified live through the frontend proxy path against the running Spring backend
 - Happy-path search and transcript-context follow-up were manually verified in the browser
 - Workspace switching, creation, rename, and conservative delete behavior were manually verified
 - Processing -> transcript_ready -> searchable flow was manually verified
@@ -104,6 +107,7 @@ This repo contains the separate demo-focused frontend for AI Knowledge Workspace
 - The app now enters through minimal register/login auth and reflects the authenticated user from `GET /api/me`
 - Current UI already covers workspace, upload, status, transcript, explicit indexing, search, and transcript context
 - Workspace controls now cover create, rename, and conservative delete inside the authenticated shell
+- Workspace and asset mutations now show lightweight success feedback without changing the single-shell structure
 - The selected-asset panel now includes a minimal inline rename flow that keeps list and search titles in sync on success
 - Asset rows now include a minimal delete action that refreshes the workspace list and clears only dependent stale state
 - Workspace delete now clears dependent stale state and safely falls forward to another visible workspace after backend confirmation

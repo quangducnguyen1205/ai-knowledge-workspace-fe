@@ -552,6 +552,7 @@ export function AssetsPanel({
   workspaceName,
   assets,
   selectedAssetId,
+  successNotice,
   assetsError,
   deleteError,
   deleteBusy,
@@ -567,6 +568,7 @@ export function AssetsPanel({
   workspaceName: string;
   assets: AssetSummary[];
   selectedAssetId: string | null;
+  successNotice: { title: string; message: string } | null;
   assetsError: unknown;
   deleteError: unknown;
   deleteBusy: boolean;
@@ -710,6 +712,9 @@ export function AssetsPanel({
             detail={deleteErrorCopy.detail}
           />
         ) : null}
+        {!assetsLoading && !assetsError && successNotice ? (
+          <InfoBanner tone="success" title={successNotice.title} message={successNotice.message} />
+        ) : null}
 
         {!assetsLoading && !assetsError && assets.length === 0 ? (
           <EmptyState
@@ -763,6 +768,7 @@ export function AssetsPanel({
 export function SelectedAssetPanel({
   asset,
   workspaceName,
+  successNotice,
   resolvedAssetStatus,
   statusResponse,
   statusError,
@@ -780,6 +786,7 @@ export function SelectedAssetPanel({
 }: {
   asset: AssetSummary | null;
   workspaceName: string;
+  successNotice: { title: string; message: string } | null;
   resolvedAssetStatus: AssetStatus | null;
   statusResponse?: AssetStatusResponse;
   statusError: unknown;
@@ -798,6 +805,7 @@ export function SelectedAssetPanel({
   const transcriptRowCount = transcriptRows?.length ?? 0;
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [draftTitle, setDraftTitle] = useState('');
+  const normalizedDraftTitle = draftTitle.trim();
   const transcriptConflictCopy = getTranscriptConflictCopy(
     transcriptError,
     resolvedAssetStatus,
@@ -914,7 +922,11 @@ export function SelectedAssetPanel({
               disabled={isRenaming}
             />
             <div className="selected-asset-title__actions">
-              <Button type="submit" className="button--inline" disabled={isRenaming}>
+              <Button
+                type="submit"
+                className="button--inline"
+                disabled={isRenaming || !normalizedDraftTitle || normalizedDraftTitle === asset.title.trim()}
+              >
                 {isRenaming ? 'Saving...' : 'Save'}
               </Button>
               <Button
@@ -951,6 +963,7 @@ export function SelectedAssetPanel({
           detail={renameErrorCopy.detail}
         />
       ) : null}
+      {successNotice ? <InfoBanner tone="success" title={successNotice.title} message={successNotice.message} /> : null}
 
       <div className="detail-grid">
         {statusPairs.map(([label, value]) => (

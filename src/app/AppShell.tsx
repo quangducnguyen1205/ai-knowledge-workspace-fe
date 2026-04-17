@@ -42,6 +42,11 @@ import {
 
 const lastWorkspaceSelectionStorageKey = 'akw:last-workspace-id';
 
+type SuccessNotice = {
+  title: string;
+  message: string;
+};
+
 function readStoredWorkspaceSelection(): string | null {
   if (typeof window === 'undefined') {
     return null;
@@ -155,6 +160,9 @@ export function AppShell() {
   const indexMutation = useIndexAssetMutation();
   const deleteMutation = useDeleteAssetMutation();
   const renameMutation = useRenameAssetMutation();
+  const [workspaceSuccessNotice, setWorkspaceSuccessNotice] = useState<SuccessNotice | null>(null);
+  const [assetLibrarySuccessNotice, setAssetLibrarySuccessNotice] = useState<SuccessNotice | null>(null);
+  const [assetDetailSuccessNotice, setAssetDetailSuccessNotice] = useState<SuccessNotice | null>(null);
 
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [preferredAssetId, setPreferredAssetId] = useState<string | null>(null);
@@ -164,10 +172,22 @@ export function AppShell() {
   useEffect(() => {
     setSelectedAssetId(null);
     setPreferredAssetId(null);
+    setAssetLibrarySuccessNotice(null);
+    setAssetDetailSuccessNotice(null);
   }, [selectedWorkspaceId]);
 
   useEffect(() => {
+    setWorkspaceSuccessNotice(null);
+    setAssetLibrarySuccessNotice(null);
+    setAssetDetailSuccessNotice(null);
+  }, [currentUser?.id]);
+
+  useEffect(() => {
     selectedAssetIdRef.current = selectedAssetId;
+  }, [selectedAssetId]);
+
+  useEffect(() => {
+    setAssetDetailSuccessNotice(null);
   }, [selectedAssetId]);
 
   useEffect(() => {
@@ -426,9 +446,14 @@ export function AppShell() {
   }, [searchQuery.data?.results, selectedSearchResult]);
 
   function handleCreateWorkspace(name: string) {
+    setWorkspaceSuccessNotice(null);
     createWorkspaceMutation.mutate(name, {
       onSuccess: (workspace) => {
         setPreferredWorkspaceId(workspace.id);
+        setWorkspaceSuccessNotice({
+          title: 'Workspace created',
+          message: `Created "${workspace.name}" and refreshed the visible workspace scope.`,
+        });
       },
     });
   }
@@ -457,12 +482,21 @@ export function AppShell() {
     setStatusPollingEnabled(false);
     setSubmittedSearch(null);
     setSelectedSearchResult(null);
+    setAssetLibrarySuccessNotice(null);
+    setAssetDetailSuccessNotice(null);
     setSearchResetToken((current) => current + 1);
     startTransition(() => setSelectedWorkspaceId(null));
   }
 
   function handleRenameWorkspace(input: { workspaceId: string; name: string }) {
+    setWorkspaceSuccessNotice(null);
     renameWorkspaceMutation.mutate(input, {
+      onSuccess: (workspace) => {
+        setWorkspaceSuccessNotice({
+          title: 'Workspace renamed',
+          message: `Active workspace is now "${workspace.name}".`,
+        });
+      },
       onError: async (error, variables) => {
         if (error instanceof ApiClientError && error.status === 404) {
           setWorkspaceScopeRefreshAfter(Date.now());
@@ -478,20 +512,26 @@ export function AppShell() {
       return;
     }
 
+    const deletingWorkspaceName = selectedWorkspace.name;
     const confirmed = window.confirm(
-      `Delete workspace "${selectedWorkspace.name}"?\n\nOnly empty non-default workspaces can be removed. This will refresh the visible workspace scope.`,
+      `Delete workspace "${deletingWorkspaceName}"?\n\nOnly empty non-default workspaces can be removed. This will refresh the visible workspace scope.`,
     );
 
     if (!confirmed) {
       return;
     }
 
+    setWorkspaceSuccessNotice(null);
     deleteWorkspaceMutation.mutate(
       { workspaceId: selectedWorkspace.id },
       {
         onSuccess: async (_response, variables) => {
           setWorkspaceScopeRefreshAfter(Date.now());
           clearWorkspaceScopedState(variables.workspaceId);
+          setWorkspaceSuccessNotice({
+            title: 'Workspace deleted',
+            message: `Removed "${deletingWorkspaceName}" and refreshed the visible workspace scope.`,
+          });
           await queryClient.invalidateQueries({ queryKey: workspaceKeys.all });
         },
         onError: async (error, variables) => {
@@ -518,6 +558,9 @@ export function AppShell() {
     setStatusPollingEnabled(false);
     setSubmittedSearch(null);
     setSelectedSearchResult(null);
+    setWorkspaceSuccessNotice(null);
+    setAssetLibrarySuccessNotice(null);
+    setAssetDetailSuccessNotice(null);
     setSearchResetToken((current) => current + 1);
     startTransition(() => setSelectedWorkspaceId(null));
 
@@ -659,6 +702,8 @@ export function AppShell() {
       return;
     }
 
+    setAssetLibrarySuccessNotice(null);
+    setAssetDetailSuccessNotice(null);
     deleteMutation.mutate(
       {
         assetId: asset.assetId,
@@ -667,6 +712,10 @@ export function AppShell() {
       {
         onSuccess: async (_response, variables) => {
           clearAssetDependentState(variables.assetId);
+          setAssetLibrarySuccessNotice({
+            title: 'Asset deleted',
+            message: `Removed "${asset.title}" from ${selectedWorkspace?.name ?? 'the active workspace'}.`,
+          });
 
           await Promise.all([
             queryClient.invalidateQueries({ queryKey: assetKeys.list(variables.workspaceId) }),
@@ -692,6 +741,7 @@ export function AppShell() {
       return;
     }
 
+    setAssetDetailSuccessNotice(null);
     renameMutation.mutate(
       {
         assetId: selectedAsset.assetId,
@@ -718,6 +768,10 @@ export function AppShell() {
           setSelectedSearchResult((current) =>
             current?.assetId === variables.assetId ? { ...current, assetTitle: response.title } : current,
           );
+          setAssetDetailSuccessNotice({
+            title: 'Asset renamed',
+            message: `Title updated to "${response.title}".`,
+          });
         },
         onError: async (error, variables) => {
           if (error instanceof ApiClientError && error.status === 404) {
@@ -857,6 +911,7 @@ export function AppShell() {
           selectedWorkspace={selectedWorkspace}
           selectedWorkspaceId={selectedWorkspaceId}
           isLoading={workspacesQuery.isLoading || workspacesQuery.isFetching || isTransitionPending}
+          successNotice={workspaceSuccessNotice}
           createError={createWorkspaceMutation.error}
           renameError={
             renameWorkspaceMutation.error &&
@@ -889,6 +944,7 @@ export function AppShell() {
             workspaceName={selectedWorkspace.name}
             assets={displayAssets}
             selectedAssetId={selectedAssetId}
+            successNotice={assetLibrarySuccessNotice}
             assetsError={assetsQuery.error}
             deleteError={visibleDeleteError}
             deleteBusy={deleteMutation.isPending}
@@ -905,6 +961,7 @@ export function AppShell() {
           <SelectedAssetPanel
             asset={selectedAsset}
             workspaceName={selectedWorkspace.name}
+            successNotice={assetDetailSuccessNotice}
             resolvedAssetStatus={resolvedAssetStatus}
             statusResponse={assetStatusQuery.data}
             statusError={assetStatusQuery.error}

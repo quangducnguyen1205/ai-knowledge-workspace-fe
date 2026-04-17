@@ -172,6 +172,7 @@ export function WorkspaceBar({
   selectedWorkspace,
   selectedWorkspaceId,
   isLoading,
+  successNotice,
   createError,
   renameError,
   deleteError,
@@ -191,6 +192,7 @@ export function WorkspaceBar({
   selectedWorkspace: Workspace | null;
   selectedWorkspaceId: string | null;
   isLoading: boolean;
+  successNotice: { title: string; message: string } | null;
   createError: unknown;
   renameError: unknown;
   deleteError: unknown;
@@ -211,6 +213,7 @@ export function WorkspaceBar({
   const logoutErrorCopy = getFriendlyLogoutErrorCopy(logoutError);
   const renameErrorCopy = getFriendlyWorkspaceRenameErrorCopy(renameError);
   const deleteErrorCopy = getFriendlyWorkspaceDeleteErrorCopy(deleteError);
+  const workspaceActionBusy = isCreating || isRenaming || isDeleting;
 
   useEffect(() => {
     if (createSuccessId) {
@@ -286,7 +289,7 @@ export function WorkspaceBar({
             className="field__input"
             value={selectedWorkspaceId ?? ''}
             onChange={(event) => onSelectWorkspace(event.target.value)}
-            disabled={isLoading || workspaces.length === 0}
+            disabled={isLoading || workspaces.length === 0 || isRenaming || isDeleting}
           >
             {workspaces.length === 0 ? <option value="">No workspace yet</option> : null}
             {workspaces.map((workspace) => (
@@ -312,10 +315,11 @@ export function WorkspaceBar({
               onChange={(event) => setWorkspaceName(event.target.value)}
               placeholder="Algorithms, Databases, Distributed Systems..."
               maxLength={255}
+              disabled={workspaceActionBusy}
             />
             <span className="field__hint">Use focused workspace names that make future search scope obvious.</span>
           </label>
-          <Button type="submit" tone="secondary" disabled={isCreating || !workspaceName.trim()}>
+          <Button type="submit" tone="secondary" disabled={workspaceActionBusy || !workspaceName.trim()}>
             {isCreating ? 'Creating...' : 'Create workspace'}
           </Button>
         </form>
@@ -330,7 +334,7 @@ export function WorkspaceBar({
               onChange={(event) => setRenameWorkspaceName(event.target.value)}
               placeholder="Rename the active workspace"
               maxLength={255}
-              disabled={!selectedWorkspace}
+              disabled={!selectedWorkspace || workspaceActionBusy}
             />
             <span className="field__hint">
               {selectedWorkspace
@@ -344,7 +348,7 @@ export function WorkspaceBar({
               type="submit"
               tone="ghost"
               disabled={
-                isRenaming ||
+                workspaceActionBusy ||
                 !selectedWorkspace ||
                 !renameWorkspaceName.trim() ||
                 renameWorkspaceName.trim() === selectedWorkspace.name
@@ -352,13 +356,21 @@ export function WorkspaceBar({
             >
               {isRenaming ? 'Saving...' : 'Rename workspace'}
             </Button>
-            <Button type="button" tone="ghost" disabled={isDeleting || !selectedWorkspace} onClick={onDeleteWorkspace}>
+            <Button type="button" tone="ghost" disabled={workspaceActionBusy || !selectedWorkspace} onClick={onDeleteWorkspace}>
               {isDeleting ? 'Deleting...' : 'Delete workspace'}
             </Button>
           </div>
         </form>
       </div>
 
+      {successNotice ? (
+        <InfoBanner
+          className="workspace-bar__error"
+          tone="success"
+          title={successNotice.title}
+          message={successNotice.message}
+        />
+      ) : null}
       {logoutError ? (
         <ErrorBanner
           error={logoutError}
