@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   getTranscriptContext,
@@ -8,6 +8,7 @@ import {
   type TranscriptContextResponse,
   type TranscriptRow,
 } from '../../lib/api';
+import { buildTranscriptDisplayRows } from '../../lib/transcript-display';
 import { Button, EmptyState, ErrorBanner, InfoBanner, LoadingBlock, Section, formatDateTime, formatScore } from '../../lib/ui';
 
 export type SearchParams = {
@@ -94,6 +95,10 @@ export function SearchPanel({
   const [searchInput, setSearchInput] = useState('');
   const searchEnabled = searchableAssetCount > 0;
   const hasSearchResults = Boolean(searchResponse?.results.length);
+  const displayContextRows = useMemo(
+    () => (contextResponse?.rows.length ? buildTranscriptDisplayRows(contextResponse.rows) : []),
+    [contextResponse?.rows],
+  );
   const searchPromptState = !activeQuery
     ? {
         title: 'Search this workspace',
@@ -288,7 +293,7 @@ export function SearchPanel({
             </div>
 
             <ol className="transcript-list transcript-list--compact">
-              {contextResponse.rows.map((row) => {
+              {displayContextRows.map(({ row, displayText, overlapHidden }) => {
                 const isHit = matchesContextRow(row, contextResponse.transcriptRowId);
 
                 return (
@@ -299,9 +304,10 @@ export function SearchPanel({
                     <div className="transcript-list__meta">
                       <span>Segment {row.segmentIndex ?? 'n/a'}</span>
                       <span>{formatDateTime(row.createdAt)}</span>
+                      {overlapHidden ? <span className="transcript-overlap-note">Overlap hidden</span> : null}
                       {isHit ? <span className="hit-pill">Hit row</span> : null}
                     </div>
-                    <p>{row.text}</p>
+                    <p>{displayText}</p>
                   </li>
                 );
               })}

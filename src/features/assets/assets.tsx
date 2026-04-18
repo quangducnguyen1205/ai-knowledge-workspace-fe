@@ -18,6 +18,7 @@ import {
   type TranscriptRow,
   type UpdateAssetTitleInput,
 } from '../../lib/api';
+import { buildTranscriptDisplayRows } from '../../lib/transcript-display';
 import { Button, EmptyState, ErrorBanner, InfoBanner, LoadingBlock, Section, formatDateTime } from '../../lib/ui';
 
 export const assetKeys = {
@@ -830,6 +831,10 @@ export function SelectedAssetPanel({
     transcriptRows,
     transcriptError,
   });
+  const displayTranscriptRows = useMemo(
+    () => (transcriptRows?.length ? buildTranscriptDisplayRows(transcriptRows) : []),
+    [transcriptRows],
+  );
   const statusPairs = useMemo(
     () => [
       ['Workspace', workspaceName],
@@ -1043,15 +1048,16 @@ export function SelectedAssetPanel({
           />
         ) : null}
 
-        {transcriptRows?.length ? (
+        {displayTranscriptRows.length ? (
           <ol className="transcript-list">
-            {transcriptRows.map((row) => (
+            {displayTranscriptRows.map(({ row, displayText, overlapHidden }) => (
               <li key={row.id ?? `segment-${row.segmentIndex ?? 'missing'}`} className="transcript-list__item">
                 <div className="transcript-list__meta">
                   <span>Segment {row.segmentIndex ?? 'n/a'}</span>
                   <span>{formatDateTime(row.createdAt)}</span>
+                  {overlapHidden ? <span className="transcript-overlap-note">Overlap hidden</span> : null}
                 </div>
-                <p>{row.text}</p>
+                <p>{displayText}</p>
               </li>
             ))}
           </ol>

@@ -1103,6 +1103,18 @@ code {
   background: rgba(49, 89, 203, 0.10);
 }
 
+.transcript-overlap-note {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--text-soft);
+  background: rgba(18, 24, 38, 0.06);
+}
+
 .app-shell--product {
   width: 100%;
   max-width: none;
