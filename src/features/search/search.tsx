@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   getTranscriptContext,
@@ -93,8 +93,14 @@ export function SearchPanel({
   onSelectResult: (result: SearchResult) => void;
 }) {
   const [searchInput, setSearchInput] = useState('');
+  const [contextSpotlightActive, setContextSpotlightActive] = useState(false);
+  const contextPanelRef = useRef<HTMLDivElement | null>(null);
+  const contextSpotlightTimeoutRef = useRef<number | null>(null);
   const searchEnabled = searchableAssetCount > 0;
   const hasSearchResults = Boolean(searchResponse?.results.length);
+  const selectedResultKey = selectedResult
+    ? `${selectedResult.assetId}-${selectedResult.transcriptRowId ?? 'no-row'}-${selectedResult.segmentIndex ?? 'na'}`
+    : null;
   const displayContextRows = useMemo(
     () => (contextResponse?.rows.length ? buildTranscriptDisplayRows(contextResponse.rows) : []),
     [contextResponse?.rows],
@@ -131,6 +137,43 @@ export function SearchPanel({
   useEffect(() => {
     setSearchInput('');
   }, [resetToken, workspaceName]);
+
+  useEffect(() => {
+    if (contextSpotlightTimeoutRef.current !== null) {
+      window.clearTimeout(contextSpotlightTimeoutRef.current);
+      contextSpotlightTimeoutRef.current = null;
+    }
+
+    if (!selectedResultKey) {
+      setContextSpotlightActive(false);
+      return;
+    }
+
+    setContextSpotlightActive(true);
+
+    const frameId = window.requestAnimationFrame(() => {
+      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      contextPanelRef.current?.scrollIntoView({
+        behavior: prefersReducedMotion ? 'auto' : 'smooth',
+        block: 'start',
+      });
+    });
+
+    contextSpotlightTimeoutRef.current = window.setTimeout(() => {
+      setContextSpotlightActive(false);
+      contextSpotlightTimeoutRef.current = null;
+    }, 1800);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+
+      if (contextSpotlightTimeoutRef.current !== null) {
+        window.clearTimeout(contextSpotlightTimeoutRef.current);
+        contextSpotlightTimeoutRef.current = null;
+      }
+    };
+  }, [selectedResultKey]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -254,7 +297,10 @@ export function SearchPanel({
         </ul>
       ) : null}
 
-      <div className="context-panel">
+      <div
+        ref={contextPanelRef}
+        className={`context-panel ${contextSpotlightActive ? 'context-panel--spotlight' : ''}`}
+      >
         <div className="panel-block__header">
           <h3>Transcript context</h3>
           <span className="context-panel__hint">Context window: 2 rows around the hit</span>

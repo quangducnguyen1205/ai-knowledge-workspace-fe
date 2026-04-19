@@ -321,6 +321,17 @@ code {
   gap: 14px;
 }
 
+.context-panel {
+  scroll-margin-top: 104px;
+  border-radius: var(--radius-lg);
+  transition: background-color 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.context-panel--spotlight {
+  box-shadow: 0 0 0 4px rgba(49, 89, 203, 0.14);
+  background: rgba(49, 89, 203, 0.06);
+}
+
 .auth-form__actions,
 .upload-card__actions {
   display: flex;
