@@ -1,6 +1,16 @@
-import type { AssetIndexResponse, AssetStatus, AssetStatusResponse, AssetSummary, TranscriptRow } from '../../lib/api';
+import type {
+  AssetIndexResponse,
+  AssetStatus,
+  AssetStatusResponse,
+  AssetSummary,
+  SearchResponse,
+  SearchResult,
+  TranscriptContextResponse,
+  TranscriptRow,
+} from '../../lib/api';
 import { Button, EmptyState, Section } from '../../lib/ui';
 import { SelectedAssetPanel, StatusBadge } from './assets';
+import { SearchPanel } from '../search/search';
 
 type AssetDetailScreenProps = {
   workspaceName: string;
@@ -18,10 +28,21 @@ type AssetDetailScreenProps = {
   isIndexing: boolean;
   isRenaming: boolean;
   renameError: unknown;
+  activeQuery: string | null;
+  searchResponse?: SearchResponse;
+  searchError: unknown;
+  isSearching: boolean;
+  contextResponse?: TranscriptContextResponse;
+  contextError: unknown;
+  isContextLoading: boolean;
+  selectedSearchResult: SearchResult | null;
+  searchResetToken: number;
   searchableAssetCount: number;
   onIndex: () => void;
   onRename: (title: string) => void;
   onResetRename: () => void;
+  onSearchWithinAsset: (query: string) => void;
+  onSelectSearchResult: (result: SearchResult) => void;
   onOpenLibrary: () => void;
   onOpenSearch: () => void;
   onOpenAsset: (assetId: string) => void;
@@ -43,15 +64,27 @@ export function AssetDetailScreen({
   isIndexing,
   isRenaming,
   renameError,
+  activeQuery,
+  searchResponse,
+  searchError,
+  isSearching,
+  contextResponse,
+  contextError,
+  isContextLoading,
+  selectedSearchResult,
+  searchResetToken,
   searchableAssetCount,
   onIndex,
   onRename,
   onResetRename,
+  onSearchWithinAsset,
+  onSelectSearchResult,
   onOpenLibrary,
   onOpenSearch,
   onOpenAsset,
 }: AssetDetailScreenProps) {
   const otherAssets = assets.filter((currentAsset) => currentAsset.assetId !== asset?.assetId).slice(0, 5);
+  const assetSearchableCount = resolvedAssetStatus === 'SEARCHABLE' ? 1 : 0;
 
   return (
     <div className="screen-grid screen-grid--detail">
@@ -75,6 +108,25 @@ export function AssetDetailScreen({
           onRename={onRename}
           onResetRename={onResetRename}
         />
+
+        {asset ? (
+          <SearchPanel
+            workspaceName={workspaceName}
+            searchableAssetCount={assetSearchableCount}
+            resetToken={searchResetToken}
+            activeQuery={activeQuery}
+            searchResponse={searchResponse}
+            searchError={searchError}
+            isSearching={isSearching}
+            contextResponse={contextResponse}
+            contextError={contextError}
+            isContextLoading={isContextLoading}
+            selectedResult={selectedSearchResult}
+            scope={{ mode: 'asset', assetTitle: asset.title }}
+            onSearch={onSearchWithinAsset}
+            onSelectResult={onSelectSearchResult}
+          />
+        ) : null}
       </div>
 
       <div className="screen-side">

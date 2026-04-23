@@ -341,16 +341,33 @@ export function AppShell() {
   const [selectedSearchResult, setSelectedSearchResult] = useState<SearchResult | null>(null);
   const [searchResetToken, setSearchResetToken] = useState(0);
   const selectedSearchResultRef = useRef<SearchResult | null>(null);
+  const [assetDetailSubmittedSearch, setAssetDetailSubmittedSearch] = useState<string | null>(null);
+  const [selectedAssetDetailSearchResult, setSelectedAssetDetailSearchResult] = useState<SearchResult | null>(null);
+  const [assetDetailSearchResetToken, setAssetDetailSearchResetToken] = useState(0);
+  const selectedAssetDetailSearchResultRef = useRef<SearchResult | null>(null);
 
   useEffect(() => {
     selectedSearchResultRef.current = selectedSearchResult;
   }, [selectedSearchResult]);
 
   useEffect(() => {
+    selectedAssetDetailSearchResultRef.current = selectedAssetDetailSearchResult;
+  }, [selectedAssetDetailSearchResult]);
+
+  useEffect(() => {
     setSubmittedSearch(null);
     setSelectedSearchResult(null);
     setSearchResetToken((current) => current + 1);
+    setAssetDetailSubmittedSearch(null);
+    setSelectedAssetDetailSearchResult(null);
+    setAssetDetailSearchResetToken((current) => current + 1);
   }, [selectedWorkspaceId]);
+
+  useEffect(() => {
+    setAssetDetailSubmittedSearch(null);
+    setSelectedAssetDetailSearchResult(null);
+    setAssetDetailSearchResetToken((current) => current + 1);
+  }, [selectedAssetId]);
 
   useEffect(() => {
     uploadMutation.reset();
@@ -371,14 +388,31 @@ export function AppShell() {
   const searchQuery = useSearchQuery(
     submittedSearch && selectedWorkspaceId ? { query: submittedSearch, workspaceId: selectedWorkspaceId } : null,
   );
+  const assetDetailSearchQuery = useSearchQuery(
+    assetDetailSubmittedSearch && selectedWorkspaceId && selectedAssetId
+      ? { query: assetDetailSubmittedSearch, workspaceId: selectedWorkspaceId, assetId: selectedAssetId }
+      : null,
+  );
 
   const contextLookupId = selectedSearchResult ? resolveTranscriptLookupId(selectedSearchResult) : null;
+  const assetDetailContextLookupId = selectedAssetDetailSearchResult
+    ? resolveTranscriptLookupId(selectedAssetDetailSearchResult)
+    : null;
 
   const contextQuery = useTranscriptContextQuery(
     selectedSearchResult && contextLookupId
       ? {
           assetId: selectedSearchResult.assetId,
           transcriptRowId: contextLookupId,
+          window: 2,
+        }
+      : null,
+  );
+  const assetDetailContextQuery = useTranscriptContextQuery(
+    selectedAssetDetailSearchResult && assetDetailContextLookupId
+      ? {
+          assetId: selectedAssetDetailSearchResult.assetId,
+          transcriptRowId: assetDetailContextLookupId,
           window: 2,
         }
       : null,
@@ -394,6 +428,9 @@ export function AppShell() {
     setSubmittedSearch(null);
     setSelectedSearchResult(null);
     setSearchResetToken((current) => current + 1);
+    setAssetDetailSubmittedSearch(null);
+    setSelectedAssetDetailSearchResult(null);
+    setAssetDetailSearchResetToken((current) => current + 1);
   }, [uploadMutation.data?.assetId]);
 
   useEffect(() => {
@@ -406,6 +443,11 @@ export function AppShell() {
     setSubmittedSearch(null);
     setSelectedSearchResult(null);
     setSearchResetToken((current) => current + 1);
+    if (indexedAssetId === selectedAssetIdRef.current) {
+      setAssetDetailSubmittedSearch(null);
+      setSelectedAssetDetailSearchResult(null);
+      setAssetDetailSearchResetToken((current) => current + 1);
+    }
   }, [indexMutation.data?.assetId]);
 
   useEffect(() => {
@@ -426,6 +468,25 @@ export function AppShell() {
       setSelectedSearchResult(null);
     }
   }, [searchQuery.data?.results, selectedSearchResult]);
+
+  useEffect(() => {
+    const results = assetDetailSearchQuery.data?.results;
+
+    if (!selectedAssetDetailSearchResult || !results) {
+      return;
+    }
+
+    const stillPresent = results.some(
+      (result) =>
+        result.assetId === selectedAssetDetailSearchResult.assetId &&
+        result.transcriptRowId === selectedAssetDetailSearchResult.transcriptRowId &&
+        result.segmentIndex === selectedAssetDetailSearchResult.segmentIndex,
+    );
+
+    if (!stillPresent) {
+      setSelectedAssetDetailSearchResult(null);
+    }
+  }, [assetDetailSearchQuery.data?.results, selectedAssetDetailSearchResult]);
 
   useEffect(() => {
     if (selectedWorkspace) {
@@ -474,6 +535,9 @@ export function AppShell() {
     setSubmittedSearch(null);
     setSelectedSearchResult(null);
     setSearchResetToken((current) => current + 1);
+    setAssetDetailSubmittedSearch(null);
+    setSelectedAssetDetailSearchResult(null);
+    setAssetDetailSearchResetToken((current) => current + 1);
     startTransition(() => setSelectedWorkspaceId(workspaceId));
   }
 
@@ -498,6 +562,9 @@ export function AppShell() {
     setAssetLibrarySuccessNotice(null);
     setAssetDetailSuccessNotice(null);
     setSearchResetToken((current) => current + 1);
+    setAssetDetailSubmittedSearch(null);
+    setSelectedAssetDetailSearchResult(null);
+    setAssetDetailSearchResetToken((current) => current + 1);
     startTransition(() => setSelectedWorkspaceId(null));
   }
 
@@ -576,6 +643,9 @@ export function AppShell() {
     setAssetLibrarySuccessNotice(null);
     setAssetDetailSuccessNotice(null);
     setSearchResetToken((current) => current + 1);
+    setAssetDetailSubmittedSearch(null);
+    setSelectedAssetDetailSearchResult(null);
+    setAssetDetailSearchResetToken((current) => current + 1);
     startTransition(() => setSelectedWorkspaceId(null));
 
     queryClient.removeQueries({ queryKey: searchKeys.all });
@@ -704,6 +774,8 @@ export function AppShell() {
     if (selectedAssetIdRef.current === assetId) {
       setSelectedAssetId(null);
       setStatusPollingEnabled(false);
+      setAssetDetailSubmittedSearch(null);
+      setAssetDetailSearchResetToken((current) => current + 1);
       queryClient.removeQueries({ queryKey: assetKeys.status(assetId) });
       queryClient.removeQueries({ queryKey: assetKeys.transcript(assetId) });
     }
@@ -714,6 +786,10 @@ export function AppShell() {
 
     if (selectedSearchResultRef.current?.assetId === assetId) {
       setSelectedSearchResult(null);
+    }
+
+    if (selectedAssetDetailSearchResultRef.current?.assetId === assetId) {
+      setSelectedAssetDetailSearchResult(null);
     }
 
     queryClient.removeQueries({ queryKey: ['search', 'context', assetId] });
@@ -799,6 +875,9 @@ export function AppShell() {
 
           updateSearchResultTitles(variables.assetId, response.title);
           setSelectedSearchResult((current) =>
+            current?.assetId === variables.assetId ? { ...current, assetTitle: response.title } : current,
+          );
+          setSelectedAssetDetailSearchResult((current) =>
             current?.assetId === variables.assetId ? { ...current, assetTitle: response.title } : current,
           );
           setAssetDetailSuccessNotice({
@@ -983,10 +1062,24 @@ export function AppShell() {
             isIndexing={indexMutation.isPending}
             isRenaming={Boolean(isRenamingSelectedAsset)}
             renameError={visibleRenameError}
+            activeQuery={assetDetailSubmittedSearch}
+            searchResponse={assetDetailSearchQuery.data}
+            searchError={assetDetailSearchQuery.error}
+            isSearching={assetDetailSearchQuery.isLoading || assetDetailSearchQuery.isFetching}
+            contextResponse={assetDetailContextQuery.data}
+            contextError={assetDetailContextQuery.error}
+            isContextLoading={assetDetailContextQuery.isLoading || assetDetailContextQuery.isFetching}
+            selectedSearchResult={selectedAssetDetailSearchResult}
+            searchResetToken={assetDetailSearchResetToken}
             searchableAssetCount={searchableAssetCount}
             onIndex={handleIndexAsset}
             onRename={handleRenameAsset}
             onResetRename={() => renameMutation.reset()}
+            onSearchWithinAsset={(query) => {
+              setAssetDetailSubmittedSearch(query);
+              setSelectedAssetDetailSearchResult(null);
+            }}
+            onSelectSearchResult={setSelectedAssetDetailSearchResult}
             onOpenLibrary={() => navigate({ name: 'library' })}
             onOpenSearch={() => navigate({ name: 'search' })}
             onOpenAsset={openAsset}

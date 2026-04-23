@@ -14,6 +14,7 @@ import { Button, EmptyState, ErrorBanner, InfoBanner, LoadingBlock, Section, for
 export type SearchParams = {
   query: string;
   workspaceId: string;
+  assetId?: string | null;
 };
 
 export type TranscriptContextParams = {
@@ -24,7 +25,8 @@ export type TranscriptContextParams = {
 
 export const searchKeys = {
   all: ['search'] as const,
-  results: (workspaceId: string, query: string) => ['search', 'results', workspaceId, query] as const,
+  results: (workspaceId: string, query: string, assetId?: string | null) =>
+    ['search', 'results', workspaceId, assetId ?? 'all-assets', query] as const,
   context: (assetId: string, transcriptRowId: string, window: number) =>
     ['search', 'context', assetId, transcriptRowId, window] as const,
 };
@@ -47,11 +49,18 @@ function matchesContextRow(row: TranscriptRow, transcriptRowId: string): boolean
 
 export function useSearchQuery(params: SearchParams | null) {
   return useQuery({
-    queryKey: params ? searchKeys.results(params.workspaceId, params.query) : ['search', 'results', 'empty'],
-    queryFn: () => searchTranscript(params?.query ?? '', params?.workspaceId ?? ''),
+    queryKey: params
+      ? searchKeys.results(params.workspaceId, params.query, params.assetId)
+      : ['search', 'results', 'empty'],
+    queryFn: () => searchTranscript(params?.query ?? '', params?.workspaceId ?? '', params?.assetId),
     enabled: Boolean(params?.query && params?.workspaceId),
   });
 }
+
+type SearchPanelScope = {
+  mode: 'workspace' | 'asset';
+  assetTitle?: string;
+};
 
 export function useTranscriptContextQuery(params: TranscriptContextParams | null) {
   return useQuery({
@@ -75,6 +84,7 @@ export function SearchPanel({
   contextError,
   isContextLoading,
   selectedResult,
+  scope,
   onSearch,
   onSelectResult,
 }: {
@@ -89,6 +99,7 @@ export function SearchPanel({
   contextError: unknown;
   isContextLoading: boolean;
   selectedResult: SearchResult | null;
+  scope?: SearchPanelScope;
   onSearch: (query: string) => void;
   onSelectResult: (result: SearchResult) => void;
 }) {
@@ -96,7 +107,16 @@ export function SearchPanel({
   const [contextSpotlightActive, setContextSpotlightActive] = useState(false);
   const contextPanelRef = useRef<HTMLDivElement | null>(null);
   const contextSpotlightTimeoutRef = useRef<number | null>(null);
+  const isAssetScoped = scope?.mode === 'asset';
+  const scopeTitle = isAssetScoped ? scope?.assetTitle ?? 'Current video' : workspaceName;
+  const searchTitle = isAssetScoped ? 'Search within this video' : 'Workspace Search';
+  const resultScopeCopy = isAssetScoped ? 'Scoped to this video' : 'Scoped to the active workspace';
   const searchEnabled = searchableAssetCount > 0;
+  const searchAvailabilityLabel = isAssetScoped
+    ? searchEnabled
+      ? 'Searchable now'
+      : 'Not searchable yet'
+    : `${searchableAssetCount} searchable ${searchableAssetCount === 1 ? 'asset' : 'assets'}`;
   const hasSearchResults = Boolean(searchResponse?.results.length);
   const selectedResultKey = selectedResult
     ? `${selectedResult.assetId}-${selectedResult.transcriptRowId ?? 'no-row'}-${selectedResult.segmentIndex ?? 'na'}`
@@ -107,8 +127,10 @@ export function SearchPanel({
   );
   const searchPromptState = !activeQuery
     ? {
-        title: 'Search this workspace',
-        description: 'Run a query after at least one asset is indexed. Results stay scoped to the active workspace.',
+        title: isAssetScoped ? 'Search within this video' : 'Search this workspace',
+        description: isAssetScoped
+          ? 'Run a query after this video is indexed. Results stay limited to the current asset.'
+          : 'Run a query after at least one asset is indexed. Results stay scoped to the active workspace.',
       }
     : hasSearchResults
       ? {
@@ -122,7 +144,9 @@ export function SearchPanel({
   const contextEmptyState = !activeQuery
     ? {
         title: 'Search first, then open context',
-        description: 'Run a workspace search to choose one result and open its transcript context window.',
+        description: isAssetScoped
+          ? 'Run a video search to choose one result and open its transcript context window.'
+          : 'Run a workspace search to choose one result and open its transcript context window.',
       }
     : hasSearchResults
       ? {
@@ -188,17 +212,13 @@ export function SearchPanel({
 
   return (
     <Section
-      title="Workspace Search"
-      eyebrow={workspaceName}
-      actions={
-        <span className="panel-pill">
-          {searchableAssetCount} searchable {searchableAssetCount === 1 ? 'asset' : 'assets'}
-        </span>
-      }
+      title={searchTitle}
+      eyebrow={scopeTitle}
+      actions={<span className="panel-pill">{searchAvailabilityLabel}</span>}
     >
       <form className="stack" onSubmit={handleSubmit}>
         <label className="field">
-          <span className="field__label">Search transcript text</span>
+          <span className="field__label">{isAssetScoped ? 'Search transcript text in this video' : 'Search transcript text'}</span>
           <div className="search-form">
             <input
               className="field__input"
@@ -208,7 +228,9 @@ export function SearchPanel({
               placeholder={
                 searchEnabled
                   ? 'consensus, paging, normalization, binary trees...'
-                  : 'Index one asset in this workspace to enable search'
+                  : isAssetScoped
+                    ? 'Index this video to enable search within it'
+                    : 'Index one asset in this workspace to enable search'
               }
               disabled={!searchEnabled}
             />
@@ -220,16 +242,28 @@ export function SearchPanel({
       </form>
 
       <InfoBanner
-        title={`Search scope: ${workspaceName}`}
-        message="Only indexed assets inside the active workspace are considered by this search panel."
-        detail={`${searchableAssetCount} searchable asset${searchableAssetCount === 1 ? '' : 's'} currently available.`}
+        title={`Search scope: ${scopeTitle}`}
+        message={
+          isAssetScoped
+            ? 'Only indexed transcript rows inside this video are considered by this search panel.'
+            : 'Only indexed assets inside the active workspace are considered by this search panel.'
+        }
+        detail={
+          isAssetScoped
+            ? `Workspace: ${workspaceName}.`
+            : `${searchableAssetCount} searchable asset${searchableAssetCount === 1 ? '' : 's'} currently available.`
+        }
       />
 
       {!searchEnabled ? (
         <InfoBanner
           tone="warning"
           title="Search unlocks after indexing"
-          message="This workspace does not have any searchable assets yet. Finish transcript review and explicit indexing first."
+          message={
+            isAssetScoped
+              ? 'This video is not searchable yet. Finish transcript review and explicit indexing first.'
+              : 'This workspace does not have any searchable assets yet. Finish transcript review and explicit indexing first.'
+          }
         />
       ) : null}
 
@@ -239,7 +273,7 @@ export function SearchPanel({
         <div className="search-summary">
           <strong>{searchResponse?.resultCount ?? 0}</strong>
           <span>
-            results for <code>{activeQuery}</code> in {workspaceName}
+            results for <code>{activeQuery}</code> in {isAssetScoped ? 'this video' : workspaceName}
           </span>
         </div>
       ) : (
@@ -250,8 +284,12 @@ export function SearchPanel({
 
       {!isSearching && activeQuery && !searchError && !searchResponse?.results.length ? (
         <EmptyState
-          title="No matches in this workspace"
-          description="Try a different phrase, broader topic, or another indexed asset in this workspace."
+          title={isAssetScoped ? 'No matches in this video' : 'No matches in this workspace'}
+          description={
+            isAssetScoped
+              ? 'Try a different phrase or a broader topic from this video transcript.'
+              : 'Try a different phrase, broader topic, or another indexed asset in this workspace.'
+          }
         />
       ) : null}
 
@@ -285,7 +323,7 @@ export function SearchPanel({
                     <span>{workspaceName}</span>
                   </div>
                   <div className="search-result__footer">
-                    <span className="search-result__scope">Scoped to the active workspace</span>
+                    <span className="search-result__scope">{resultScopeCopy}</span>
                     <span className={`search-result__action ${isSelected ? 'search-result__action--active' : ''}`}>
                       {!hasContextAction ? 'Context unavailable' : isSelected ? 'Context shown below' : 'Open transcript context'}
                     </span>
@@ -319,7 +357,7 @@ export function SearchPanel({
             </p>
             <strong>{selectedResult.assetTitle}</strong>
             <span>
-              Matched <code>{activeQuery ?? 'current query'}</code> inside {workspaceName}
+              Matched <code>{activeQuery ?? 'current query'}</code> inside {isAssetScoped ? 'this video' : workspaceName}
             </span>
             <p className="context-window__selected-copy">{selectedResult.text}</p>
           </div>

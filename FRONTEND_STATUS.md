@@ -10,6 +10,7 @@ This repo now implements a small product-grade frontend for AI Knowledge Workspa
 - processing and transcript review
 - explicit indexing
 - workspace-scoped search
+- asset-scoped search from Asset Detail
 - transcript context
 
 It is intentionally not a chatbot surface, not a RAG shell, and not an AI assistant experience.
@@ -32,6 +33,7 @@ The frontend now behaves like a routed web app instead of a single giant shell:
 - Workspace home
 - Asset library
 - Asset detail / transcript review
+- Asset detail / transcript review / in-video search
 - Workspace search
 - Settings / workspace management
 
@@ -47,12 +49,14 @@ The frontend now behaves like a routed web app instead of a single giant shell:
 - Upload lecture videos into the active workspace
 - Review library-wide asset status in a full browse/manage screen
 - Open a dedicated asset detail screen for transcript review
+- Search within the currently viewed video from Asset Detail once that asset is searchable
 - Rename and delete assets
 - Poll processing state until terminal
 - Load transcript rows only when the backend says they are ready
 - Explicitly index transcript rows to unlock search
 - Open a dedicated workspace search screen
 - Search only within the active workspace
+- Optionally restrict search to the current asset from Asset Detail
 - Open transcript context around a selected result
 
 ## 5. Backend API Surface Used
@@ -97,6 +101,7 @@ The frontend now behaves like a routed web app instead of a single giant shell:
 - Routing is hash-based to stay compatible with the current frontend setup and avoid new backend/server route assumptions
 - Upload copy and accepted file input remain lecture-video-first to match the current real product path
 - Search stays disabled until explicit indexing produces searchable assets
+- Asset Detail can reuse the same transcript-hit/context search pattern, but scoped to the current asset
 - No assistant/chat UI, no fake AI affordances, and no unsupported media seek behavior were added
 
 ## 9. Intentionally Deferred

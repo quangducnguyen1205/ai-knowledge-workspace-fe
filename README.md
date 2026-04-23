@@ -10,6 +10,7 @@ This repo is the separate frontend for the AI Knowledge Workspace demo. It is in
 - transcript retrieval
 - explicit indexing
 - search and transcript-context follow-up
+- search within the currently viewed video from Asset Detail
 - selected asset lifecycle guidance with a clearer current step and next action
 - search disabled until the active workspace has at least one searchable asset
 - search/context state kept in sync across workspace switch, upload completion, indexing completion, and refreshed results

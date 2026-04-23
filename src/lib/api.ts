@@ -373,8 +373,8 @@ export async function indexAssetTranscript(assetId: string): Promise<AssetIndexR
   });
 }
 
-export async function searchTranscript(query: string, workspaceId: string): Promise<SearchResponse> {
-  return request<SearchResponse>(`/api/search${buildQueryString({ q: query, workspaceId })}`);
+export async function searchTranscript(query: string, workspaceId: string, assetId?: string | null): Promise<SearchResponse> {
+  return request<SearchResponse>(`/api/search${buildQueryString({ q: query, workspaceId, assetId: assetId ?? undefined })}`);
 }
 
 export async function getTranscriptContext(
