@@ -766,6 +766,26 @@ export function AssetsPanel({
   );
 }
 
+type SelectedAssetPanelProps = {
+  asset: AssetSummary | null;
+  workspaceName: string;
+  successNotice: { title: string; message: string } | null;
+  resolvedAssetStatus: AssetStatus | null;
+  statusResponse?: AssetStatusResponse;
+  statusError: unknown;
+  transcriptRows?: TranscriptRow[];
+  transcriptError: unknown;
+  transcriptLoading: boolean;
+  indexError: unknown;
+  indexResponse?: AssetIndexResponse;
+  isIndexing: boolean;
+  isRenaming: boolean;
+  renameError: unknown;
+  onIndex: () => void;
+  onRename: (title: string) => void;
+  onResetRename: () => void;
+};
+
 export function SelectedAssetPanel({
   asset,
   workspaceName,
@@ -784,34 +804,11 @@ export function SelectedAssetPanel({
   onIndex,
   onRename,
   onResetRename,
-}: {
-  asset: AssetSummary | null;
-  workspaceName: string;
-  successNotice: { title: string; message: string } | null;
-  resolvedAssetStatus: AssetStatus | null;
-  statusResponse?: AssetStatusResponse;
-  statusError: unknown;
-  transcriptRows?: TranscriptRow[];
-  transcriptError: unknown;
-  transcriptLoading: boolean;
-  indexError: unknown;
-  indexResponse?: AssetIndexResponse;
-  isIndexing: boolean;
-  isRenaming: boolean;
-  renameError: unknown;
-  onIndex: () => void;
-  onRename: (title: string) => void;
-  onResetRename: () => void;
-}) {
+}: SelectedAssetPanelProps) {
   const transcriptRowCount = transcriptRows?.length ?? 0;
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [draftTitle, setDraftTitle] = useState('');
   const normalizedDraftTitle = draftTitle.trim();
-  const transcriptConflictCopy = getTranscriptConflictCopy(
-    transcriptError,
-    resolvedAssetStatus,
-    statusResponse?.processingJobStatus,
-  );
   const renameErrorCopy = getFriendlyRenameErrorCopy(renameError);
   const indexActionState = getIndexActionState({
     resolvedAssetStatus,
@@ -831,10 +828,6 @@ export function SelectedAssetPanel({
     transcriptRows,
     transcriptError,
   });
-  const displayTranscriptRows = useMemo(
-    () => (transcriptRows?.length ? buildTranscriptDisplayRows(transcriptRows) : []),
-    [transcriptRows],
-  );
   const statusPairs = useMemo(
     () => [
       ['Workspace', workspaceName],
@@ -859,7 +852,7 @@ export function SelectedAssetPanel({
 
   if (!asset) {
     return (
-      <Section title="Transcript Review" eyebrow="Asset details">
+      <Section title="Asset Detail" eyebrow="Asset details">
         <EmptyState
           title="Pick an asset"
           description="Choose an uploaded asset to review status, read the transcript, and control when it becomes searchable."
@@ -869,7 +862,7 @@ export function SelectedAssetPanel({
   }
 
   return (
-    <Section title="Transcript Review" eyebrow={workspaceName} actions={<StatusBadge status={resolvedAssetStatus} />}>
+    <Section title="Asset Detail" eyebrow={workspaceName} actions={<StatusBadge status={resolvedAssetStatus} />}>
       <div className="selected-asset-title">
         <div className="selected-asset-title__copy">
           <p className="panel__eyebrow">Selected asset</p>
@@ -1002,30 +995,70 @@ export function SelectedAssetPanel({
         />
       ) : null}
 
-      <div className="panel-block">
-        <div className={`action-card ${!indexActionState.canIndex ? 'action-card--muted' : ''}`}>
-          <div className="action-card__copy">
-            <p className="panel__eyebrow">Explicit indexing</p>
-            <h3>{indexActionState.title}</h3>
-            <p>{indexActionState.description}</p>
-          </div>
-          <Button
-            type="button"
-            tone={indexActionState.buttonTone}
-            onClick={onIndex}
-            disabled={!indexActionState.canIndex || isIndexing}
-          >
-            {isIndexing ? 'Indexing...' : indexActionState.buttonLabel}
-          </Button>
+      <div className={`action-card ${!indexActionState.canIndex ? 'action-card--muted' : ''}`}>
+        <div className="action-card__copy">
+          <p className="panel__eyebrow">Explicit indexing</p>
+          <h3>{indexActionState.title}</h3>
+          <p>{indexActionState.description}</p>
         </div>
+        <Button
+          type="button"
+          tone={indexActionState.buttonTone}
+          onClick={onIndex}
+          disabled={!indexActionState.canIndex || isIndexing}
+        >
+          {isIndexing ? 'Indexing...' : indexActionState.buttonLabel}
+        </Button>
+      </div>
 
-        {isIndexing ? (
-          <InfoBanner
-            title="Indexing transcript"
-            message="Publishing transcript rows to workspace search so this asset becomes discoverable."
-          />
-        ) : null}
+      {isIndexing ? (
+        <InfoBanner
+          title="Indexing transcript"
+          message="Publishing transcript rows to workspace search so this asset becomes discoverable."
+        />
+      ) : null}
 
+      {indexResponse ? (
+        <InfoBanner
+          tone="success"
+          title="Indexing complete"
+          message={`Indexed ${indexResponse.indexedDocumentCount} transcript rows for this asset.`}
+        />
+      ) : null}
+      {indexError ? <ErrorBanner error={indexError} /> : null}
+    </Section>
+  );
+}
+
+export function SelectedAssetTranscriptPanel({
+  asset,
+  workspaceName,
+  resolvedAssetStatus,
+  statusResponse,
+  transcriptRows,
+  transcriptError,
+  transcriptLoading,
+}: Pick<
+  SelectedAssetPanelProps,
+  'asset' | 'workspaceName' | 'resolvedAssetStatus' | 'statusResponse' | 'transcriptRows' | 'transcriptError' | 'transcriptLoading'
+>) {
+  const transcriptConflictCopy = getTranscriptConflictCopy(
+    transcriptError,
+    resolvedAssetStatus,
+    statusResponse?.processingJobStatus,
+  );
+  const displayTranscriptRows = useMemo(
+    () => (transcriptRows?.length ? buildTranscriptDisplayRows(transcriptRows) : []),
+    [transcriptRows],
+  );
+
+  if (!asset) {
+    return null;
+  }
+
+  return (
+    <Section title="Transcript Review" eyebrow={workspaceName}>
+      <div className="panel-block">
         <div className="panel-block__header">
           <h3>Transcript</h3>
           <span className="context-panel__hint">Transcript rows appear here as soon as they are ready</span>
@@ -1063,15 +1096,6 @@ export function SelectedAssetPanel({
           </ol>
         ) : null}
       </div>
-
-      {indexResponse ? (
-        <InfoBanner
-          tone="success"
-          title="Indexing complete"
-          message={`Indexed ${indexResponse.indexedDocumentCount} transcript rows for this asset.`}
-        />
-      ) : null}
-      {indexError ? <ErrorBanner error={indexError} /> : null}
     </Section>
   );
 }

@@ -9,7 +9,7 @@ import type {
   TranscriptRow,
 } from '../../lib/api';
 import { Button, EmptyState, Section } from '../../lib/ui';
-import { SelectedAssetPanel, StatusBadge } from './assets';
+import { SelectedAssetPanel, SelectedAssetTranscriptPanel, StatusBadge } from './assets';
 import { SearchPanel } from '../search/search';
 
 type AssetDetailScreenProps = {
@@ -127,6 +127,16 @@ export function AssetDetailScreen({
             onSelectResult={onSelectSearchResult}
           />
         ) : null}
+
+        <SelectedAssetTranscriptPanel
+          asset={asset}
+          workspaceName={workspaceName}
+          resolvedAssetStatus={resolvedAssetStatus}
+          statusResponse={statusResponse}
+          transcriptRows={transcriptRows}
+          transcriptError={transcriptError}
+          transcriptLoading={transcriptLoading}
+        />
       </div>
 
       <div className="screen-side">
