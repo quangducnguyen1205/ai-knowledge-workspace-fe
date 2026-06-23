@@ -21,6 +21,7 @@ import {
   clearOidcCallbackUrl,
   createKeycloakOidcClient,
   isOidcCallbackUrl,
+  type OidcAuthenticatedSession,
   type OidcAuthClient,
 } from '../../lib/oidc-client';
 
@@ -83,7 +84,7 @@ export function AuthProvider({
     [config, oidcClientFactory],
   );
   const accessTokenRef = useRef<string | null>(null);
-  const callbackStartedRef = useRef(false);
+  const callbackPromiseRef = useRef<Promise<OidcAuthenticatedSession> | null>(null);
   const [accessTokenVersion, setAccessTokenVersion] = useState(0);
   const [keycloakPhase, setKeycloakPhase] = useState<KeycloakAuthPhase | null>(() => getInitialKeycloakPhase(config));
   const [isStartingLogin, setIsStartingLogin] = useState(false);
@@ -126,12 +127,11 @@ export function AuthProvider({
   }, [config.mode, handleAuthModeUnavailable, handleJwtUnauthorized]);
 
   useEffect(() => {
-    if (config.mode !== 'keycloak_jwt' || !oidcClient || !isOidcCallbackUrl() || callbackStartedRef.current) {
+    if (config.mode !== 'keycloak_jwt' || !oidcClient || !isOidcCallbackUrl()) {
       return;
     }
 
     const activeOidcClient = oidcClient;
-    callbackStartedRef.current = true;
     let isCancelled = false;
 
     async function completeCallback() {
@@ -139,7 +139,12 @@ export function AuthProvider({
       setAuthErrorMessage(null);
 
       try {
-        const session = await activeOidcClient.completeSignInRedirect();
+        if (!callbackPromiseRef.current) {
+          callbackPromiseRef.current = activeOidcClient.completeSignInRedirect();
+        }
+
+        const callbackPromise = callbackPromiseRef.current;
+        const session = await callbackPromise;
         if (isCancelled) {
           return;
         }
@@ -148,6 +153,7 @@ export function AuthProvider({
         setAccessTokenVersion((current) => current + 1);
         setKeycloakPhase('authenticated');
         clearOidcCallbackUrl();
+        callbackPromiseRef.current = null;
       } catch (error) {
         if (isCancelled) {
           return;
@@ -156,6 +162,7 @@ export function AuthProvider({
         clearBearerToken();
         setAuthErrorMessage(getErrorMessage(error));
         setKeycloakPhase('error');
+        callbackPromiseRef.current = null;
       }
     }
 

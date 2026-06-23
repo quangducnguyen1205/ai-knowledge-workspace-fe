@@ -85,9 +85,12 @@ The frontend now behaves like a routed web app instead of a single giant shell:
 - Legacy mode keeps the existing register/login/logout/session-cookie behavior.
 - Opt-in `VITE_AUTHENTICATION_MODE=keycloak_jwt` uses Keycloak Authorization Code + PKCE through the public `workspace-web` client.
 - The JWT access token is held in memory and attached through the shared API client as `Authorization: Bearer <access-token>`.
+- Temporary OIDC redirect transaction state may use session-scoped storage so a full-page Keycloak redirect can complete; authenticated tokens and product-user state are not persisted.
 - Spring `GET /api/me` remains the visible product-user source after Keycloak redirects back.
 - Workspace and asset authorization remains backend-controlled through Spring/PostgreSQL ownership; the frontend does not read Keycloak roles for product permissions.
-- Browser Keycloak smoke, token refresh, silent SSO, global logout propagation, account management, and deployment cutover remain future work.
+- P3-C4 verified the local browser Keycloak flow: legacy auth remained visually available by default, opt-in JWT mode completed Authorization Code + PKCE through the public `workspace-web` client, Spring `/api/me` returned the local product user, the product shell rendered, browser storage inspection found no token persistence, and frontend logout cleared only local auth state.
+- The P3-C4 smoke made one minimal frontend correction: redirect callback completion now shares the in-flight OIDC callback promise across React StrictMode effect replay so the development browser flow does not remain stuck on the callback loading state.
+- Token refresh, silent SSO, global logout propagation, account management, production deployment cutover, auth-default cutover, and full accessibility certification remain future work.
 
 ## 7. Local Run Path
 
@@ -104,6 +107,7 @@ The frontend now behaves like a routed web app instead of a single giant shell:
 - Dockerized production build passed with `docker compose run --rm frontend npm run build`
 - Auth boundary, workspace queries, asset queries, transcript flow, explicit indexing, and search remain backend-aligned
 - The new routed shell compiles cleanly without adding external router dependencies
+- P3-C4 local browser smoke passed for the opt-in Keycloak JWT flow. Evidence covered the legacy password auth entry, JWT Keycloak-only entry, empty Keycloak login form, authenticated product shell from Spring `/api/me`, local frontend logout return, and focused primary Keycloak action.
 
 ## 9. Design / Product Notes
 

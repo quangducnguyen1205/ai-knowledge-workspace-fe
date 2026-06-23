@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -57,14 +58,16 @@ function createOidcClientMock(overrides: Partial<OidcAuthClient> = {}): OidcAuth
   };
 }
 
-function renderApp(config: FrontendAuthConfig, oidcClient = createOidcClientMock()) {
-  render(
+function renderApp(config: FrontendAuthConfig, oidcClient = createOidcClientMock(), options: { strictMode?: boolean } = {}) {
+  const app = (
     <QueryClientProvider client={createQueryClient()}>
       <AuthProvider config={config} oidcClientFactory={() => oidcClient}>
         <AppShell />
       </AuthProvider>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+
+  render(options.strictMode ? <StrictMode>{app}</StrictMode> : app);
 
   return oidcClient;
 }
@@ -193,6 +196,41 @@ describe('auth mode UI boundary', () => {
     expect(window.location.search).toBe('');
     expect(storageSetItem).not.toHaveBeenCalledWith(expect.any(String), expect.stringContaining(bearerValue));
     expect(indexedDbOpen).not.toHaveBeenCalled();
+  });
+
+  it('shares the redirect callback promise across React StrictMode effect replay', async () => {
+    const bearerValue = `bearer-${crypto.randomUUID()}`;
+    const callbackCode = crypto.randomUUID();
+    const callbackState = crypto.randomUUID();
+    window.history.pushState({}, '', `/?code=${encodeURIComponent(callbackCode)}&state=${encodeURIComponent(callbackState)}`);
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/me') {
+        return jsonResponse({ id: 'spring-user-id', email: 'strict-mode-product@example.com' });
+      }
+      if (url === '/api/workspaces') {
+        return jsonResponse([]);
+      }
+      return jsonResponse([]);
+    });
+    let resolveCallback: (session: { accessToken: string }) => void = () => undefined;
+    const callbackPromise = new Promise<{ accessToken: string }>((resolve) => {
+      resolveCallback = resolve;
+    });
+    const oidcClient = createOidcClientMock({
+      completeSignInRedirect: vi.fn(() => callbackPromise),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderApp(keycloakConfig, oidcClient, { strictMode: true });
+
+    expect(await screen.findByText(/completing keycloak sign-in/i)).toBeInTheDocument();
+    resolveCallback({ accessToken: bearerValue });
+
+    expect(await screen.findAllByText('strict-mode-product@example.com')).not.toHaveLength(0);
+    expect(oidcClient.completeSignInRedirect).toHaveBeenCalledTimes(1);
+    expect(requestHeaders(fetchMock, '/api/me').get('Authorization')).toBe(`Bearer ${bearerValue}`);
+    expect(window.location.search).toBe('');
   });
 
   it('does not create a redirect loop when the backend reports AUTH_MODE_UNAVAILABLE', async () => {
