@@ -1,18 +1,23 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { ApiClientError, getCurrentUser, loginUser, logoutUser, registerUser, type AuthCredentialsInput } from '../../lib/api';
+import type { AuthConfigurationIssue } from '../../lib/auth-config';
 import { Button, ErrorBanner } from '../../lib/ui';
+import { useAuth } from './auth-provider';
 
 export const authKeys = {
   currentUser: ['auth', 'me'] as const,
 };
 
 export function useCurrentUserQuery() {
+  const auth = useAuth();
+
   return useQuery({
-    queryKey: authKeys.currentUser,
+    queryKey: [...authKeys.currentUser, auth.mode, auth.accessTokenVersion] as const,
     queryFn: getCurrentUser,
     retry: false,
     staleTime: 0,
+    enabled: auth.mode === 'legacy_session' || auth.hasBearerToken,
   });
 }
 
@@ -39,6 +44,21 @@ type FriendlyAuthErrorCopy = {
   message: string;
   detail?: string;
 };
+
+const productHighlights = [
+  {
+    title: 'Upload source material',
+    description: 'Bring lecture videos into one workspace.',
+  },
+  {
+    title: 'Review the transcript',
+    description: 'Read the extracted transcript before publishing it to search.',
+  },
+  {
+    title: 'Search exact context',
+    description: 'Open the surrounding transcript rows around every hit.',
+  },
+];
 
 function getFriendlyAuthErrorCopy(error: unknown, mode: 'register' | 'login' | 'logout'): FriendlyAuthErrorCopy | null {
   if (!(error instanceof ApiClientError)) {
@@ -136,20 +156,6 @@ export function AuthEntrySurface({
   const activeError = mode === 'register' ? registerError : loginError;
   const errorCopy = getFriendlyAuthErrorCopy(activeError, mode);
   const isSubmitting = mode === 'register' ? isRegistering : isLoggingIn;
-  const productHighlights = [
-    {
-      title: 'Upload source material',
-      description: 'Bring lecture videos into one workspace.',
-    },
-    {
-      title: 'Review the transcript',
-      description: 'Read the extracted transcript before publishing it to search.',
-    },
-    {
-      title: 'Search exact context',
-      description: 'Open the surrounding transcript rows around every hit.',
-    },
-  ];
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -310,6 +316,119 @@ export function AuthEntrySurface({
           <div className="auth-card__footer">
             <strong>What happens next</strong>
             <p>Choose or create a workspace, upload a source asset, review the transcript, then explicitly index it for search.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function KeycloakAuthEntrySurface({
+  configIssue,
+  authModeUnavailable,
+  authErrorMessage,
+  isStartingLogin,
+  onContinue,
+}: {
+  configIssue: AuthConfigurationIssue | null;
+  authModeUnavailable: boolean;
+  authErrorMessage: string | null;
+  isStartingLogin: boolean;
+  onContinue: () => void;
+}) {
+  const isActionDisabled = Boolean(configIssue) || authModeUnavailable || isStartingLogin;
+
+  return (
+    <div className="auth-shell">
+      <div className="auth-layout">
+        <section className="auth-hero">
+          <div className="auth-hero__copy">
+            <p className="hero__eyebrow">AI Knowledge Workspace</p>
+            <h1>Search-first workspaces for long-form knowledge.</h1>
+            <p>
+              Upload a lecture video, review the transcript, explicitly index it, and search the exact passage you
+              need inside the right workspace.
+            </p>
+          </div>
+
+          <div className="auth-highlights">
+            {productHighlights.map((highlight, index) => (
+              <div key={highlight.title} className="auth-highlight">
+                <span className="auth-highlight__index">0{index + 1}</span>
+                <div>
+                  <strong>{highlight.title}</strong>
+                  <p>{highlight.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="auth-preview">
+            <div className="auth-preview__card">
+              <span className="auth-preview__label">Workspace</span>
+              <strong>Distributed Systems Lab</strong>
+              <p>12 assets ready for transcript review and search preparation.</p>
+            </div>
+            <div className="auth-preview__card auth-preview__card--accent">
+              <span className="auth-preview__label">Transcript state</span>
+              <strong>Ready to index</strong>
+              <p>Transcript reviewed. Publish to workspace search when you are ready.</p>
+            </div>
+            <div className="auth-preview__snippet">
+              <span className="auth-preview__label">Search context</span>
+              <p>"Vector clocks capture causal ordering without forcing a single global time."</p>
+            </div>
+          </div>
+        </section>
+
+        <div className="auth-card">
+          <div className="auth-card__top">
+            <div className="auth-card__intro">
+              <p className="hero__eyebrow">Keycloak sign-in</p>
+              <h2>Continue to your workspace</h2>
+              <p>Use the configured workspace identity provider, then the app will load your Spring product account.</p>
+            </div>
+          </div>
+
+          <div className="auth-form">
+            <div className="auth-form__actions">
+              <Button type="button" onClick={onContinue} disabled={isActionDisabled}>
+                {isStartingLogin ? 'Opening Keycloak...' : 'Continue with Keycloak'}
+              </Button>
+              <span className="auth-form__hint">
+                Workspace and asset access stays enforced by the product API after sign-in.
+              </span>
+            </div>
+          </div>
+
+          {configIssue ? (
+            <ErrorBanner
+              error={new Error(configIssue.message)}
+              title="Keycloak configuration incomplete"
+              message={configIssue.message}
+              detail={configIssue.missingKeys?.length ? `Missing: ${configIssue.missingKeys.join(', ')}` : undefined}
+            />
+          ) : null}
+
+          {authModeUnavailable ? (
+            <ErrorBanner
+              error={new Error(authErrorMessage ?? 'Backend auth mode mismatch.')}
+              title="Backend auth mode mismatch"
+              message="The frontend is configured for bearer-token authentication, but the backend did not accept that auth mode for this request."
+            />
+          ) : null}
+
+          {!configIssue && !authModeUnavailable && authErrorMessage ? (
+            <ErrorBanner
+              error={new Error(authErrorMessage)}
+              title="Keycloak sign-in did not finish"
+              message={authErrorMessage}
+            />
+          ) : null}
+
+          <div className="auth-card__footer">
+            <strong>What happens next</strong>
+            <p>After Keycloak returns, the app asks Spring for `/api/me` and uses that product user in the workspace shell.</p>
           </div>
         </div>
       </div>

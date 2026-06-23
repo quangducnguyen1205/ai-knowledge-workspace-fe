@@ -6,11 +6,13 @@ import { useHashRoute, type AppRoute } from './router';
 import {
   useCurrentUserQuery,
   AuthEntrySurface,
+  KeycloakAuthEntrySurface,
   authKeys,
   useLoginMutation,
   useLogoutMutation,
   useRegisterMutation,
 } from '../features/auth/auth';
+import { useAuth } from '../features/auth/auth-provider';
 import {
   assetKeys,
   deriveAssetStatus,
@@ -85,6 +87,7 @@ function canLoadTranscript(assetStatus: AssetStatus | null, processingJobStatus?
 }
 
 export function AppShell() {
+  const auth = useAuth();
   const queryClient = useQueryClient();
   const [route, navigate] = useHashRoute();
   const [isTransitionPending, startTransition] = useTransition();
@@ -93,12 +96,20 @@ export function AppShell() {
   const registerMutation = useRegisterMutation();
   const loginMutation = useLoginMutation();
   const logoutMutation = useLogoutMutation();
-  const isAuthenticated = currentUserQuery.isSuccess;
+  const isAuthenticated =
+    auth.mode === 'keycloak_jwt' ? auth.hasBearerToken && currentUserQuery.isSuccess : currentUserQuery.isSuccess;
   const currentUser = currentUserQuery.data ?? null;
-  const isAuthRequired =
+  const isLegacyAuthRequired =
+    auth.mode === 'legacy_session' &&
     currentUserQuery.error instanceof ApiClientError &&
     currentUserQuery.error.status === 401 &&
     currentUserQuery.error.code === 'AUTHENTICATION_REQUIRED';
+  const isJwtAuthModeUnavailable =
+    auth.mode === 'keycloak_jwt' &&
+    (auth.keycloakPhase === 'auth_mode_unavailable' ||
+      (currentUserQuery.error instanceof ApiClientError &&
+        currentUserQuery.error.status === 409 &&
+        currentUserQuery.error.code === 'AUTH_MODE_UNAVAILABLE'));
 
   const workspacesQuery = useWorkspacesQuery(isAuthenticated);
   const createWorkspaceMutation = useCreateWorkspaceMutation();
@@ -684,7 +695,18 @@ export function AppShell() {
     });
   }
 
-  function handleLogout() {
+  async function handleLogout() {
+    if (auth.mode === 'keycloak_jwt') {
+      setWorkspaceScopeRefreshAfter(null);
+      clearSessionScopedState();
+      queryClient.removeQueries({ queryKey: authKeys.currentUser });
+      queryClient.removeQueries({ queryKey: assetKeys.all });
+      queryClient.removeQueries({ queryKey: workspaceKeys.all });
+      navigate({ name: 'home' });
+      await auth.clearLocalAuth();
+      return;
+    }
+
     logoutMutation.mutate(undefined, {
       onSuccess: async () => {
         setWorkspaceScopeRefreshAfter(null);
@@ -946,6 +968,27 @@ export function AppShell() {
     { label: 'Search', route: { name: 'search' }, disabled: !selectedWorkspace, isActive: route.name === 'search' },
     { label: 'Settings', route: { name: 'settings' }, isActive: route.name === 'settings' },
   ];
+  const isLogoutPending = auth.mode === 'legacy_session' && logoutMutation.isPending;
+
+  if (auth.isResolvingAuth) {
+    return (
+      <div className="app-shell app-shell--centered">
+        <LoadingBlock label="Completing Keycloak sign-in..." />
+      </div>
+    );
+  }
+
+  if (auth.mode === 'keycloak_jwt' && (auth.configIssue || isJwtAuthModeUnavailable || !auth.hasBearerToken)) {
+    return (
+      <KeycloakAuthEntrySurface
+        configIssue={auth.configIssue}
+        authModeUnavailable={isJwtAuthModeUnavailable}
+        authErrorMessage={auth.authErrorMessage}
+        isStartingLogin={auth.isStartingLogin}
+        onContinue={() => void auth.startKeycloakLogin()}
+      />
+    );
+  }
 
   if (currentUserQuery.isLoading) {
     return (
@@ -955,7 +998,7 @@ export function AppShell() {
     );
   }
 
-  if (isAuthRequired) {
+  if (isLegacyAuthRequired) {
     return (
       <AuthEntrySurface
         registerError={registerMutation.error}
@@ -1135,7 +1178,7 @@ export function AppShell() {
                     ? deleteWorkspaceMutation.error
                     : null
                 }
-                logoutError={logoutMutation.error}
+                logoutError={auth.mode === 'legacy_session' ? logoutMutation.error : null}
                 createSuccessId={createWorkspaceMutation.data?.id}
                 onSelectWorkspace={handleSelectWorkspace}
                 onCreateWorkspace={handleCreateWorkspace}
@@ -1145,7 +1188,7 @@ export function AppShell() {
                 isRenaming={renameWorkspaceMutation.isPending}
                 isDeleting={deleteWorkspaceMutation.isPending}
                 onLogout={handleLogout}
-                isLoggingOut={logoutMutation.isPending}
+                isLoggingOut={isLogoutPending}
               />
             }
           />
@@ -1240,8 +1283,8 @@ export function AppShell() {
               <Button type="button" tone="secondary" onClick={() => navigate({ name: 'settings' })}>
                 Workspace settings
               </Button>
-              <Button type="button" tone="ghost" onClick={handleLogout} disabled={logoutMutation.isPending}>
-                {logoutMutation.isPending ? 'Signing out...' : 'Sign out'}
+              <Button type="button" tone="ghost" onClick={() => void handleLogout()} disabled={isLogoutPending}>
+                {isLogoutPending ? 'Signing out...' : 'Sign out'}
               </Button>
             </div>
           </header>

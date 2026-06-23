@@ -1,3 +1,5 @@
+import { resolveAuthMode, type AuthMode } from './auth-config';
+
 export type Workspace = {
   id: string;
   name: string;
@@ -143,6 +145,17 @@ export class ApiClientError extends Error {
   }
 }
 
+type ApiAuthContext = {
+  mode: AuthMode;
+  getAccessToken?: () => string | null;
+  onUnauthorized?: (error: ApiClientError) => void;
+  onAuthModeUnavailable?: (error: ApiClientError) => void;
+};
+
+let apiAuthContext: ApiAuthContext = {
+  mode: resolveAuthMode(),
+};
+
 const rawApiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').trim();
 const normalizedApiBaseUrl = rawApiBaseUrl.replace(/\/$/, '');
 
@@ -213,18 +226,37 @@ async function parseResponseBody(response: Response): Promise<unknown> {
   }
 }
 
+function buildRequestInit(init?: RequestInit): RequestInit {
+  const headers = new Headers(init?.headers);
+  if (!headers.has('Accept')) {
+    headers.set('Accept', 'application/json');
+  }
+
+  if (apiAuthContext.mode === 'keycloak_jwt') {
+    const accessToken = apiAuthContext.getAccessToken?.();
+    if (accessToken) {
+      headers.set('Authorization', `Bearer ${accessToken}`);
+    }
+
+    return {
+      ...init,
+      credentials: 'omit',
+      headers,
+    };
+  }
+
+  return {
+    ...init,
+    credentials: init?.credentials ?? 'include',
+    headers,
+  };
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
 
   try {
-    response = await fetch(buildUrl(path), {
-      credentials: 'include',
-      ...init,
-      headers: {
-        Accept: 'application/json',
-        ...(init?.headers ?? {}),
-      },
-    });
+    response = await fetch(buildUrl(path), buildRequestInit(init));
   } catch {
     throw new ApiClientError(0, 'Unable to reach the backend.');
   }
@@ -232,10 +264,30 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const payload = await parseResponseBody(response);
 
   if (!response.ok) {
-    throw new ApiClientError(response.status, getErrorMessage(payload, response.status), getErrorCode(payload));
+    const error = new ApiClientError(response.status, getErrorMessage(payload, response.status), getErrorCode(payload));
+
+    if (apiAuthContext.mode === 'keycloak_jwt' && error.status === 401) {
+      apiAuthContext.onUnauthorized?.(error);
+    }
+
+    if (apiAuthContext.mode === 'keycloak_jwt' && error.status === 409 && error.code === 'AUTH_MODE_UNAVAILABLE') {
+      apiAuthContext.onAuthModeUnavailable?.(error);
+    }
+
+    throw error;
   }
 
   return payload as T;
+}
+
+export function configureApiAuth(context: ApiAuthContext): void {
+  apiAuthContext = context;
+}
+
+export function resetApiAuthForTests(): void {
+  apiAuthContext = {
+    mode: resolveAuthMode(),
+  };
 }
 
 export function isApiClientError(error: unknown): error is ApiClientError {

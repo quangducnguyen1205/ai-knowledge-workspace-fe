@@ -79,7 +79,17 @@ The frontend now behaves like a routed web app instead of a single giant shell:
 - `GET /api/search`
 - `GET /api/assets/{assetId}/transcript/context`
 
-## 6. Local Run Path
+## 6. Project 3 Auth Foundation
+
+- Default mode remains `VITE_AUTHENTICATION_MODE=legacy_session`.
+- Legacy mode keeps the existing register/login/logout/session-cookie behavior.
+- Opt-in `VITE_AUTHENTICATION_MODE=keycloak_jwt` uses Keycloak Authorization Code + PKCE through the public `workspace-web` client.
+- The JWT access token is held in memory and attached through the shared API client as `Authorization: Bearer <access-token>`.
+- Spring `GET /api/me` remains the visible product-user source after Keycloak redirects back.
+- Workspace and asset authorization remains backend-controlled through Spring/PostgreSQL ownership; the frontend does not read Keycloak roles for product permissions.
+- Browser Keycloak smoke, token refresh, silent SSO, global logout propagation, account management, and deployment cutover remain future work.
+
+## 7. Local Run Path
 
 - Recommended path: Docker
 - Main commands:
@@ -89,13 +99,13 @@ The frontend now behaves like a routed web app instead of a single giant shell:
 - Expected frontend URL: `http://localhost:5173`
 - Expected backend URL: `http://localhost:8081`
 
-## 7. Verification Notes
+## 8. Verification Notes
 
 - Dockerized production build passed with `docker compose run --rm frontend npm run build`
 - Auth boundary, workspace queries, asset queries, transcript flow, explicit indexing, and search remain backend-aligned
 - The new routed shell compiles cleanly without adding external router dependencies
 
-## 8. Design / Product Notes
+## 9. Design / Product Notes
 
 - The UI now uses a persistent app shell with navigation instead of a demo hero plus three fixed panels
 - Routing is hash-based to stay compatible with the current frontend setup and avoid new backend/server route assumptions
@@ -104,7 +114,7 @@ The frontend now behaves like a routed web app instead of a single giant shell:
 - Asset Detail can reuse the same transcript-hit/context search pattern, but scoped to the current asset
 - No assistant/chat UI, no fake AI affordances, and no unsupported media seek behavior were added
 
-## 9. Intentionally Deferred
+## 10. Intentionally Deferred
 
 - Chat or assistant flows
 - Timestamp seek or media playback controls
@@ -114,7 +124,7 @@ The frontend now behaves like a routed web app instead of a single giant shell:
 - Analytics dashboards
 - Broader auth-platform features beyond the current supported backend path
 
-## 10. Quick Summary
+## 11. Quick Summary
 
 - The frontend now feels like a small real product rather than a single-shell demo
 - Navigation, layout hierarchy, empty states, and success/error handling are stronger and more realistic
