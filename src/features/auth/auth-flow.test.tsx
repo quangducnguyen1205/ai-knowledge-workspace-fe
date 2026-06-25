@@ -198,6 +198,49 @@ describe('auth mode UI boundary', () => {
     expect(indexedDbOpen).not.toHaveBeenCalled();
   });
 
+  it('renders the authenticated product shell with top navigation and keyboard-close mobile menu behavior', async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/me') {
+        return jsonResponse({ id: 'spring-user-id', email: 'learner@example.com' });
+      }
+      if (url === '/api/workspaces') {
+        return jsonResponse([
+          {
+            id: 'workspace-1',
+            name: 'Lecture Workspace',
+            createdAt: '2026-06-26T00:00:00Z',
+          },
+        ]);
+      }
+      if (url === '/api/assets?workspaceId=workspace-1') {
+        return jsonResponse([]);
+      }
+      return jsonResponse([]);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderApp(legacyConfig);
+
+    expect(await screen.findByRole('heading', { name: /workspace home/i, level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /skip to content/i })).toHaveAttribute('href', '#main-content');
+    expect(screen.getByRole('navigation', { name: /product navigation/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Library' })).toHaveAttribute('href', '#/library');
+    expect(screen.getByRole('button', { name: 'Upload' })).toBeEnabled();
+
+    const menuButton = screen.getByRole('button', { name: /menu/i });
+    await user.click(menuButton);
+    expect(menuButton).toHaveAttribute('aria-expanded', 'true');
+
+    await user.keyboard('{Escape}');
+    expect(menuButton).toHaveAttribute('aria-expanded', 'false');
+    expect(menuButton).toHaveFocus();
+
+    window.localStorage.clear();
+  });
+
   it('shares the redirect callback promise across React StrictMode effect replay', async () => {
     const bearerValue = `bearer-${crypto.randomUUID()}`;
     const callbackCode = crypto.randomUUID();

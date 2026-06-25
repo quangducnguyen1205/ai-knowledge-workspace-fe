@@ -14,6 +14,18 @@ This repo is the separate frontend for the AI Knowledge Workspace demo. It is in
 - selected asset lifecycle guidance with a clearer current step and next action
 - search disabled until the active workspace has at least one searchable asset
 - search/context state kept in sync across workspace switch, upload completion, indexing completion, and refreshed results
+- responsive product app shell with persistent desktop top navigation and compact mobile navigation
+
+## Navigation Model
+
+Authenticated product screens use a horizontal top navigation model:
+
+- `Home` for workspace readiness and next action orientation
+- `Library` for upload, asset inventory, and asset management
+- `Search` for workspace-scoped transcript search and context inspection
+- `Settings` for workspace management and account context
+
+Asset detail remains a deep route under Library and exposes a breadcrumb back to the library. The shell includes a skip-to-content link, active navigation state with `aria-current`, a keyboard-operable compact mobile menu, and a single shell-level Upload action that routes to the existing Library upload flow. P3-F1 assistant context remains a backend retrieval-only API; this frontend phase does not add assistant answers, chat state, or fake AI output.
 
 ## Local Setup
 
@@ -39,6 +51,7 @@ Recently verified in the browser:
 - invalid or rejected upload flow
 - empty search results for nonsense queries
 - P3-C4 local Keycloak browser smoke: legacy auth entry remained visually available, and opt-in `keycloak_jwt` completed browser Authorization Code + PKCE through Keycloak, returned to the frontend, called Spring `/api/me`, rendered the authenticated product shell, and returned to the local Keycloak entry surface after frontend logout
+- P3-FE1 product shell foundation: route-aware top navigation, mobile menu Escape handling, skip link, active destination state, and visible account/workspace context are covered by frontend tests. Browser verification for this phase is Vite-only and does not claim authenticated backend integration when Spring/auth runtime is not running.
 
 Dockerized frontend build has also passed successfully, and the Docker local-dev path has recently been rechecked with the app serving on `http://localhost:5173`.
 
@@ -59,7 +72,7 @@ Dockerized frontend build has also passed successfully, and the Docker local-dev
 - no production Keycloak deployment or auth-default cutover claimed
 - no token refresh, silent SSO, global Keycloak logout propagation, account-management wiring, or production deployment cutover yet
 - no full accessibility certification; P3-C4 was a targeted local browser smoke with keyboard/focus/error-state checks
-- no collaboration, chatbot/RAG, or routing-heavy redesign
+- no collaboration, chatbot/RAG, assistant answer UI, or generated answer placeholder
 - no media player or timestamp-seek UI
 - no transcript timestamps invented on the frontend
 - no heavy design system or production-grade docs set

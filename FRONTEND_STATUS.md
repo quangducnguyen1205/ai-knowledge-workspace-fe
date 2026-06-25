@@ -24,10 +24,11 @@ It is intentionally not a chatbot surface, not a RAG shell, and not an AI assist
 - Plain CSS with a custom product shell and screen layouts
 - Lightweight hash-based routing implemented locally in the app
 - Docker-first local development with `/api` requests proxied to the Spring backend
+- Responsive authenticated app shell with desktop top navigation and keyboard-operable compact mobile navigation
 
 ## 3. Current Product IA
 
-The frontend now behaves like a routed web app instead of a single giant shell:
+The frontend now behaves like a routed web app with a persistent product shell instead of a single giant shell:
 
 - Auth entry
 - Workspace home
@@ -36,6 +37,8 @@ The frontend now behaves like a routed web app instead of a single giant shell:
 - Asset detail / transcript review / in-video search
 - Workspace search
 - Settings / workspace management
+
+Authenticated routes are surfaced through top navigation on desktop: `Home`, `Library`, `Search`, and `Settings`. Upload is a single shell-level action into the existing Library upload flow rather than a fake standalone route. Asset Detail remains a deep Library route with a breadcrumb back to Library.
 
 ## 4. Implemented Product Flow
 
@@ -58,6 +61,7 @@ The frontend now behaves like a routed web app instead of a single giant shell:
 - Search only within the active workspace
 - Optionally restrict search to the current asset from Asset Detail
 - Open transcript context around a selected result
+- Keep orientation through the top navigation active state, page heading, workspace status, visible account summary, and asset-detail breadcrumb
 
 ## 5. Backend API Surface Used
 
@@ -108,15 +112,18 @@ The frontend now behaves like a routed web app instead of a single giant shell:
 - Auth boundary, workspace queries, asset queries, transcript flow, explicit indexing, and search remain backend-aligned
 - The new routed shell compiles cleanly without adding external router dependencies
 - P3-C4 local browser smoke passed for the opt-in Keycloak JWT flow. Evidence covered the legacy password auth entry, JWT Keycloak-only entry, empty Keycloak login form, authenticated product shell from Spring `/api/me`, local frontend logout return, and focused primary Keycloak action.
+- P3-FE1 frontend tests cover the authenticated top navigation landmarks, `aria-current` active state, shell Upload action availability, and Escape-to-close behavior for the compact mobile menu.
+- P3-FE1 browser checks are Vite-only by design. They do not claim authenticated backend/browser integration when Spring/auth services are not running.
 
 ## 9. Design / Product Notes
 
-- The UI now uses a persistent app shell with navigation instead of a demo hero plus three fixed panels
+- The UI now uses a persistent app shell with horizontal desktop navigation instead of a demo hero plus three fixed panels
 - Routing is hash-based to stay compatible with the current frontend setup and avoid new backend/server route assumptions
 - Upload copy and accepted file input remain lecture-video-first to match the current real product path
 - Search stays disabled until explicit indexing produces searchable assets
 - Asset Detail can reuse the same transcript-hit/context search pattern, but scoped to the current asset
 - No assistant/chat UI, no fake AI affordances, and no unsupported media seek behavior were added
+- P3-F1 assistant context remains a backend retrieval-only endpoint in this phase; no frontend answer generation, provider integration, or persisted chat state has been added.
 
 ## 10. Intentionally Deferred
 
