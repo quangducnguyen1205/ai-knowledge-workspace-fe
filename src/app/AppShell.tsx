@@ -408,25 +408,27 @@ export function AppShell() {
       : null,
   );
 
-  const contextLookupId = selectedSearchResult ? resolveTranscriptLookupId(selectedSearchResult) : null;
   const assetDetailContextLookupId = selectedAssetDetailSearchResult
     ? resolveTranscriptLookupId(selectedAssetDetailSearchResult)
     : null;
 
-  const contextQuery = useTranscriptContextQuery(
-    selectedSearchResult && contextLookupId
-      ? {
-          assetId: selectedSearchResult.assetId,
-          transcriptRowId: contextLookupId,
-          window: 2,
-        }
-      : null,
-  );
+  const contextQuery = useTranscriptContextQuery(null);
   const assetDetailContextQuery = useTranscriptContextQuery(
     selectedAssetDetailSearchResult && assetDetailContextLookupId
       ? {
           assetId: selectedAssetDetailSearchResult.assetId,
           transcriptRowId: assetDetailContextLookupId,
+          window: 2,
+        }
+      : null,
+  );
+  const routedTranscriptRowId = route.name === 'asset' ? route.transcriptRowId ?? null : null;
+  const routedSearchQuery = route.name === 'asset' && route.source === 'search' ? route.searchQuery ?? submittedSearch : null;
+  const routedStudyContextQuery = useTranscriptContextQuery(
+    route.name === 'asset' && routedTranscriptRowId && selectedWorkspaceId
+      ? {
+          assetId: route.assetId,
+          transcriptRowId: routedTranscriptRowId,
           window: 2,
         }
       : null,
@@ -730,6 +732,35 @@ export function AppShell() {
     setPreferredAssetId(assetId);
     startTransition(() => setSelectedAssetId(assetId));
     navigate({ name: 'asset', assetId });
+  }
+
+  function openSearchResultInAsset(result: SearchResult) {
+    const transcriptRowId = resolveTranscriptLookupId(result);
+
+    if (!transcriptRowId) {
+      setSelectedSearchResult(null);
+      openAsset(result.assetId);
+      return;
+    }
+
+    setSelectedSearchResult(result);
+    setPreferredAssetId(result.assetId);
+    startTransition(() => setSelectedAssetId(result.assetId));
+    navigate({
+      name: 'asset',
+      assetId: result.assetId,
+      transcriptRowId,
+      source: 'search',
+      searchQuery: submittedSearch ?? undefined,
+    });
+  }
+
+  function clearRoutedStudyContext() {
+    if (route.name !== 'asset') {
+      return;
+    }
+
+    navigate({ name: 'asset', assetId: route.assetId });
   }
 
   function handleUpload(input: { file: File; title?: string }) {
@@ -1151,6 +1182,11 @@ export function AppShell() {
             contextError={assetDetailContextQuery.error}
             isContextLoading={assetDetailContextQuery.isLoading || assetDetailContextQuery.isFetching}
             selectedSearchResult={selectedAssetDetailSearchResult}
+            focusedTranscriptRowId={routedTranscriptRowId}
+            sourceSearchQuery={routedSearchQuery}
+            studyContextResponse={routedStudyContextQuery.data}
+            studyContextError={routedStudyContextQuery.error}
+            isStudyContextLoading={routedStudyContextQuery.isLoading || routedStudyContextQuery.isFetching}
             searchResetToken={assetDetailSearchResetToken}
             searchableAssetCount={searchableAssetCount}
             onIndex={handleIndexAsset}
@@ -1164,6 +1200,8 @@ export function AppShell() {
             onOpenLibrary={() => navigate({ name: 'library' })}
             onOpenSearch={() => navigate({ name: 'search' })}
             onOpenAsset={openAsset}
+            onReturnToSearch={route.name === 'asset' && route.source === 'search' ? () => navigate({ name: 'search' }) : undefined}
+            onClearStudyContext={routedTranscriptRowId ? clearRoutedStudyContext : undefined}
           />
         );
         break;
@@ -1187,6 +1225,7 @@ export function AppShell() {
               setSelectedSearchResult(null);
             }}
             onSelectResult={setSelectedSearchResult}
+            onOpenResultContext={openSearchResultInAsset}
             onOpenAsset={openAsset}
             onOpenLibrary={() => navigate({ name: 'library' })}
           />

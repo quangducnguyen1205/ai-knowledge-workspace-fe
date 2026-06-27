@@ -11,7 +11,8 @@ This repo now implements a small product-grade frontend for AI Knowledge Workspa
 - explicit indexing
 - workspace-scoped search
 - asset-scoped search from Asset Detail
-- transcript context
+- search-to-asset study context
+- transcript context around selected hits
 
 It is intentionally not a chatbot surface, not a RAG shell, and not an AI assistant experience.
 
@@ -59,6 +60,10 @@ Authenticated routes are surfaced through top navigation on desktop: `Home`, `Li
 - Explicitly index transcript rows to unlock search
 - Open a dedicated workspace search screen
 - Search only within the active workspace
+- Review ranked search results with a distinct asset title, transcript excerpt, and transcript moment metadata
+- Open a result into the real Asset Detail route with the asset id, selected transcript-row reference, and optional source query preserved in the hash route
+- Read nearby transcript rows from the existing transcript context API on Asset Detail
+- Return to Search from a detail page that originated from a workspace result
 - Optionally restrict search to the current asset from Asset Detail
 - Open transcript context around a selected result
 - Keep orientation through the top navigation active state, page heading, workspace status, visible account summary, and asset-detail breadcrumb
@@ -114,6 +119,8 @@ Authenticated routes are surfaced through top navigation on desktop: `Home`, `Li
 - P3-C4 local browser smoke passed for the opt-in Keycloak JWT flow. Evidence covered the legacy password auth entry, JWT Keycloak-only entry, empty Keycloak login form, authenticated product shell from Spring `/api/me`, local frontend logout return, and focused primary Keycloak action.
 - P3-FE1 frontend tests cover the authenticated top navigation landmarks, `aria-current` active state, shell Upload action availability, and Escape-to-close behavior for the compact mobile menu.
 - P3-FE1 browser checks are Vite-only by design. They do not claim authenticated backend/browser integration when Spring/auth services are not running.
+- P3-FE2 component tests cover the Search page labelled query control, result readability, route/state produced by opening a result, loading/empty/error states, selected transcript context on Asset Detail, canonical transcript display without a selected row, missing-row feedback, Search return behavior, and keyboard activation for the context-opening action.
+- P3-FE2 browser checks are public/auth-surface only when no real authenticated backend session is available; search and asset study behavior are validated through frontend component tests without fake backend sessions.
 
 ## 9. Design / Product Notes
 
@@ -121,6 +128,7 @@ Authenticated routes are surfaced through top navigation on desktop: `Home`, `Li
 - Routing is hash-based to stay compatible with the current frontend setup and avoid new backend/server route assumptions
 - Upload copy and accepted file input remain lecture-video-first to match the current real product path
 - Search stays disabled until explicit indexing produces searchable assets
+- Workspace Search opens relevant results into Asset Detail so the learner can continue reading nearby transcript context without losing the source Search orientation
 - Asset Detail can reuse the same transcript-hit/context search pattern, but scoped to the current asset
 - No assistant/chat UI, no fake AI affordances, and no unsupported media seek behavior were added
 - P3-F1 assistant context remains a backend retrieval-only endpoint in this phase; no frontend answer generation, provider integration, or persisted chat state has been added.

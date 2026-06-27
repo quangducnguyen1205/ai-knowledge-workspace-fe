@@ -6,9 +6,8 @@ import {
   type SearchResponse,
   type SearchResult,
   type TranscriptContextResponse,
-  type TranscriptRow,
 } from '../../lib/api';
-import { buildTranscriptDisplayRows } from '../../lib/transcript-display';
+import { buildTranscriptDisplayRows, matchesTranscriptReference } from '../../lib/transcript-display';
 import { Button, EmptyState, ErrorBanner, InfoBanner, LoadingBlock, Section, formatDateTime, formatScore } from '../../lib/ui';
 
 export type SearchParams = {
@@ -37,14 +36,6 @@ export function resolveTranscriptLookupId(result: SearchResult): string | null {
   }
 
   return result.segmentIndex !== null ? `segment-${result.segmentIndex}` : null;
-}
-
-function matchesContextRow(row: TranscriptRow, transcriptRowId: string): boolean {
-  if (row.id) {
-    return row.id === transcriptRowId;
-  }
-
-  return row.segmentIndex !== null && `segment-${row.segmentIndex}` === transcriptRowId;
 }
 
 export function useSearchQuery(params: SearchParams | null) {
@@ -87,6 +78,7 @@ export function SearchPanel({
   scope,
   onSearch,
   onSelectResult,
+  onOpenResultContext,
 }: {
   workspaceName: string;
   searchableAssetCount: number;
@@ -102,6 +94,7 @@ export function SearchPanel({
   scope?: SearchPanelScope;
   onSearch: (query: string) => void;
   onSelectResult: (result: SearchResult) => void;
+  onOpenResultContext?: (result: SearchResult) => void;
 }) {
   const [searchInput, setSearchInput] = useState('');
   const [contextSpotlightActive, setContextSpotlightActive] = useState(false);
@@ -111,6 +104,8 @@ export function SearchPanel({
   const scopeTitle = isAssetScoped ? scope?.assetTitle ?? 'Current video' : workspaceName;
   const searchTitle = isAssetScoped ? 'Search within this video' : 'Workspace Search';
   const resultScopeCopy = isAssetScoped ? 'Scoped to this video' : 'Scoped to the active workspace';
+  const opensAssetContext = Boolean(onOpenResultContext);
+  const contextActionCopy = opensAssetContext ? 'Study this moment' : 'Open transcript context';
   const searchEnabled = searchableAssetCount > 0;
   const searchAvailabilityLabel = isAssetScoped
     ? searchEnabled
@@ -118,7 +113,7 @@ export function SearchPanel({
       : 'Not searchable yet'
     : `${searchableAssetCount} searchable ${searchableAssetCount === 1 ? 'asset' : 'assets'}`;
   const hasSearchResults = Boolean(searchResponse?.results.length);
-  const selectedResultKey = selectedResult
+  const selectedResultKey = !opensAssetContext && selectedResult
     ? `${selectedResult.assetId}-${selectedResult.transcriptRowId ?? 'no-row'}-${selectedResult.segmentIndex ?? 'na'}`
     : null;
   const displayContextRows = useMemo(
@@ -134,8 +129,10 @@ export function SearchPanel({
       }
     : hasSearchResults
       ? {
-          title: 'Choose a result to open context',
-          description: 'Choose a result to inspect the surrounding transcript rows for that hit.',
+          title: opensAssetContext ? 'Choose a result to study' : 'Choose a result to open context',
+          description: opensAssetContext
+            ? 'Open a result in its asset detail page to keep reading nearby transcript context.'
+            : 'Choose a result to inspect the surrounding transcript rows for that hit.',
         }
       : {
           title: 'No transcript context selected yet',
@@ -146,12 +143,16 @@ export function SearchPanel({
         title: 'Search first, then open context',
         description: isAssetScoped
           ? 'Run a video search to choose one result and open its transcript context window.'
-          : 'Run a workspace search to choose one result and open its transcript context window.',
+          : opensAssetContext
+            ? 'Run a workspace search to choose one result and open it in the asset detail study surface.'
+            : 'Run a workspace search to choose one result and open its transcript context window.',
       }
     : hasSearchResults
       ? {
           title: 'Choose a result to open context',
-          description: 'Choose one enabled result card above to inspect the surrounding transcript rows for that hit.',
+          description: opensAssetContext
+            ? 'Use a result action above to open the matching asset and nearby transcript context.'
+            : 'Choose one enabled result card above to inspect the surrounding transcript rows for that hit.',
         }
       : {
           title: 'No transcript context available yet',
@@ -295,7 +296,7 @@ export function SearchPanel({
 
       {searchResponse?.results.length ? (
         <ul className="search-results">
-          {searchResponse.results.map((result) => {
+          {searchResponse.results.map((result, index) => {
             const lookupId = resolveTranscriptLookupId(result);
             const hasContextAction = Boolean(lookupId);
             const isSelected =
@@ -305,100 +306,120 @@ export function SearchPanel({
 
             return (
               <li key={`${result.assetId}-${lookupId ?? 'no-row'}-${result.segmentIndex ?? 'na'}`}>
-                <button
-                  type="button"
+                <article
                   className={`search-result ${isSelected ? 'search-result--selected' : ''} ${!hasContextAction ? 'search-result--disabled' : ''}`}
-                  onClick={hasContextAction ? () => onSelectResult(result) : undefined}
-                  disabled={!hasContextAction}
-                  aria-pressed={isSelected}
+                  aria-current={isSelected ? 'true' : undefined}
                 >
                   <div className="search-result__header">
-                    <strong>{result.assetTitle}</strong>
+                    <div className="search-result__title">
+                      <span className="search-result__rank">Result {index + 1}</span>
+                      <strong>{result.assetTitle}</strong>
+                    </div>
                     <span className="search-result__score">score {formatScore(result.score)}</span>
                   </div>
                   <p>{result.text}</p>
                   <div className="search-result__meta">
-                    <span>Segment {result.segmentIndex ?? 'n/a'}</span>
+                    <span>Moment: Segment {result.segmentIndex ?? 'n/a'}</span>
                     <span>{formatDateTime(result.createdAt)}</span>
                     <span>{workspaceName}</span>
                   </div>
                   <div className="search-result__footer">
                     <span className="search-result__scope">{resultScopeCopy}</span>
-                    <span className={`search-result__action ${isSelected ? 'search-result__action--active' : ''}`}>
-                      {!hasContextAction ? 'Context unavailable' : isSelected ? 'Context shown below' : 'Open transcript context'}
-                    </span>
+                    <Button
+                      type="button"
+                      tone={opensAssetContext ? 'primary' : 'secondary'}
+                      className="search-result__action-button"
+                      onClick={() => {
+                        if (onOpenResultContext) {
+                          onOpenResultContext(result);
+                          return;
+                        }
+
+                        onSelectResult(result);
+                      }}
+                      disabled={!hasContextAction}
+                      aria-label={
+                        opensAssetContext
+                          ? `Study result ${index + 1} in ${result.assetTitle}`
+                          : `Open transcript context for result ${index + 1} in ${result.assetTitle}`
+                      }
+                    >
+                      {!hasContextAction ? 'Context unavailable' : isSelected ? 'Context shown below' : contextActionCopy}
+                    </Button>
                   </div>
-                </button>
+                </article>
               </li>
             );
           })}
         </ul>
       ) : null}
 
-      <div
-        ref={contextPanelRef}
-        className={`context-panel ${contextSpotlightActive ? 'context-panel--spotlight' : ''}`}
-      >
-        <div className="panel-block__header">
-          <h3>Transcript context</h3>
-          <span className="context-panel__hint">Context window: 2 rows around the hit</span>
-        </div>
-
-        {selectedResult ? (
-          <div className={`context-window__selected ${isContextLoading ? 'context-window__selected--pending' : ''}`}>
-            <p className="context-window__label">
-              {contextResponse
-                ? 'Opened from selected result'
-                : isContextLoading
-                  ? 'Loading selected result'
-                  : contextError
-                    ? 'Selected result with context error'
-                    : 'Selected result'}
-            </p>
-            <strong>{selectedResult.assetTitle}</strong>
-            <span>
-              Matched <code>{activeQuery ?? 'current query'}</code> inside {isAssetScoped ? 'this video' : workspaceName}
-            </span>
-            <p className="context-window__selected-copy">{selectedResult.text}</p>
+      {!opensAssetContext ? (
+        <div
+          ref={contextPanelRef}
+          className={`context-panel ${contextSpotlightActive ? 'context-panel--spotlight' : ''}`}
+        >
+          <div className="panel-block__header">
+            <h3>Transcript context</h3>
+            <span className="context-panel__hint">Context window: 2 rows around the hit</span>
           </div>
-        ) : null}
 
-        {isContextLoading ? <LoadingBlock label="Loading transcript context..." compact /> : null}
-        {!isContextLoading && contextError ? <ErrorBanner error={contextError} /> : null}
-        {!isContextLoading && !contextError && !contextResponse ? (
-          <EmptyState title={contextEmptyState.title} description={contextEmptyState.description} />
-        ) : null}
-
-        {contextResponse ? (
-          <div className="context-window">
-            <div className="context-window__meta">
-              <span>Hit segment: {contextResponse.hitSegmentIndex ?? 'n/a'}</span>
-              <span>Window size: {contextResponse.window}</span>
+          {selectedResult ? (
+            <div className={`context-window__selected ${isContextLoading ? 'context-window__selected--pending' : ''}`}>
+              <p className="context-window__label">
+                {contextResponse
+                  ? 'Opened from selected result'
+                  : isContextLoading
+                    ? 'Loading selected result'
+                    : contextError
+                      ? 'Selected result with context error'
+                      : 'Selected result'}
+              </p>
+              <strong>{selectedResult.assetTitle}</strong>
+              <span>
+                Matched <code>{activeQuery ?? 'current query'}</code> inside {isAssetScoped ? 'this video' : workspaceName}
+              </span>
+              <p className="context-window__selected-copy">{selectedResult.text}</p>
             </div>
+          ) : null}
 
-            <ol className="transcript-list transcript-list--compact">
-              {displayContextRows.map(({ row, displayText, overlapHidden }) => {
-                const isHit = matchesContextRow(row, contextResponse.transcriptRowId);
+          {isContextLoading ? <LoadingBlock label="Loading transcript context..." compact /> : null}
+          {!isContextLoading && contextError ? <ErrorBanner error={contextError} /> : null}
+          {!isContextLoading && !contextError && !contextResponse ? (
+            <EmptyState title={contextEmptyState.title} description={contextEmptyState.description} />
+          ) : null}
 
-                return (
-                  <li
-                    key={row.id ?? `segment-${row.segmentIndex ?? 'missing'}`}
-                    className={`transcript-list__item ${isHit ? 'transcript-list__item--active' : ''}`}
-                  >
-                    <div className="transcript-list__meta">
-                      <span>Segment {row.segmentIndex ?? 'n/a'}</span>
-                      <span>{formatDateTime(row.createdAt)}</span>
-                      {overlapHidden ? <span className="transcript-overlap-note">Overlap hidden</span> : null}
-                      {isHit ? <span className="hit-pill">Hit row</span> : null}
-                    </div>
-                    <p>{displayText}</p>
-                  </li>
-                );
-              })}
-            </ol>
-          </div>
-        ) : null}
-      </div>
+          {contextResponse ? (
+            <div className="context-window">
+              <div className="context-window__meta">
+                <span>Hit segment: {contextResponse.hitSegmentIndex ?? 'n/a'}</span>
+                <span>Window size: {contextResponse.window}</span>
+              </div>
+
+              <ol className="transcript-list transcript-list--compact">
+                {displayContextRows.map(({ row, displayText, overlapHidden }) => {
+                  const isHit = matchesTranscriptReference(row, contextResponse.transcriptRowId);
+
+                  return (
+                    <li
+                      key={row.id ?? `segment-${row.segmentIndex ?? 'missing'}`}
+                      className={`transcript-list__item ${isHit ? 'transcript-list__item--active' : ''}`}
+                    >
+                      <div className="transcript-list__meta">
+                        <span>Segment {row.segmentIndex ?? 'n/a'}</span>
+                        <span>{formatDateTime(row.createdAt)}</span>
+                        {overlapHidden ? <span className="transcript-overlap-note">Overlap hidden</span> : null}
+                        {isHit ? <span className="hit-pill">Hit row</span> : null}
+                      </div>
+                      <p>{displayText}</p>
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </Section>
   );
 }

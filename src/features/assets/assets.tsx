@@ -18,7 +18,7 @@ import {
   type TranscriptRow,
   type UpdateAssetTitleInput,
 } from '../../lib/api';
-import { buildTranscriptDisplayRows } from '../../lib/transcript-display';
+import { buildTranscriptDisplayRows, matchesTranscriptReference } from '../../lib/transcript-display';
 import { Button, EmptyState, ErrorBanner, InfoBanner, LoadingBlock, Section, formatDateTime } from '../../lib/ui';
 
 export const assetKeys = {
@@ -1038,10 +1038,13 @@ export function SelectedAssetTranscriptPanel({
   transcriptRows,
   transcriptError,
   transcriptLoading,
+  focusedTranscriptRowId,
 }: Pick<
   SelectedAssetPanelProps,
   'asset' | 'workspaceName' | 'resolvedAssetStatus' | 'statusResponse' | 'transcriptRows' | 'transcriptError' | 'transcriptLoading'
->) {
+> & {
+  focusedTranscriptRowId?: string | null;
+}) {
   const transcriptConflictCopy = getTranscriptConflictCopy(
     transcriptError,
     resolvedAssetStatus,
@@ -1050,6 +1053,10 @@ export function SelectedAssetTranscriptPanel({
   const displayTranscriptRows = useMemo(
     () => (transcriptRows?.length ? buildTranscriptDisplayRows(transcriptRows) : []),
     [transcriptRows],
+  );
+  const focusedRowIsVisible = Boolean(
+    focusedTranscriptRowId &&
+      displayTranscriptRows.some(({ row }) => matchesTranscriptReference(row, focusedTranscriptRowId)),
   );
 
   if (!asset) {
@@ -1080,19 +1087,36 @@ export function SelectedAssetTranscriptPanel({
             description="Keep this asset selected. Transcript rows will appear here as soon as processing completes successfully."
           />
         ) : null}
+        {focusedTranscriptRowId && !transcriptLoading && displayTranscriptRows.length > 0 && !focusedRowIsVisible ? (
+          <InfoBanner
+            tone="warning"
+            title="Selected search row is not visible in this transcript"
+            message="The transcript may have changed since the search result was opened. Use the study context above or return to search."
+          />
+        ) : null}
 
         {displayTranscriptRows.length ? (
           <ol className="transcript-list">
-            {displayTranscriptRows.map(({ row, displayText, overlapHidden }) => (
-              <li key={row.id ?? `segment-${row.segmentIndex ?? 'missing'}`} className="transcript-list__item">
-                <div className="transcript-list__meta">
-                  <span>Segment {row.segmentIndex ?? 'n/a'}</span>
-                  <span>{formatDateTime(row.createdAt)}</span>
-                  {overlapHidden ? <span className="transcript-overlap-note">Overlap hidden</span> : null}
-                </div>
-                <p>{displayText}</p>
-              </li>
-            ))}
+            {displayTranscriptRows.map(({ row, displayText, overlapHidden }) => {
+              const isFocusedRow = Boolean(
+                focusedTranscriptRowId && matchesTranscriptReference(row, focusedTranscriptRowId),
+              );
+
+              return (
+                <li
+                  key={row.id ?? `segment-${row.segmentIndex ?? 'missing'}`}
+                  className={`transcript-list__item ${isFocusedRow ? 'transcript-list__item--active' : ''}`}
+                >
+                  <div className="transcript-list__meta">
+                    <span>Segment {row.segmentIndex ?? 'n/a'}</span>
+                    <span>{formatDateTime(row.createdAt)}</span>
+                    {overlapHidden ? <span className="transcript-overlap-note">Overlap hidden</span> : null}
+                    {isFocusedRow ? <span className="hit-pill">Search hit</span> : null}
+                  </div>
+                  <p>{displayText}</p>
+                </li>
+              );
+            })}
           </ol>
         ) : null}
       </div>

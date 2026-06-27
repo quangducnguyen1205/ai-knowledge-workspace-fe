@@ -9,7 +9,8 @@ This repo is the separate frontend for the AI Knowledge Workspace demo. It is in
 - processing status polling
 - transcript retrieval
 - explicit indexing
-- search and transcript-context follow-up
+- workspace search with result-to-asset study context
+- transcript-context follow-up around selected hits
 - search within the currently viewed video from Asset Detail
 - selected asset lifecycle guidance with a clearer current step and next action
 - search disabled until the active workspace has at least one searchable asset
@@ -22,10 +23,25 @@ Authenticated product screens use a horizontal top navigation model:
 
 - `Home` for workspace readiness and next action orientation
 - `Library` for upload, asset inventory, and asset management
-- `Search` for workspace-scoped transcript search and context inspection
+- `Search` for workspace-scoped transcript search and opening relevant asset moments
 - `Settings` for workspace management and account context
 
 Asset detail remains a deep route under Library and exposes a breadcrumb back to the library. The shell includes a skip-to-content link, active navigation state with `aria-current`, a keyboard-operable compact mobile menu, and a single shell-level Upload action that routes to the existing Library upload flow. P3-F1 assistant context remains a backend retrieval-only API; this frontend phase does not add assistant answers, chat state, or fake AI output.
+
+## Search And Study Flow
+
+Workspace Search now supports the real learner flow:
+
+```text
+Search transcript text
+-> review ranked results with asset title, excerpt, and transcript moment metadata
+-> Study this moment
+-> Asset Detail opens with the selected transcript row carried in the hash route
+-> nearby transcript context loads from the existing transcript context API
+-> the canonical transcript remains available below, with the selected row marked when visible
+```
+
+The route carries only compact state: asset id, transcript-row reference, and optional source query. It does not serialize transcript text, credentials, raw API payloads, user email, tokens, or private data into the URL. Asset Detail keeps a return action back to Search when the route originated there, while Library remains the canonical place for upload and asset management.
 
 ## Local Setup
 

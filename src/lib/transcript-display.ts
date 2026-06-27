@@ -86,3 +86,15 @@ export function buildTranscriptDisplayRows(rows: TranscriptRow[]): TranscriptDis
     };
   });
 }
+
+export function transcriptRowReference(row: TranscriptRow): string | null {
+  if (row.id) {
+    return row.id;
+  }
+
+  return row.segmentIndex !== null ? `segment-${row.segmentIndex}` : null;
+}
+
+export function matchesTranscriptReference(row: TranscriptRow, transcriptRowId: string): boolean {
+  return transcriptRowReference(row) === transcriptRowId;
+}

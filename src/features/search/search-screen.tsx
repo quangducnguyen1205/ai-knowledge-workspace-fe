@@ -18,6 +18,7 @@ type SearchScreenProps = {
   assets: AssetSummary[];
   onSearch: (query: string) => void;
   onSelectResult: (result: SearchResult) => void;
+  onOpenResultContext: (result: SearchResult) => void;
   onOpenAsset: (assetId: string) => void;
   onOpenLibrary: () => void;
 };
@@ -37,6 +38,7 @@ export function WorkspaceSearchScreen({
   assets,
   onSearch,
   onSelectResult,
+  onOpenResultContext,
   onOpenAsset,
   onOpenLibrary,
 }: SearchScreenProps) {
@@ -59,6 +61,7 @@ export function WorkspaceSearchScreen({
           selectedResult={selectedResult}
           onSearch={onSearch}
           onSelectResult={onSelectResult}
+          onOpenResultContext={onOpenResultContext}
         />
       </div>
 

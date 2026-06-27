@@ -8,7 +8,8 @@ import type {
   TranscriptContextResponse,
   TranscriptRow,
 } from '../../lib/api';
-import { Button, EmptyState, Section } from '../../lib/ui';
+import { buildTranscriptDisplayRows, matchesTranscriptReference } from '../../lib/transcript-display';
+import { Button, EmptyState, ErrorBanner, InfoBanner, LoadingBlock, Section, formatDateTime } from '../../lib/ui';
 import { SelectedAssetPanel, SelectedAssetTranscriptPanel, StatusBadge } from './assets';
 import { SearchPanel } from '../search/search';
 
@@ -36,6 +37,11 @@ type AssetDetailScreenProps = {
   contextError: unknown;
   isContextLoading: boolean;
   selectedSearchResult: SearchResult | null;
+  focusedTranscriptRowId: string | null;
+  sourceSearchQuery: string | null;
+  studyContextResponse?: TranscriptContextResponse;
+  studyContextError: unknown;
+  isStudyContextLoading: boolean;
   searchResetToken: number;
   searchableAssetCount: number;
   onIndex: () => void;
@@ -46,6 +52,8 @@ type AssetDetailScreenProps = {
   onOpenLibrary: () => void;
   onOpenSearch: () => void;
   onOpenAsset: (assetId: string) => void;
+  onReturnToSearch?: () => void;
+  onClearStudyContext?: () => void;
 };
 
 export function AssetDetailScreen({
@@ -72,6 +80,11 @@ export function AssetDetailScreen({
   contextError,
   isContextLoading,
   selectedSearchResult,
+  focusedTranscriptRowId,
+  sourceSearchQuery,
+  studyContextResponse,
+  studyContextError,
+  isStudyContextLoading,
   searchResetToken,
   searchableAssetCount,
   onIndex,
@@ -82,6 +95,8 @@ export function AssetDetailScreen({
   onOpenLibrary,
   onOpenSearch,
   onOpenAsset,
+  onReturnToSearch,
+  onClearStudyContext,
 }: AssetDetailScreenProps) {
   const otherAssets = assets.filter((currentAsset) => currentAsset.assetId !== asset?.assetId).slice(0, 5);
   const assetSearchableCount = resolvedAssetStatus === 'SEARCHABLE' ? 1 : 0;
@@ -108,6 +123,20 @@ export function AssetDetailScreen({
           onRename={onRename}
           onResetRename={onResetRename}
         />
+
+        {asset && focusedTranscriptRowId ? (
+          <TranscriptStudyContextPanel
+            assetTitle={asset.title}
+            workspaceName={workspaceName}
+            focusedTranscriptRowId={focusedTranscriptRowId}
+            sourceSearchQuery={sourceSearchQuery}
+            contextResponse={studyContextResponse}
+            contextError={studyContextError}
+            isContextLoading={isStudyContextLoading}
+            onReturnToSearch={onReturnToSearch}
+            onClearStudyContext={onClearStudyContext}
+          />
+        ) : null}
 
         {asset ? (
           <SearchPanel
@@ -136,6 +165,7 @@ export function AssetDetailScreen({
           transcriptRows={transcriptRows}
           transcriptError={transcriptError}
           transcriptLoading={transcriptLoading}
+          focusedTranscriptRowId={focusedTranscriptRowId}
         />
       </div>
 
@@ -196,5 +226,107 @@ export function AssetDetailScreen({
         </Section>
       </div>
     </div>
+  );
+}
+
+function TranscriptStudyContextPanel({
+  assetTitle,
+  workspaceName,
+  focusedTranscriptRowId,
+  sourceSearchQuery,
+  contextResponse,
+  contextError,
+  isContextLoading,
+  onReturnToSearch,
+  onClearStudyContext,
+}: {
+  assetTitle: string;
+  workspaceName: string;
+  focusedTranscriptRowId: string;
+  sourceSearchQuery: string | null;
+  contextResponse?: TranscriptContextResponse;
+  contextError: unknown;
+  isContextLoading: boolean;
+  onReturnToSearch?: () => void;
+  onClearStudyContext?: () => void;
+}) {
+  const displayContextRows = contextResponse?.rows.length ? buildTranscriptDisplayRows(contextResponse.rows) : [];
+
+  return (
+    <Section
+      title="Study this moment"
+      eyebrow={assetTitle}
+      actions={
+        <div className="study-context__actions">
+          {onReturnToSearch ? (
+            <Button type="button" tone="secondary" onClick={onReturnToSearch}>
+              Back to search
+            </Button>
+          ) : null}
+          {onClearStudyContext ? (
+            <Button type="button" tone="ghost" onClick={onClearStudyContext}>
+              Clear focus
+            </Button>
+          ) : null}
+        </div>
+      }
+    >
+      <InfoBanner
+        title="Opened from workspace search"
+        message={
+          sourceSearchQuery
+            ? `This asset detail view is focused on a transcript match for "${sourceSearchQuery}".`
+            : 'This asset detail view is focused on a selected transcript match.'
+        }
+        detail={`Workspace: ${workspaceName}. Nearby context uses the existing transcript context API.`}
+      />
+
+      {isContextLoading ? <LoadingBlock label="Loading selected transcript context..." /> : null}
+
+      {!isContextLoading && contextError ? (
+        <ErrorBanner
+          error={contextError}
+          title="Selected transcript row is unavailable"
+          message="The selected search hit could not be loaded. Return to search or review the full transcript below."
+        />
+      ) : null}
+
+      {!isContextLoading && !contextError && !contextResponse ? (
+        <EmptyState
+          title="Context not available yet"
+          description="The selected search hit is still carried in the route, but nearby transcript rows are not loaded."
+        />
+      ) : null}
+
+      {contextResponse ? (
+        <div className="context-window study-context">
+          <div className="context-window__meta">
+            <span>Hit segment: {contextResponse.hitSegmentIndex ?? 'n/a'}</span>
+            <span>Context window: {contextResponse.window}</span>
+          </div>
+
+          <ol className="transcript-list transcript-list--compact">
+            {displayContextRows.map(({ row, displayText, overlapHidden }) => {
+              const isHit = matchesTranscriptReference(row, focusedTranscriptRowId);
+
+              return (
+                <li
+                  key={row.id ?? `segment-${row.segmentIndex ?? 'missing'}`}
+                  className={`transcript-list__item ${isHit ? 'transcript-list__item--active' : ''}`}
+                >
+                  <div className="transcript-list__meta">
+                    <span>Segment {row.segmentIndex ?? 'n/a'}</span>
+                    <span>{formatDateTime(row.createdAt)}</span>
+                    {overlapHidden ? <span className="transcript-overlap-note">Overlap hidden</span> : null}
+                    {isHit ? <span className="hit-pill">Search hit</span> : null}
+                  </div>
+                  <p>{displayText}</p>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      ) : null}
+    </Section>
   );
 }

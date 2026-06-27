@@ -3,7 +3,13 @@ import { useCallback, useEffect, useState } from 'react';
 export type AppRoute =
   | { name: 'home' }
   | { name: 'library' }
-  | { name: 'asset'; assetId: string }
+  | {
+      name: 'asset';
+      assetId: string;
+      transcriptRowId?: string;
+      source?: 'search';
+      searchQuery?: string;
+    }
   | { name: 'search' }
   | { name: 'settings' };
 
@@ -18,7 +24,9 @@ function getCurrentHash(): string {
 export function parseRoute(hash: string): AppRoute {
   const normalizedPath = hash.replace(/^#/, '') || '/';
   const path = normalizedPath.startsWith('/') ? normalizedPath : `/${normalizedPath}`;
-  const segments = path.split('/').filter(Boolean);
+  const [pathname, queryString = ''] = path.split('?');
+  const searchParams = new URLSearchParams(queryString);
+  const segments = pathname.split('/').filter(Boolean);
 
   if (segments[0] === 'library') {
     return { name: 'library' };
@@ -33,7 +41,17 @@ export function parseRoute(hash: string): AppRoute {
   }
 
   if (segments[0] === 'assets' && segments[1]) {
-    return { name: 'asset', assetId: decodeURIComponent(segments[1]) };
+    const transcriptRowId = searchParams.get('row')?.trim() || undefined;
+    const source = searchParams.get('from') === 'search' ? 'search' : undefined;
+    const searchQuery = searchParams.get('q')?.trim() || undefined;
+
+    return {
+      name: 'asset',
+      assetId: decodeURIComponent(segments[1]),
+      transcriptRowId,
+      source,
+      searchQuery,
+    };
   }
 
   return { name: 'home' };
@@ -50,7 +68,24 @@ export function routeToHash(route: AppRoute): string {
     case 'settings':
       return '#/settings';
     case 'asset':
-      return `#/assets/${encodeURIComponent(route.assetId)}`;
+      {
+        const params = new URLSearchParams();
+
+        if (route.transcriptRowId) {
+          params.set('row', route.transcriptRowId);
+        }
+
+        if (route.source === 'search') {
+          params.set('from', 'search');
+        }
+
+        if (route.searchQuery?.trim()) {
+          params.set('q', route.searchQuery.trim());
+        }
+
+        const queryString = params.toString();
+        return `#/assets/${encodeURIComponent(route.assetId)}${queryString ? `?${queryString}` : ''}`;
+      }
     default:
       return '#/';
   }
