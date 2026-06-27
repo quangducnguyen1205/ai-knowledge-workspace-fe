@@ -41,7 +41,7 @@ Search transcript text
 -> the canonical transcript remains available below, with the selected row marked when visible
 ```
 
-The route carries only compact state: asset id, transcript-row reference, and optional source query. It does not serialize transcript text, credentials, raw API payloads, user email, tokens, or private data into the URL. Asset Detail keeps a return action back to Search when the route originated there, while Library remains the canonical place for upload and asset management.
+The route carries only compact state: asset id, transcript-row reference, and optional source query. It does not serialize transcript text, credentials, raw API payloads, user email, tokens, or private data into the URL. Asset Detail keeps a return action back to Search when the route originated there, including the safe original query as `#/search?q=<query>` when present. Returning to Search reloads results through the existing product search API; result rows are not cached, fabricated, or serialized into the URL. Library remains the canonical place for upload and asset management.
 
 ## Local Setup
 

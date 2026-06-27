@@ -355,6 +355,7 @@ export function AppShell() {
   const [selectedSearchResult, setSelectedSearchResult] = useState<SearchResult | null>(null);
   const [searchResetToken, setSearchResetToken] = useState(0);
   const selectedSearchResultRef = useRef<SearchResult | null>(null);
+  const lastRouteSearchSubmissionRef = useRef<string | null>(null);
   const [assetDetailSubmittedSearch, setAssetDetailSubmittedSearch] = useState<string | null>(null);
   const [selectedAssetDetailSearchResult, setSelectedAssetDetailSearchResult] = useState<SearchResult | null>(null);
   const [assetDetailSearchResetToken, setAssetDetailSearchResetToken] = useState(0);
@@ -402,6 +403,7 @@ export function AppShell() {
   const searchQuery = useSearchQuery(
     submittedSearch && selectedWorkspaceId ? { query: submittedSearch, workspaceId: selectedWorkspaceId } : null,
   );
+  const routeSearchQuery = route.name === 'search' ? route.searchQuery?.trim() || null : null;
   const assetDetailSearchQuery = useSearchQuery(
     assetDetailSubmittedSearch && selectedWorkspaceId && selectedAssetId
       ? { query: assetDetailSubmittedSearch, workspaceId: selectedWorkspaceId, assetId: selectedAssetId }
@@ -433,6 +435,33 @@ export function AppShell() {
         }
       : null,
   );
+
+  useEffect(() => {
+    if (route.name !== 'search') {
+      return;
+    }
+
+    if (!routeSearchQuery) {
+      lastRouteSearchSubmissionRef.current = null;
+      return;
+    }
+
+    if (!selectedWorkspaceId || searchableAssetCount === 0) {
+      return;
+    }
+
+    const routeSearchKey = `${selectedWorkspaceId}:${routeSearchQuery}`;
+    if (lastRouteSearchSubmissionRef.current === routeSearchKey && submittedSearch === routeSearchQuery) {
+      return;
+    }
+
+    lastRouteSearchSubmissionRef.current = routeSearchKey;
+
+    if (submittedSearch !== routeSearchQuery) {
+      setSubmittedSearch(routeSearchQuery);
+      setSelectedSearchResult(null);
+    }
+  }, [route.name, routeSearchQuery, searchableAssetCount, selectedWorkspaceId, submittedSearch]);
 
   useEffect(() => {
     const uploadedAssetId = uploadMutation.data?.assetId;
@@ -509,12 +538,36 @@ export function AppShell() {
       return;
     }
 
+    if (!isAuthenticated || currentUserQuery.isLoading || currentUserQuery.isFetching) {
+      return;
+    }
+
+    if (
+      workspacesQuery.isLoading ||
+      workspacesQuery.isFetching ||
+      workspaceScopeRefreshAfter !== null ||
+      (workspacesQuery.data?.length ?? 0) > 0
+    ) {
+      return;
+    }
+
     if (route.name === 'home' || route.name === 'settings') {
       return;
     }
 
     navigate({ name: 'home' });
-  }, [navigate, route.name, selectedWorkspace]);
+  }, [
+    currentUserQuery.isFetching,
+    currentUserQuery.isLoading,
+    isAuthenticated,
+    navigate,
+    route.name,
+    selectedWorkspace,
+    workspaceScopeRefreshAfter,
+    workspacesQuery.data?.length,
+    workspacesQuery.isFetching,
+    workspacesQuery.isLoading,
+  ]);
 
   useEffect(() => {
     if (route.name !== 'asset') {
@@ -761,6 +814,16 @@ export function AppShell() {
     }
 
     navigate({ name: 'asset', assetId: route.assetId });
+  }
+
+  function returnToSearchFromAsset() {
+    if (route.name !== 'asset') {
+      navigate({ name: 'search' });
+      return;
+    }
+
+    const searchQueryFromRoute = route.searchQuery?.trim();
+    navigate(searchQueryFromRoute ? { name: 'search', searchQuery: searchQueryFromRoute } : { name: 'search' });
   }
 
   function handleUpload(input: { file: File; title?: string }) {
@@ -1200,7 +1263,7 @@ export function AppShell() {
             onOpenLibrary={() => navigate({ name: 'library' })}
             onOpenSearch={() => navigate({ name: 'search' })}
             onOpenAsset={openAsset}
-            onReturnToSearch={route.name === 'asset' && route.source === 'search' ? () => navigate({ name: 'search' }) : undefined}
+            onReturnToSearch={route.name === 'asset' && route.source === 'search' ? returnToSearchFromAsset : undefined}
             onClearStudyContext={routedTranscriptRowId ? clearRoutedStudyContext : undefined}
           />
         );
@@ -1212,6 +1275,7 @@ export function AppShell() {
             searchableAssetCount={searchableAssetCount}
             resetToken={searchResetToken}
             activeQuery={submittedSearch}
+            routeQuery={routeSearchQuery}
             searchResponse={searchQuery.data}
             searchError={searchQuery.error}
             isSearching={searchQuery.isLoading || searchQuery.isFetching}
@@ -1221,8 +1285,10 @@ export function AppShell() {
             selectedResult={selectedSearchResult}
             assets={displayAssets}
             onSearch={(query) => {
-              setSubmittedSearch(query);
+              const trimmedQuery = query.trim();
+              setSubmittedSearch(trimmedQuery);
               setSelectedSearchResult(null);
+              navigate({ name: 'search', searchQuery: trimmedQuery });
             }}
             onSelectResult={setSelectedSearchResult}
             onOpenResultContext={openSearchResultInAsset}

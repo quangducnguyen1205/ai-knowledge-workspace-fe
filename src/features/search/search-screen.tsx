@@ -1,5 +1,5 @@
 import type { SearchResponse, SearchResult, TranscriptContextResponse, AssetSummary } from '../../lib/api';
-import { Button, EmptyState, Section } from '../../lib/ui';
+import { Button, EmptyState, InfoBanner, Section } from '../../lib/ui';
 import { StatusBadge } from '../assets/assets';
 import { SearchPanel } from './search';
 
@@ -8,6 +8,7 @@ type SearchScreenProps = {
   searchableAssetCount: number;
   resetToken: number;
   activeQuery: string | null;
+  routeQuery: string | null;
   searchResponse?: SearchResponse;
   searchError: unknown;
   isSearching: boolean;
@@ -28,6 +29,7 @@ export function WorkspaceSearchScreen({
   searchableAssetCount,
   resetToken,
   activeQuery,
+  routeQuery,
   searchResponse,
   searchError,
   isSearching,
@@ -47,11 +49,19 @@ export function WorkspaceSearchScreen({
   return (
     <div className="screen-grid screen-grid--search">
       <div className="screen-main">
+        {routeQuery ? (
+          <InfoBanner
+            title={`Returned to workspace search for "${routeQuery}"`}
+            message="Results are loaded through the current product search API; result rows are not cached or restored from the URL."
+          />
+        ) : null}
+
         <SearchPanel
           workspaceName={workspaceName}
           searchableAssetCount={searchableAssetCount}
           resetToken={resetToken}
           activeQuery={activeQuery}
+          routeQuery={routeQuery}
           searchResponse={searchResponse}
           searchError={searchError}
           isSearching={isSearching}

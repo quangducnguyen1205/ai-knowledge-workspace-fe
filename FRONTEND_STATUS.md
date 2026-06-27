@@ -63,7 +63,7 @@ Authenticated routes are surfaced through top navigation on desktop: `Home`, `Li
 - Review ranked search results with a distinct asset title, transcript excerpt, and transcript moment metadata
 - Open a result into the real Asset Detail route with the asset id, selected transcript-row reference, and optional source query preserved in the hash route
 - Read nearby transcript rows from the existing transcript context API on Asset Detail
-- Return to Search from a detail page that originated from a workspace result
+- Return to Search from a detail page that originated from a workspace result, preserving the safe query as `#/search?q=<query>` when available
 - Optionally restrict search to the current asset from Asset Detail
 - Open transcript context around a selected result
 - Keep orientation through the top navigation active state, page heading, workspace status, visible account summary, and asset-detail breadcrumb
@@ -129,6 +129,7 @@ Authenticated routes are surfaced through top navigation on desktop: `Home`, `Li
 - Upload copy and accepted file input remain lecture-video-first to match the current real product path
 - Search stays disabled until explicit indexing produces searchable assets
 - Workspace Search opens relevant results into Asset Detail so the learner can continue reading nearby transcript context without losing the source Search orientation
+- Search return links carry only compact route state and reuse the existing product search path; result rows are not cached, fabricated, or serialized into the URL
 - Asset Detail can reuse the same transcript-hit/context search pattern, but scoped to the current asset
 - No assistant/chat UI, no fake AI affordances, and no unsupported media seek behavior were added
 - P3-F1 assistant context remains a backend retrieval-only endpoint in this phase; no frontend answer generation, provider integration, or persisted chat state has been added.

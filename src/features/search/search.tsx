@@ -75,6 +75,7 @@ export function SearchPanel({
   contextError,
   isContextLoading,
   selectedResult,
+  routeQuery,
   scope,
   onSearch,
   onSelectResult,
@@ -91,6 +92,7 @@ export function SearchPanel({
   contextError: unknown;
   isContextLoading: boolean;
   selectedResult: SearchResult | null;
+  routeQuery?: string | null;
   scope?: SearchPanelScope;
   onSearch: (query: string) => void;
   onSelectResult: (result: SearchResult) => void;
@@ -100,6 +102,7 @@ export function SearchPanel({
   const [contextSpotlightActive, setContextSpotlightActive] = useState(false);
   const contextPanelRef = useRef<HTMLDivElement | null>(null);
   const contextSpotlightTimeoutRef = useRef<number | null>(null);
+  const routeQueryDraft = routeQuery?.trim() || null;
   const isAssetScoped = scope?.mode === 'asset';
   const scopeTitle = isAssetScoped ? scope?.assetTitle ?? 'Current video' : workspaceName;
   const searchTitle = isAssetScoped ? 'Search within this video' : 'Workspace Search';
@@ -160,8 +163,13 @@ export function SearchPanel({
         };
 
   useEffect(() => {
+    if (routeQueryDraft) {
+      setSearchInput(routeQueryDraft);
+      return;
+    }
+
     setSearchInput('');
-  }, [resetToken, workspaceName]);
+  }, [resetToken, routeQueryDraft, workspaceName]);
 
   useEffect(() => {
     if (contextSpotlightTimeoutRef.current !== null) {

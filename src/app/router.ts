@@ -10,7 +10,7 @@ export type AppRoute =
       source?: 'search';
       searchQuery?: string;
     }
-  | { name: 'search' }
+  | { name: 'search'; searchQuery?: string }
   | { name: 'settings' };
 
 function getCurrentHash(): string {
@@ -33,7 +33,9 @@ export function parseRoute(hash: string): AppRoute {
   }
 
   if (segments[0] === 'search') {
-    return { name: 'search' };
+    const searchQuery = searchParams.get('q')?.trim() || undefined;
+
+    return { name: 'search', searchQuery };
   }
 
   if (segments[0] === 'settings') {
@@ -64,7 +66,16 @@ export function routeToHash(route: AppRoute): string {
     case 'library':
       return '#/library';
     case 'search':
-      return '#/search';
+      {
+        const params = new URLSearchParams();
+
+        if (route.searchQuery?.trim()) {
+          params.set('q', route.searchQuery.trim());
+        }
+
+        const queryString = params.toString();
+        return `#/search${queryString ? `?${queryString}` : ''}`;
+      }
     case 'settings':
       return '#/settings';
     case 'asset':
