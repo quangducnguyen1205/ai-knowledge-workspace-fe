@@ -7,7 +7,7 @@ import {
   type SearchResult,
   type TranscriptContextResponse,
 } from '../../lib/api';
-import { buildTranscriptDisplayRows, matchesTranscriptReference } from '../../lib/transcript-display';
+import { buildTranscriptDisplayRows, matchesTranscriptReference } from '../../entities/transcript/model/transcript-display';
 import { Button, EmptyState, ErrorBanner, InfoBanner, LoadingBlock, Section, formatDateTime, formatScore } from '../../lib/ui';
 
 export type SearchParams = {

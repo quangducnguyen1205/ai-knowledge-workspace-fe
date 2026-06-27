@@ -8,7 +8,7 @@ import type {
   TranscriptContextResponse,
   TranscriptRow,
 } from '../../lib/api';
-import { buildTranscriptDisplayRows, matchesTranscriptReference } from '../../lib/transcript-display';
+import { buildTranscriptDisplayRows, matchesTranscriptReference } from '../../entities/transcript/model/transcript-display';
 import { Button, EmptyState, ErrorBanner, InfoBanner, LoadingBlock, Section, formatDateTime } from '../../lib/ui';
 import { SelectedAssetPanel, SelectedAssetTranscriptPanel, StatusBadge } from './assets';
 import { SearchPanel } from '../search/search';

@@ -41,7 +41,20 @@ The frontend now behaves like a routed web app with a persistent product shell i
 
 Authenticated routes are surfaced through top navigation on desktop: `Home`, `Library`, `Search`, and `Settings`. Upload is a single shell-level action into the existing Library upload flow rather than a fake standalone route. Asset Detail remains a deep Library route with a breadcrumb back to Library.
 
-## 4. Implemented Product Flow
+## 4. Frontend Modular Boundaries
+
+The modularization approach is incremental and feature-first. It is not a framework migration or a full Feature-Sliced Design adoption.
+
+- `app/` owns application startup, hash routing, authenticated shell composition, workspace bootstrap, and protected-route fallback.
+- `features/` owns user-oriented flows such as auth, asset library/detail, workspace search, and Search-to-study route behavior.
+- `entities/` owns reusable product-domain behavior shared by features, currently transcript display/reference handling.
+- `lib/` owns shared API behavior, auth config, OIDC client setup, and generic UI primitives.
+
+Dependency direction stays one-way: `app -> features/entities/lib`, `features -> entities/lib`, `entities -> lib`. Shared `lib` code must not depend on business features or entities. Router and bootstrap remain app-owned; Search route hydration remains Search-feature-owned; compact study route interpretation stays near the Search/study workflow; transcript display/reference behavior has one canonical transcript entity owner. The repo does not use barrel exports by default, so imports point to concrete module owners.
+
+This refactor preserves existing routes, API request shapes, auth defaults, token handling, visible copy, and UX behavior.
+
+## 5. Implemented Product Flow
 
 - Sign in or create account through the authenticated product entry surface
 - Resolve the signed-in user through `GET /api/me`
@@ -68,7 +81,7 @@ Authenticated routes are surfaced through top navigation on desktop: `Home`, `Li
 - Open transcript context around a selected result
 - Keep orientation through the top navigation active state, page heading, workspace status, visible account summary, and asset-detail breadcrumb
 
-## 5. Backend API Surface Used
+## 6. Backend API Surface Used
 
 - `POST /api/auth/register`
 - `POST /api/auth/login`
@@ -88,7 +101,7 @@ Authenticated routes are surfaced through top navigation on desktop: `Home`, `Li
 - `GET /api/search`
 - `GET /api/assets/{assetId}/transcript/context`
 
-## 6. Project 3 Auth Foundation
+## 7. Project 3 Auth Foundation
 
 - Default mode remains `VITE_AUTHENTICATION_MODE=legacy_session`.
 - Legacy mode keeps the existing register/login/logout/session-cookie behavior.
@@ -101,7 +114,7 @@ Authenticated routes are surfaced through top navigation on desktop: `Home`, `Li
 - The P3-C4 smoke made one minimal frontend correction: redirect callback completion now shares the in-flight OIDC callback promise across React StrictMode effect replay so the development browser flow does not remain stuck on the callback loading state.
 - Token refresh, silent SSO, global logout propagation, account management, production deployment cutover, auth-default cutover, and full accessibility certification remain future work.
 
-## 7. Local Run Path
+## 8. Local Run Path
 
 - Recommended path: Docker
 - Main commands:
@@ -111,7 +124,7 @@ Authenticated routes are surfaced through top navigation on desktop: `Home`, `Li
 - Expected frontend URL: `http://localhost:5173`
 - Expected backend URL: `http://localhost:8081`
 
-## 8. Verification Notes
+## 9. Verification Notes
 
 - Dockerized production build passed with `docker compose run --rm frontend npm run build`
 - Auth boundary, workspace queries, asset queries, transcript flow, explicit indexing, and search remain backend-aligned
@@ -121,8 +134,9 @@ Authenticated routes are surfaced through top navigation on desktop: `Home`, `Li
 - P3-FE1 browser checks are Vite-only by design. They do not claim authenticated backend/browser integration when Spring/auth services are not running.
 - P3-FE2 component tests cover the Search page labelled query control, result readability, route/state produced by opening a result, loading/empty/error states, selected transcript context on Asset Detail, canonical transcript display without a selected row, missing-row feedback, Search return behavior, and keyboard activation for the context-opening action.
 - P3-FE2 browser checks are public/auth-surface only when no real authenticated backend session is available; search and asset study behavior are validated through frontend component tests without fake backend sessions.
+- P3-FE2.2 modularized app routing/bootstrap, Search route hydration, study route interpretation, and transcript display ownership without changing routes, API calls, auth defaults, or visible UX.
 
-## 9. Design / Product Notes
+## 10. Design / Product Notes
 
 - The UI now uses a persistent app shell with horizontal desktop navigation instead of a demo hero plus three fixed panels
 - Routing is hash-based to stay compatible with the current frontend setup and avoid new backend/server route assumptions
@@ -134,7 +148,7 @@ Authenticated routes are surfaced through top navigation on desktop: `Home`, `Li
 - No assistant/chat UI, no fake AI affordances, and no unsupported media seek behavior were added
 - P3-F1 assistant context remains a backend retrieval-only endpoint in this phase; no frontend answer generation, provider integration, or persisted chat state has been added.
 
-## 10. Intentionally Deferred
+## 11. Intentionally Deferred
 
 - Chat or assistant flows
 - Timestamp seek or media playback controls
@@ -144,7 +158,7 @@ Authenticated routes are surfaced through top navigation on desktop: `Home`, `Li
 - Analytics dashboards
 - Broader auth-platform features beyond the current supported backend path
 
-## 11. Quick Summary
+## 12. Quick Summary
 
 - The frontend now feels like a small real product rather than a single-shell demo
 - Navigation, layout hierarchy, empty states, and success/error handling are stronger and more realistic

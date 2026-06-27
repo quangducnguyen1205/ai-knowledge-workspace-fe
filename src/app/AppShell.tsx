@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { type AssetStatus, ApiClientError, type AssetSummary, type SearchResponse, type SearchResult } from '../lib/api';
 import { Button, EmptyState, ErrorBanner, LoadingBlock } from '../lib/ui';
 import { routeToHash, useHashRoute, type AppRoute } from './router';
+import { useProtectedRouteFallback } from './bootstrap/use-protected-route-fallback';
+import { useWorkspaceBootstrap } from './bootstrap/use-workspace-bootstrap';
 import {
   useCurrentUserQuery,
   AuthEntrySurface,
@@ -29,6 +31,8 @@ import { AssetLibraryScreen } from '../features/assets/library-screen';
 import { AssetDetailScreen } from '../features/assets/detail-screen';
 import { WorkspaceHomeScreen } from '../features/dashboard/dashboard';
 import { searchKeys, resolveTranscriptLookupId, useSearchQuery, useTranscriptContextQuery } from '../features/search/search';
+import { getClearedStudyRoute, getSearchReturnRoute, getStudyRouteState } from '../features/search/model/study-route-state';
+import { useRouteSearchHydration } from '../features/search/model/use-route-search-hydration';
 import { WorkspaceSearchScreen } from '../features/search/search-screen';
 import { SettingsScreen } from '../features/settings/settings';
 import {
@@ -39,8 +43,6 @@ import {
   WorkspaceBar,
   workspaceKeys,
 } from '../features/workspaces/workspaces';
-
-const lastWorkspaceSelectionStorageKey = 'akw:last-workspace-id';
 
 type SuccessNotice = {
   title: string;
@@ -54,30 +56,6 @@ type ShellNavItem = {
   disabledReason?: string;
   isActive: boolean;
 };
-
-function readStoredWorkspaceSelection(): string | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  try {
-    return window.localStorage.getItem(lastWorkspaceSelectionStorageKey)?.trim() || null;
-  } catch {
-    return null;
-  }
-}
-
-function writeStoredWorkspaceSelection(workspaceId: string): void {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  try {
-    window.localStorage.setItem(lastWorkspaceSelectionStorageKey, workspaceId);
-  } catch {
-    // Ignore storage failures and keep the shell functional.
-  }
-}
 
 function canLoadTranscript(assetStatus: AssetStatus | null, processingJobStatus?: string): boolean {
   return (
@@ -118,63 +96,18 @@ export function AppShell() {
   const createWorkspaceMutation = useCreateWorkspaceMutation();
   const renameWorkspaceMutation = useRenameWorkspaceMutation();
   const deleteWorkspaceMutation = useDeleteWorkspaceMutation();
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null);
-  const [preferredWorkspaceId, setPreferredWorkspaceId] = useState<string | null>(() => readStoredWorkspaceSelection());
-  const [workspaceScopeRefreshAfter, setWorkspaceScopeRefreshAfter] = useState<number | null>(null);
-
-  useEffect(() => {
-    const workspaces = workspacesQuery.data ?? [];
-
-    if (workspaceScopeRefreshAfter !== null) {
-      if (workspacesQuery.dataUpdatedAt <= workspaceScopeRefreshAfter) {
-        return;
-      }
-
-      if (!workspaces.length) {
-        setWorkspaceScopeRefreshAfter(null);
-        return;
-      }
-
-      const restoredWorkspace = preferredWorkspaceId
-        ? workspaces.find((workspace) => workspace.id === preferredWorkspaceId)
-        : null;
-
-      startTransition(() => setSelectedWorkspaceId(restoredWorkspace?.id ?? workspaces[0].id));
-      setWorkspaceScopeRefreshAfter(null);
-      return;
-    }
-
-    if (!workspaces.length) {
-      return;
-    }
-
-    if (preferredWorkspaceId) {
-      const preferredWorkspace = workspaces.find((workspace) => workspace.id === preferredWorkspaceId);
-      if (preferredWorkspace) {
-        startTransition(() => setSelectedWorkspaceId(preferredWorkspace.id));
-        setPreferredWorkspaceId(null);
-        return;
-      }
-    }
-
-    if (selectedWorkspaceId && workspaces.some((workspace) => workspace.id === selectedWorkspaceId)) {
-      return;
-    }
-
-    startTransition(() => setSelectedWorkspaceId(workspaces[0].id));
-  }, [
-    preferredWorkspaceId,
+  const {
+    selectedWorkspace,
     selectedWorkspaceId,
-    startTransition,
+    setSelectedWorkspaceId,
+    setPreferredWorkspaceId,
     workspaceScopeRefreshAfter,
-    workspacesQuery.data,
-    workspacesQuery.dataUpdatedAt,
-  ]);
-
-  const selectedWorkspace = useMemo(
-    () => workspacesQuery.data?.find((workspace) => workspace.id === selectedWorkspaceId) ?? null,
-    [selectedWorkspaceId, workspacesQuery.data],
-  );
+    setWorkspaceScopeRefreshAfter,
+  } = useWorkspaceBootstrap({
+    workspaces: workspacesQuery.data,
+    workspacesDataUpdatedAt: workspacesQuery.dataUpdatedAt,
+    startTransition,
+  });
 
   const assetsQuery = useAssetsQuery(selectedWorkspaceId);
   const uploadMutation = useUploadAssetMutation();
@@ -355,7 +288,6 @@ export function AppShell() {
   const [selectedSearchResult, setSelectedSearchResult] = useState<SearchResult | null>(null);
   const [searchResetToken, setSearchResetToken] = useState(0);
   const selectedSearchResultRef = useRef<SearchResult | null>(null);
-  const lastRouteSearchSubmissionRef = useRef<string | null>(null);
   const [assetDetailSubmittedSearch, setAssetDetailSubmittedSearch] = useState<string | null>(null);
   const [selectedAssetDetailSearchResult, setSelectedAssetDetailSearchResult] = useState<SearchResult | null>(null);
   const [assetDetailSearchResetToken, setAssetDetailSearchResetToken] = useState(0);
@@ -394,16 +326,20 @@ export function AppShell() {
     }
   }, [renameMutation.isPending, renameMutation.reset, renameMutation.variables?.assetId, selectedAssetId]);
 
-  useEffect(() => {
-    if (selectedWorkspaceId) {
-      writeStoredWorkspaceSelection(selectedWorkspaceId);
-    }
-  }, [selectedWorkspaceId]);
-
   const searchQuery = useSearchQuery(
     submittedSearch && selectedWorkspaceId ? { query: submittedSearch, workspaceId: selectedWorkspaceId } : null,
   );
-  const routeSearchQuery = route.name === 'search' ? route.searchQuery?.trim() || null : null;
+  const handleRouteSearchSubmit = useCallback((query: string) => {
+    setSubmittedSearch(query);
+    setSelectedSearchResult(null);
+  }, []);
+  const routeSearchQuery = useRouteSearchHydration({
+    route,
+    selectedWorkspaceId,
+    searchableAssetCount,
+    submittedSearch,
+    onRouteSearchSubmit: handleRouteSearchSubmit,
+  });
   const assetDetailSearchQuery = useSearchQuery(
     assetDetailSubmittedSearch && selectedWorkspaceId && selectedAssetId
       ? { query: assetDetailSubmittedSearch, workspaceId: selectedWorkspaceId, assetId: selectedAssetId }
@@ -424,44 +360,8 @@ export function AppShell() {
         }
       : null,
   );
-  const routedTranscriptRowId = route.name === 'asset' ? route.transcriptRowId ?? null : null;
-  const routedSearchQuery = route.name === 'asset' && route.source === 'search' ? route.searchQuery ?? submittedSearch : null;
-  const routedStudyContextQuery = useTranscriptContextQuery(
-    route.name === 'asset' && routedTranscriptRowId && selectedWorkspaceId
-      ? {
-          assetId: route.assetId,
-          transcriptRowId: routedTranscriptRowId,
-          window: 2,
-        }
-      : null,
-  );
-
-  useEffect(() => {
-    if (route.name !== 'search') {
-      return;
-    }
-
-    if (!routeSearchQuery) {
-      lastRouteSearchSubmissionRef.current = null;
-      return;
-    }
-
-    if (!selectedWorkspaceId || searchableAssetCount === 0) {
-      return;
-    }
-
-    const routeSearchKey = `${selectedWorkspaceId}:${routeSearchQuery}`;
-    if (lastRouteSearchSubmissionRef.current === routeSearchKey && submittedSearch === routeSearchQuery) {
-      return;
-    }
-
-    lastRouteSearchSubmissionRef.current = routeSearchKey;
-
-    if (submittedSearch !== routeSearchQuery) {
-      setSubmittedSearch(routeSearchQuery);
-      setSelectedSearchResult(null);
-    }
-  }, [route.name, routeSearchQuery, searchableAssetCount, selectedWorkspaceId, submittedSearch]);
+  const studyRouteState = getStudyRouteState(route, selectedWorkspaceId, submittedSearch);
+  const routedStudyContextQuery = useTranscriptContextQuery(studyRouteState.contextParams);
 
   useEffect(() => {
     const uploadedAssetId = uploadMutation.data?.assetId;
@@ -533,41 +433,18 @@ export function AppShell() {
     }
   }, [assetDetailSearchQuery.data?.results, selectedAssetDetailSearchResult]);
 
-  useEffect(() => {
-    if (selectedWorkspace) {
-      return;
-    }
-
-    if (!isAuthenticated || currentUserQuery.isLoading || currentUserQuery.isFetching) {
-      return;
-    }
-
-    if (
-      workspacesQuery.isLoading ||
-      workspacesQuery.isFetching ||
-      workspaceScopeRefreshAfter !== null ||
-      (workspacesQuery.data?.length ?? 0) > 0
-    ) {
-      return;
-    }
-
-    if (route.name === 'home' || route.name === 'settings') {
-      return;
-    }
-
-    navigate({ name: 'home' });
-  }, [
-    currentUserQuery.isFetching,
-    currentUserQuery.isLoading,
+  useProtectedRouteFallback({
+    route,
     isAuthenticated,
+    isCurrentUserLoading: currentUserQuery.isLoading,
+    isCurrentUserFetching: currentUserQuery.isFetching,
+    hasSelectedWorkspace: Boolean(selectedWorkspace),
+    isWorkspaceLoading: workspacesQuery.isLoading,
+    isWorkspaceFetching: workspacesQuery.isFetching,
+    isWorkspaceScopeRefreshing: workspaceScopeRefreshAfter !== null,
+    workspaceCount: workspacesQuery.data?.length ?? 0,
     navigate,
-    route.name,
-    selectedWorkspace,
-    workspaceScopeRefreshAfter,
-    workspacesQuery.data?.length,
-    workspacesQuery.isFetching,
-    workspacesQuery.isLoading,
-  ]);
+  });
 
   useEffect(() => {
     if (route.name !== 'asset') {
@@ -809,21 +686,15 @@ export function AppShell() {
   }
 
   function clearRoutedStudyContext() {
-    if (route.name !== 'asset') {
-      return;
-    }
+    const clearedRoute = getClearedStudyRoute(route);
 
-    navigate({ name: 'asset', assetId: route.assetId });
+    if (clearedRoute) {
+      navigate(clearedRoute);
+    }
   }
 
   function returnToSearchFromAsset() {
-    if (route.name !== 'asset') {
-      navigate({ name: 'search' });
-      return;
-    }
-
-    const searchQueryFromRoute = route.searchQuery?.trim();
-    navigate(searchQueryFromRoute ? { name: 'search', searchQuery: searchQueryFromRoute } : { name: 'search' });
+    navigate(getSearchReturnRoute(route));
   }
 
   function handleUpload(input: { file: File; title?: string }) {
@@ -1245,8 +1116,8 @@ export function AppShell() {
             contextError={assetDetailContextQuery.error}
             isContextLoading={assetDetailContextQuery.isLoading || assetDetailContextQuery.isFetching}
             selectedSearchResult={selectedAssetDetailSearchResult}
-            focusedTranscriptRowId={routedTranscriptRowId}
-            sourceSearchQuery={routedSearchQuery}
+            focusedTranscriptRowId={studyRouteState.focusedTranscriptRowId}
+            sourceSearchQuery={studyRouteState.sourceSearchQuery}
             studyContextResponse={routedStudyContextQuery.data}
             studyContextError={routedStudyContextQuery.error}
             isStudyContextLoading={routedStudyContextQuery.isLoading || routedStudyContextQuery.isFetching}
@@ -1264,7 +1135,7 @@ export function AppShell() {
             onOpenSearch={() => navigate({ name: 'search' })}
             onOpenAsset={openAsset}
             onReturnToSearch={route.name === 'asset' && route.source === 'search' ? returnToSearchFromAsset : undefined}
-            onClearStudyContext={routedTranscriptRowId ? clearRoutedStudyContext : undefined}
+            onClearStudyContext={studyRouteState.focusedTranscriptRowId ? clearRoutedStudyContext : undefined}
           />
         );
         break;

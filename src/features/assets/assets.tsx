@@ -18,7 +18,7 @@ import {
   type TranscriptRow,
   type UpdateAssetTitleInput,
 } from '../../lib/api';
-import { buildTranscriptDisplayRows, matchesTranscriptReference } from '../../lib/transcript-display';
+import { buildTranscriptDisplayRows, matchesTranscriptReference } from '../../entities/transcript/model/transcript-display';
 import { Button, EmptyState, ErrorBanner, InfoBanner, LoadingBlock, Section, formatDateTime } from '../../lib/ui';
 
 export const assetKeys = {

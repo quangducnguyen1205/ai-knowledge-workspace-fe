@@ -1,4 +1,4 @@
-import type { TranscriptRow } from './api';
+import type { TranscriptRow } from '../../../lib/api';
 
 export type TranscriptDisplayRow = {
   row: TranscriptRow;

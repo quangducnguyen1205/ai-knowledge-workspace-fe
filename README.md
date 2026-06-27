@@ -16,6 +16,7 @@ This repo is the separate frontend for the AI Knowledge Workspace demo. It is in
 - search disabled until the active workspace has at least one searchable asset
 - search/context state kept in sync across workspace switch, upload completion, indexing completion, and refreshed results
 - responsive product app shell with persistent desktop top navigation and compact mobile navigation
+- incremental frontend module boundaries documented in `FRONTEND_STATUS.md`
 
 ## Navigation Model
 

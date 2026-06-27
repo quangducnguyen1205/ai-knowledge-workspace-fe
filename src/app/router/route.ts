@@ -1,5 +1,3 @@
-import { useCallback, useEffect, useState } from 'react';
-
 export type AppRoute =
   | { name: 'home' }
   | { name: 'library' }
@@ -13,7 +11,7 @@ export type AppRoute =
   | { name: 'search'; searchQuery?: string }
   | { name: 'settings' };
 
-function getCurrentHash(): string {
+export function getCurrentHash(): string {
   if (typeof window === 'undefined') {
     return '#/';
   }
@@ -100,39 +98,4 @@ export function routeToHash(route: AppRoute): string {
     default:
       return '#/';
   }
-}
-
-export function useHashRoute(): [AppRoute, (route: AppRoute) => void] {
-  const [route, setRoute] = useState<AppRoute>(() => parseRoute(getCurrentHash()));
-
-  useEffect(() => {
-    function handleHashChange() {
-      setRoute(parseRoute(getCurrentHash()));
-    }
-
-    if (typeof window === 'undefined') {
-      return undefined;
-    }
-
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
-  }, []);
-
-  const navigate = useCallback((nextRoute: AppRoute) => {
-    const nextHash = routeToHash(nextRoute);
-
-    if (typeof window === 'undefined') {
-      setRoute(nextRoute);
-      return;
-    }
-
-    if (window.location.hash === nextHash) {
-      setRoute(nextRoute);
-      return;
-    }
-
-    window.location.hash = nextHash;
-  }, []);
-
-  return [route, navigate];
 }
