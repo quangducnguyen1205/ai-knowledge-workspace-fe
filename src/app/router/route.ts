@@ -5,7 +5,7 @@ export type AppRoute =
       name: 'asset';
       assetId: string;
       transcriptRowId?: string;
-      source?: 'search';
+      source?: 'search' | 'assistant';
       searchQuery?: string;
     }
   | { name: 'search'; searchQuery?: string }
@@ -42,7 +42,8 @@ export function parseRoute(hash: string): AppRoute {
 
   if (segments[0] === 'assets' && segments[1]) {
     const transcriptRowId = searchParams.get('row')?.trim() || undefined;
-    const source = searchParams.get('from') === 'search' ? 'search' : undefined;
+    const sourceParam = searchParams.get('from');
+    const source = sourceParam === 'search' || sourceParam === 'assistant' ? sourceParam : undefined;
     const searchQuery = searchParams.get('q')?.trim() || undefined;
 
     return {
@@ -84,8 +85,8 @@ export function routeToHash(route: AppRoute): string {
           params.set('row', route.transcriptRowId);
         }
 
-        if (route.source === 'search') {
-          params.set('from', 'search');
+        if (route.source) {
+          params.set('from', route.source);
         }
 
         if (route.searchQuery?.trim()) {

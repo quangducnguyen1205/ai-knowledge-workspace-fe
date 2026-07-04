@@ -58,4 +58,22 @@ describe('hash route helpers', () => {
     expect(hash).not.toContain('assetTitle=');
     expect(hash).not.toContain('text=');
   });
+
+  it('keeps assistant citation focus route state compact', () => {
+    const hash = routeToHash({
+      name: 'asset',
+      assetId: 'asset-1',
+      transcriptRowId: 'segment-4',
+      source: 'assistant',
+    });
+
+    expect(hash).toBe('#/assets/asset-1?row=segment-4&from=assistant');
+    expect(parseRoute(hash)).toEqual({
+      name: 'asset',
+      assetId: 'asset-1',
+      transcriptRowId: 'segment-4',
+      source: 'assistant',
+      searchQuery: undefined,
+    });
+  });
 });

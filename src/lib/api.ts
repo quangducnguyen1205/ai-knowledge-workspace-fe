@@ -98,6 +98,21 @@ export type SearchResponse = {
   results: SearchResult[];
 };
 
+export type AssistantAnswerCitation = {
+  sourceId: string;
+  assetId: string;
+  assetTitle: string;
+  transcriptRowId: string | null;
+  segmentIndex: number | null;
+  createdAt: string | null;
+};
+
+export type AssistantAnswerResponse = {
+  answer: string;
+  citations: AssistantAnswerCitation[];
+  insufficientContext: boolean;
+};
+
 type CreateWorkspacePayload = {
   name: string;
 };
@@ -109,6 +124,12 @@ export type UpdateWorkspaceNameInput = {
 
 type CreateAuthSessionPayload = {
   userId: string;
+};
+
+export type AssistantAnswerInput = {
+  workspaceId: string;
+  assetId: string;
+  question: string;
 };
 
 export type AuthCredentialsInput = {
@@ -440,4 +461,19 @@ export async function getTranscriptContext(
       window: String(window),
     })}`,
   );
+}
+
+export async function answerAssistant(input: AssistantAnswerInput, signal?: AbortSignal): Promise<AssistantAnswerResponse> {
+  return request<AssistantAnswerResponse>('/api/assistant/answer', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      workspaceId: input.workspaceId,
+      assetId: input.assetId,
+      question: input.question,
+    }),
+    signal,
+  });
 }

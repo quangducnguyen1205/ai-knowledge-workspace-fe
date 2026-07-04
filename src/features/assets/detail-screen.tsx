@@ -3,6 +3,7 @@ import type {
   AssetStatus,
   AssetStatusResponse,
   AssetSummary,
+  AssistantAnswerCitation,
   SearchResponse,
   SearchResult,
   TranscriptContextResponse,
@@ -11,9 +12,11 @@ import type {
 import { buildTranscriptDisplayRows, matchesTranscriptReference } from '../../entities/transcript/model/transcript-display';
 import { Button, EmptyState, ErrorBanner, InfoBanner, LoadingBlock, Section, formatDateTime } from '../../lib/ui';
 import { SelectedAssetPanel, SelectedAssetTranscriptPanel, StatusBadge } from './assets';
+import { AssetAssistantPanel } from '../assistant/assistant';
 import { SearchPanel } from '../search/search';
 
 type AssetDetailScreenProps = {
+  workspaceId?: string;
   workspaceName: string;
   assets: AssetSummary[];
   asset: AssetSummary | null;
@@ -38,6 +41,7 @@ type AssetDetailScreenProps = {
   isContextLoading: boolean;
   selectedSearchResult: SearchResult | null;
   focusedTranscriptRowId: string | null;
+  focusedTranscriptSource?: 'search' | 'assistant' | null;
   sourceSearchQuery: string | null;
   studyContextResponse?: TranscriptContextResponse;
   studyContextError: unknown;
@@ -52,11 +56,13 @@ type AssetDetailScreenProps = {
   onOpenLibrary: () => void;
   onOpenSearch: () => void;
   onOpenAsset: (assetId: string) => void;
+  onOpenAssistantCitation?: (citation: AssistantAnswerCitation) => void;
   onReturnToSearch?: () => void;
   onClearStudyContext?: () => void;
 };
 
 export function AssetDetailScreen({
+  workspaceId,
   workspaceName,
   assets,
   asset,
@@ -81,6 +87,7 @@ export function AssetDetailScreen({
   isContextLoading,
   selectedSearchResult,
   focusedTranscriptRowId,
+  focusedTranscriptSource,
   sourceSearchQuery,
   studyContextResponse,
   studyContextError,
@@ -95,11 +102,13 @@ export function AssetDetailScreen({
   onOpenLibrary,
   onOpenSearch,
   onOpenAsset,
+  onOpenAssistantCitation,
   onReturnToSearch,
   onClearStudyContext,
 }: AssetDetailScreenProps) {
   const otherAssets = assets.filter((currentAsset) => currentAsset.assetId !== asset?.assetId).slice(0, 5);
   const assetSearchableCount = resolvedAssetStatus === 'SEARCHABLE' ? 1 : 0;
+  const assistantWorkspaceId = workspaceId ?? asset?.workspaceId ?? null;
 
   return (
     <div className="screen-grid screen-grid--detail">
@@ -124,11 +133,23 @@ export function AssetDetailScreen({
           onResetRename={onResetRename}
         />
 
+        {asset && assistantWorkspaceId && onOpenAssistantCitation ? (
+          <AssetAssistantPanel
+            workspaceId={assistantWorkspaceId}
+            workspaceName={workspaceName}
+            assetId={asset.assetId}
+            assetTitle={asset.title}
+            isAssetSearchable={resolvedAssetStatus === 'SEARCHABLE'}
+            onOpenCitationContext={onOpenAssistantCitation}
+          />
+        ) : null}
+
         {asset && focusedTranscriptRowId ? (
           <TranscriptStudyContextPanel
             assetTitle={asset.title}
             workspaceName={workspaceName}
             focusedTranscriptRowId={focusedTranscriptRowId}
+            source={focusedTranscriptSource}
             sourceSearchQuery={sourceSearchQuery}
             contextResponse={studyContextResponse}
             contextError={studyContextError}
@@ -166,6 +187,7 @@ export function AssetDetailScreen({
           transcriptError={transcriptError}
           transcriptLoading={transcriptLoading}
           focusedTranscriptRowId={focusedTranscriptRowId}
+          focusedTranscriptSource={focusedTranscriptSource}
         />
       </div>
 
@@ -233,6 +255,7 @@ function TranscriptStudyContextPanel({
   assetTitle,
   workspaceName,
   focusedTranscriptRowId,
+  source,
   sourceSearchQuery,
   contextResponse,
   contextError,
@@ -243,6 +266,7 @@ function TranscriptStudyContextPanel({
   assetTitle: string;
   workspaceName: string;
   focusedTranscriptRowId: string;
+  source?: 'search' | 'assistant' | null;
   sourceSearchQuery: string | null;
   contextResponse?: TranscriptContextResponse;
   contextError: unknown;
@@ -251,6 +275,23 @@ function TranscriptStudyContextPanel({
   onClearStudyContext?: () => void;
 }) {
   const displayContextRows = contextResponse?.rows.length ? buildTranscriptDisplayRows(contextResponse.rows) : [];
+  const resolvedSource = source ?? (sourceSearchQuery ? 'search' : null);
+  const sourceTitle =
+    resolvedSource === 'search'
+      ? 'Opened from workspace search'
+      : resolvedSource === 'assistant'
+        ? 'Opened from assistant citation'
+        : 'Focused transcript reference';
+  const sourceMessage =
+    resolvedSource === 'search'
+      ? sourceSearchQuery
+        ? `This asset detail view is focused on a transcript match for "${sourceSearchQuery}".`
+        : 'This asset detail view is focused on a selected transcript match.'
+      : resolvedSource === 'assistant'
+        ? 'This asset detail view is focused on a cited transcript reference from the assistant answer.'
+        : 'This asset detail view is focused on a transcript reference carried in the route.';
+  const hitLabel =
+    resolvedSource === 'assistant' ? 'Citation source' : resolvedSource === 'search' ? 'Search hit' : 'Focused row';
 
   return (
     <Section
@@ -272,12 +313,8 @@ function TranscriptStudyContextPanel({
       }
     >
       <InfoBanner
-        title="Opened from workspace search"
-        message={
-          sourceSearchQuery
-            ? `This asset detail view is focused on a transcript match for "${sourceSearchQuery}".`
-            : 'This asset detail view is focused on a selected transcript match.'
-        }
+        title={sourceTitle}
+        message={sourceMessage}
         detail={`Workspace: ${workspaceName}. Nearby context uses the existing transcript context API.`}
       />
 
@@ -318,7 +355,7 @@ function TranscriptStudyContextPanel({
                     <span>Segment {row.segmentIndex ?? 'n/a'}</span>
                     <span>{formatDateTime(row.createdAt)}</span>
                     {overlapHidden ? <span className="transcript-overlap-note">Overlap hidden</span> : null}
-                    {isHit ? <span className="hit-pill">Search hit</span> : null}
+                    {isHit ? <span className="hit-pill">{hitLabel}</span> : null}
                   </div>
                   <p>{displayText}</p>
                 </li>

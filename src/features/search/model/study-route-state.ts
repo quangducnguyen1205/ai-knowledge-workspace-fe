@@ -2,6 +2,7 @@ import type { AppRoute } from '../../../app/router';
 
 export type StudyRouteState = {
   focusedTranscriptRowId: string | null;
+  source: 'search' | 'assistant' | null;
   sourceSearchQuery: string | null;
   contextParams: {
     assetId: string;
@@ -16,11 +17,13 @@ export function getStudyRouteState(
   fallbackSearchQuery: string | null,
 ): StudyRouteState {
   const focusedTranscriptRowId = route.name === 'asset' ? route.transcriptRowId ?? null : null;
+  const source = route.name === 'asset' ? route.source ?? null : null;
   const sourceSearchQuery =
     route.name === 'asset' && route.source === 'search' ? route.searchQuery ?? fallbackSearchQuery : null;
 
   return {
     focusedTranscriptRowId,
+    source,
     sourceSearchQuery,
     contextParams:
       route.name === 'asset' && focusedTranscriptRowId && selectedWorkspaceId

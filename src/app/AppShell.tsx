@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { type AssetStatus, ApiClientError, type AssetSummary, type SearchResponse, type SearchResult } from '../lib/api';
+import {
+  type AssistantAnswerCitation,
+  type AssetStatus,
+  ApiClientError,
+  type AssetSummary,
+  type SearchResponse,
+  type SearchResult,
+} from '../lib/api';
 import { Button, EmptyState, ErrorBanner, LoadingBlock } from '../lib/ui';
 import { routeToHash, useHashRoute, type AppRoute } from './router';
 import { useProtectedRouteFallback } from './bootstrap/use-protected-route-fallback';
@@ -29,6 +36,7 @@ import {
 } from '../features/assets/assets';
 import { AssetLibraryScreen } from '../features/assets/library-screen';
 import { AssetDetailScreen } from '../features/assets/detail-screen';
+import { resolveAssistantCitationReference } from '../features/assistant/assistant';
 import { WorkspaceHomeScreen } from '../features/dashboard/dashboard';
 import { searchKeys, resolveTranscriptLookupId, useSearchQuery, useTranscriptContextQuery } from '../features/search/search';
 import { getClearedStudyRoute, getSearchReturnRoute, getStudyRouteState } from '../features/search/model/study-route-state';
@@ -685,6 +693,24 @@ export function AppShell() {
     });
   }
 
+  function openAssistantCitationInAsset(citation: AssistantAnswerCitation) {
+    const transcriptRowId = resolveAssistantCitationReference(citation);
+
+    if (!transcriptRowId) {
+      return;
+    }
+
+    setSelectedAssetDetailSearchResult(null);
+    setPreferredAssetId(citation.assetId);
+    startTransition(() => setSelectedAssetId(citation.assetId));
+    navigate({
+      name: 'asset',
+      assetId: citation.assetId,
+      transcriptRowId,
+      source: 'assistant',
+    });
+  }
+
   function clearRoutedStudyContext() {
     const clearedRoute = getClearedStudyRoute(route);
 
@@ -1093,6 +1119,7 @@ export function AppShell() {
       case 'asset':
         screenContent = (
           <AssetDetailScreen
+            workspaceId={selectedWorkspace.id}
             workspaceName={selectedWorkspace.name}
             assets={displayAssets}
             asset={selectedAsset}
@@ -1117,6 +1144,7 @@ export function AppShell() {
             isContextLoading={assetDetailContextQuery.isLoading || assetDetailContextQuery.isFetching}
             selectedSearchResult={selectedAssetDetailSearchResult}
             focusedTranscriptRowId={studyRouteState.focusedTranscriptRowId}
+            focusedTranscriptSource={studyRouteState.source}
             sourceSearchQuery={studyRouteState.sourceSearchQuery}
             studyContextResponse={routedStudyContextQuery.data}
             studyContextError={routedStudyContextQuery.error}
@@ -1134,6 +1162,7 @@ export function AppShell() {
             onOpenLibrary={() => navigate({ name: 'library' })}
             onOpenSearch={() => navigate({ name: 'search' })}
             onOpenAsset={openAsset}
+            onOpenAssistantCitation={openAssistantCitationInAsset}
             onReturnToSearch={route.name === 'asset' && route.source === 'search' ? returnToSearchFromAsset : undefined}
             onClearStudyContext={studyRouteState.focusedTranscriptRowId ? clearRoutedStudyContext : undefined}
           />

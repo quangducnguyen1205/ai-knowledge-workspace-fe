@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   ApiClientError,
+  answerAssistant,
   configureApiAuth,
   getCurrentUser,
   listWorkspaces,
@@ -126,5 +127,43 @@ describe('API auth boundary', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const calls = fetchMock.mock.calls as unknown as Array<[unknown, RequestInit]>;
     expect(calls[0][0]).toBe('/api/auth/login');
+  });
+});
+
+describe('assistant answer API client', () => {
+  it('posts only the public asset-scoped answer fields', async () => {
+    const fetchMock = vi.fn(async (_input?: RequestInfo | URL, _init?: RequestInit) =>
+      jsonResponse({
+        answer: 'The transcript does not contain enough context.',
+        citations: [],
+        insufficientContext: true,
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await answerAssistant({
+      workspaceId: 'workspace-1',
+      assetId: 'asset-1',
+      question: 'What does this lecture say about indexing?',
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/assistant/answer', expect.objectContaining({
+      credentials: 'include',
+      method: 'POST',
+    }));
+
+    const init = getRequestInit(fetchMock);
+    const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+    expect(body).toEqual({
+      workspaceId: 'workspace-1',
+      assetId: 'asset-1',
+      question: 'What does this lecture say about indexing?',
+    });
+    expect(body).not.toHaveProperty('maxSources');
+    expect(body).not.toHaveProperty('contextWindow');
+    expect(body).not.toHaveProperty('model');
+    expect(body).not.toHaveProperty('provider');
+    expect(body).not.toHaveProperty('temperature');
+    expect(body).not.toHaveProperty('timeout');
   });
 });

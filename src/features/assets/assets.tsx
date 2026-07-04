@@ -1039,11 +1039,13 @@ export function SelectedAssetTranscriptPanel({
   transcriptError,
   transcriptLoading,
   focusedTranscriptRowId,
+  focusedTranscriptSource,
 }: Pick<
   SelectedAssetPanelProps,
   'asset' | 'workspaceName' | 'resolvedAssetStatus' | 'statusResponse' | 'transcriptRows' | 'transcriptError' | 'transcriptLoading'
 > & {
   focusedTranscriptRowId?: string | null;
+  focusedTranscriptSource?: 'search' | 'assistant' | null;
 }) {
   const transcriptConflictCopy = getTranscriptConflictCopy(
     transcriptError,
@@ -1058,6 +1060,22 @@ export function SelectedAssetTranscriptPanel({
     focusedTranscriptRowId &&
       displayTranscriptRows.some(({ row }) => matchesTranscriptReference(row, focusedTranscriptRowId)),
   );
+  const focusedRowLabel =
+    focusedTranscriptSource === 'assistant'
+      ? 'Citation source'
+      : focusedTranscriptSource === 'search'
+        ? 'Search hit'
+        : 'Focused row';
+  const missingFocusedRowCopy =
+    focusedTranscriptSource === 'assistant'
+      ? {
+          title: 'Cited transcript source is not visible',
+          message: 'The cited transcript reference could not be matched in the loaded transcript. Review search results or the full transcript directly.',
+        }
+      : {
+          title: 'Selected search row is not visible in this transcript',
+          message: 'The transcript may have changed since the search result was opened. Use the study context above or return to search.',
+        };
 
   if (!asset) {
     return null;
@@ -1090,8 +1108,8 @@ export function SelectedAssetTranscriptPanel({
         {focusedTranscriptRowId && !transcriptLoading && displayTranscriptRows.length > 0 && !focusedRowIsVisible ? (
           <InfoBanner
             tone="warning"
-            title="Selected search row is not visible in this transcript"
-            message="The transcript may have changed since the search result was opened. Use the study context above or return to search."
+            title={missingFocusedRowCopy.title}
+            message={missingFocusedRowCopy.message}
           />
         ) : null}
 
@@ -1111,7 +1129,7 @@ export function SelectedAssetTranscriptPanel({
                     <span>Segment {row.segmentIndex ?? 'n/a'}</span>
                     <span>{formatDateTime(row.createdAt)}</span>
                     {overlapHidden ? <span className="transcript-overlap-note">Overlap hidden</span> : null}
-                    {isFocusedRow ? <span className="hit-pill">Search hit</span> : null}
+                    {isFocusedRow ? <span className="hit-pill">{focusedRowLabel}</span> : null}
                   </div>
                   <p>{displayText}</p>
                 </li>
