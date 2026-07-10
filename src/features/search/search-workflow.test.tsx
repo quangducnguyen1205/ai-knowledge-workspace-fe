@@ -280,6 +280,33 @@ describe('search-to-study workflow', () => {
     expect(screen.getAllByText(/vector clocks preserve causal relationships/i)).not.toHaveLength(0);
   });
 
+  it('keeps manual indexing available only while the asset is transcript ready', () => {
+    const transcriptReadyAsset = { ...asset, assetStatus: 'TRANSCRIPT_READY' as const };
+
+    renderAssetDetail({
+      workspaceId: 'workspace-1',
+      assets: [transcriptReadyAsset],
+      asset: transcriptReadyAsset,
+      resolvedAssetStatus: 'TRANSCRIPT_READY',
+      searchableAssetCount: 0,
+      onOpenAssistantCitation: vi.fn(),
+    });
+
+    expect(screen.getByRole('button', { name: 'Index transcript' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Ask' })).toBeDisabled();
+  });
+
+  it('uses a backend SEARCHABLE detail status to hide manual indexing and enable the assistant', () => {
+    renderAssetDetail({
+      workspaceId: 'workspace-1',
+      onOpenAssistantCitation: vi.fn(),
+    });
+
+    expect(screen.queryByRole('button', { name: /index transcript|re-index transcript/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/current asset step: ready to index/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ask' })).toBeEnabled();
+  });
+
   it('preserves canonical transcript display without a selected row', () => {
     renderAssetDetail();
 

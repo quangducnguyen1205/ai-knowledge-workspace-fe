@@ -25,7 +25,6 @@ import { useAuth } from '../features/auth/auth-provider';
 import {
   assetKeys,
   deriveAssetStatus,
-  isTerminalProcessing,
   useDeleteAssetMutation,
   useRenameAssetMutation,
   useAssetStatusQuery,
@@ -206,7 +205,10 @@ export function AppShell() {
   const [statusPollingEnabled, setStatusPollingEnabled] = useState(false);
 
   useEffect(() => {
-    setStatusPollingEnabled(Boolean(selectedAssetId) && selectedAsset?.assetStatus === 'PROCESSING');
+    setStatusPollingEnabled(
+      Boolean(selectedAssetId) &&
+        (selectedAsset?.assetStatus === 'PROCESSING' || selectedAsset?.assetStatus === 'TRANSCRIPT_READY'),
+    );
   }, [selectedAsset?.assetStatus, selectedAssetId]);
 
   useEffect(() => {
@@ -220,13 +222,16 @@ export function AppShell() {
       return;
     }
 
-    if (selectedAsset?.assetStatus !== assetStatusQuery.data.assetStatus) {
-      void queryClient.invalidateQueries({ queryKey: assetKeys.list(selectedWorkspaceId) });
+    const observedAssetStatus = assetStatusQuery.data.assetStatus;
+
+    if (selectedAsset?.assetStatus !== observedAssetStatus) {
+      void Promise.all([
+        queryClient.invalidateQueries({ queryKey: assetKeys.list(selectedWorkspaceId) }),
+        queryClient.invalidateQueries({ queryKey: searchKeys.all }),
+      ]);
     }
 
-    if (isTerminalProcessing(assetStatusQuery.data.processingJobStatus)) {
-      setStatusPollingEnabled(false);
-    }
+    setStatusPollingEnabled(observedAssetStatus === 'PROCESSING' || observedAssetStatus === 'TRANSCRIPT_READY');
   }, [assetStatusQuery.data, queryClient, selectedAsset?.assetStatus, selectedWorkspaceId]);
 
   const transcriptQuery = useAssetTranscriptQuery(

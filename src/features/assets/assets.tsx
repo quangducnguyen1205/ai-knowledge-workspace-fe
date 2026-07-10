@@ -272,21 +272,14 @@ function getIndexActionState(input: {
   processingJobStatus?: ProcessingJobStatus;
   transcriptRows?: TranscriptRow[];
   transcriptError: unknown;
-}): IndexActionState {
+}): IndexActionState | null {
   const transcriptRowCount = input.transcriptRows?.length ?? 0;
 
-  if (transcriptRowCount > 0 && input.resolvedAssetStatus === 'SEARCHABLE') {
-    return {
-      title: 'Rebuild search documents',
-      description:
-        'This asset is already searchable. Re-index only if you want search documents refreshed from the current transcript.',
-      buttonLabel: 'Re-index transcript',
-      buttonTone: 'secondary',
-      canIndex: true,
-    };
+  if (input.resolvedAssetStatus === 'SEARCHABLE') {
+    return null;
   }
 
-  if (transcriptRowCount > 0) {
+  if (transcriptRowCount > 0 && input.resolvedAssetStatus === 'TRANSCRIPT_READY') {
     return {
       title: 'Make this asset searchable',
       description: `${transcriptRowCount} transcript row${transcriptRowCount === 1 ? '' : 's'} loaded. Publish this transcript to workspace search when you are ready.`,
@@ -995,21 +988,23 @@ export function SelectedAssetPanel({
         />
       ) : null}
 
-      <div className={`action-card ${!indexActionState.canIndex ? 'action-card--muted' : ''}`}>
-        <div className="action-card__copy">
-          <p className="panel__eyebrow">Explicit indexing</p>
-          <h3>{indexActionState.title}</h3>
-          <p>{indexActionState.description}</p>
+      {indexActionState ? (
+        <div className={`action-card ${!indexActionState.canIndex ? 'action-card--muted' : ''}`}>
+          <div className="action-card__copy">
+            <p className="panel__eyebrow">Explicit indexing</p>
+            <h3>{indexActionState.title}</h3>
+            <p>{indexActionState.description}</p>
+          </div>
+          <Button
+            type="button"
+            tone={indexActionState.buttonTone}
+            onClick={onIndex}
+            disabled={!indexActionState.canIndex || isIndexing}
+          >
+            {isIndexing ? 'Indexing...' : indexActionState.buttonLabel}
+          </Button>
         </div>
-        <Button
-          type="button"
-          tone={indexActionState.buttonTone}
-          onClick={onIndex}
-          disabled={!indexActionState.canIndex || isIndexing}
-        >
-          {isIndexing ? 'Indexing...' : indexActionState.buttonLabel}
-        </Button>
-      </div>
+      ) : null}
 
       {isIndexing ? (
         <InfoBanner
