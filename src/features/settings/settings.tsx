@@ -30,7 +30,7 @@ export function SettingsScreen({
           </div>
         </Section>
 
-        <Section title="Current product rules" eyebrow="Pre-AI scope">
+        <Section title="Current product rules" eyebrow="Product lifecycle">
           <div className="summary-list">
             <div className="summary-list__item">
               <span className="summary-list__label">Upload flow</span>
@@ -38,7 +38,7 @@ export function SettingsScreen({
             </div>
             <div className="summary-list__item">
               <span className="summary-list__label">Search availability</span>
-              <strong>After explicit indexing</strong>
+              <strong>After automatic indexing</strong>
             </div>
             <div className="summary-list__item">
               <span className="summary-list__label">Workspace delete</span>

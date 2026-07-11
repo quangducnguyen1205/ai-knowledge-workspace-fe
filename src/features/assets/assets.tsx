@@ -32,6 +32,10 @@ export function isTerminalProcessing(status: ProcessingJobStatus | undefined): b
   return status === 'SUCCEEDED' || status === 'FAILED';
 }
 
+export function shouldPollAssetStatus(status: AssetStatus | null | undefined): boolean {
+  return status === 'PROCESSING' || status === 'TRANSCRIPT_READY';
+}
+
 type FriendlyMessageCopy = {
   title: string;
   message: string;
@@ -75,7 +79,7 @@ function getAssetStatusDescription(status: AssetStatus | null): string {
     case 'PROCESSING':
       return 'Processing the source and preparing transcript content.';
     case 'TRANSCRIPT_READY':
-      return 'Transcript is ready for review. Index it to unlock workspace search.';
+      return 'Transcript is ready. Search indexing normally completes automatically.';
     case 'SEARCHABLE':
       return 'Indexed and searchable inside this workspace.';
     case 'FAILED':
@@ -281,10 +285,10 @@ function getIndexActionState(input: {
 
   if (transcriptRowCount > 0 && input.resolvedAssetStatus === 'TRANSCRIPT_READY') {
     return {
-      title: 'Make this asset searchable',
-      description: `${transcriptRowCount} transcript row${transcriptRowCount === 1 ? '' : 's'} loaded. Publish this transcript to workspace search when you are ready.`,
+      title: 'Indexing fallback',
+      description: `${transcriptRowCount} transcript row${transcriptRowCount === 1 ? '' : 's'} loaded. Automatic indexing has not completed, so you can run the fallback action now.`,
       buttonLabel: 'Index transcript',
-      buttonTone: 'primary',
+      buttonTone: 'secondary',
       canIndex: true,
     };
   }
@@ -347,9 +351,9 @@ function getAssetLifecycleState(input: {
 
   if (transcriptRowCount > 0) {
     return {
-      step: 'Ready to index',
+      step: 'Waiting for search',
       summary: `${transcriptRowCount} transcript row${transcriptRowCount === 1 ? '' : 's'} loaded for this asset.`,
-      nextAction: 'Review the transcript, then run the explicit indexing action to unlock search.',
+      nextAction: 'Automatic indexing should finish next. Use the indexing fallback only if the asset does not advance.',
       tone: 'warning',
     };
   }
@@ -441,7 +445,7 @@ function getLifecycleSteps(input: {
         input.resolvedAssetStatus === 'SEARCHABLE'
           ? 'Indexed and searchable.'
           : transcriptReady
-            ? 'Ready to index.'
+            ? 'Automatic indexing in progress; fallback available.'
             : 'Search is locked.',
       state:
         input.resolvedAssetStatus === 'SEARCHABLE'
@@ -614,7 +618,7 @@ export function AssetsPanel({
         <div className="upload-card__copy">
           <p className="panel__eyebrow">Add source material</p>
           <h3>Upload a lecture video</h3>
-          <p>Every uploaded asset moves through transcript review, explicit indexing, and focused workspace search.</p>
+          <p>Every uploaded asset moves through transcript preparation, automatic indexing, and focused workspace search.</p>
         </div>
 
         <form className="stack" onSubmit={handleSubmit}>

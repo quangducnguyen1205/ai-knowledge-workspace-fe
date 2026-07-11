@@ -196,7 +196,7 @@ export function AssetDetailScreen({
           {!asset ? (
             <EmptyState
               title="No asset selected"
-              description="Open the library to choose an asset for transcript review and explicit indexing."
+              description="Open the library to choose an asset and follow its automatic path to search."
             />
           ) : (
             <div className="summary-list">

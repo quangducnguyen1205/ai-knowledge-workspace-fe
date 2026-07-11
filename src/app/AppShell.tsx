@@ -25,6 +25,7 @@ import { useAuth } from '../features/auth/auth-provider';
 import {
   assetKeys,
   deriveAssetStatus,
+  shouldPollAssetStatus,
   useDeleteAssetMutation,
   useRenameAssetMutation,
   useAssetStatusQuery,
@@ -207,7 +208,7 @@ export function AppShell() {
   useEffect(() => {
     setStatusPollingEnabled(
       Boolean(selectedAssetId) &&
-        (selectedAsset?.assetStatus === 'PROCESSING' || selectedAsset?.assetStatus === 'TRANSCRIPT_READY'),
+        shouldPollAssetStatus(selectedAsset?.assetStatus),
     );
   }, [selectedAsset?.assetStatus, selectedAssetId]);
 
@@ -231,7 +232,7 @@ export function AppShell() {
       ]);
     }
 
-    setStatusPollingEnabled(observedAssetStatus === 'PROCESSING' || observedAssetStatus === 'TRANSCRIPT_READY');
+    setStatusPollingEnabled(shouldPollAssetStatus(observedAssetStatus));
   }, [assetStatusQuery.data, queryClient, selectedAsset?.assetStatus, selectedWorkspaceId]);
 
   const transcriptQuery = useAssetTranscriptQuery(
@@ -940,7 +941,7 @@ export function AppShell() {
       case 'asset':
         return {
           title: selectedAsset?.title ?? 'Asset Detail',
-          description: 'Review processing, transcript readiness, explicit indexing, and searchability for a single asset.',
+          description: 'Review processing, automatic indexing, fallback controls, and searchability for a single asset.',
         };
       case 'search':
         return {

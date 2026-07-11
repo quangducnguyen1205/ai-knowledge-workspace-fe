@@ -79,7 +79,7 @@ export function WorkspaceHomeScreen({
             <p className="hero__eyebrow">Current workspace</p>
             <h3>{workspaceName}</h3>
             <p>
-              Keep uploads, transcript review, explicit indexing, and workspace search moving through one clear pre-AI workflow.
+              Keep uploads, transcript review, automatic indexing, and grounded workspace study moving through one clear workflow.
             </p>
           </div>
           <div className="summary-hero__actions">
@@ -96,12 +96,12 @@ export function WorkspaceHomeScreen({
           <div className="metric-card">
             <span className="metric-card__label">Searchable</span>
             <strong>{searchableAssetCount}</strong>
-            <p>{searchableAssetCount > 0 ? 'Search is available for indexed assets.' : 'Search unlocks after explicit indexing.'}</p>
+            <p>{searchableAssetCount > 0 ? 'Search is available for indexed assets.' : 'Search unlocks after automatic indexing completes.'}</p>
           </div>
           <div className="metric-card">
             <span className="metric-card__label">Transcript ready</span>
             <strong>{transcriptReadyCount}</strong>
-            <p>{transcriptReadyCount > 0 ? 'Review and publish these assets to search.' : 'No assets are waiting for indexing right now.'}</p>
+            <p>{transcriptReadyCount > 0 ? 'Automatic indexing is pending; a fallback is available in asset detail.' : 'No assets are waiting for indexing right now.'}</p>
           </div>
           <div className="metric-card">
             <span className="metric-card__label">Processing</span>

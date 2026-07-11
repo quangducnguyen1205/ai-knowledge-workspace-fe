@@ -209,8 +209,8 @@ export function AuthEntrySurface({
             </div>
             <div className="auth-preview__card auth-preview__card--accent">
               <span className="auth-preview__label">Transcript state</span>
-              <strong>Ready to index</strong>
-              <p>Transcript reviewed. Publish to workspace search when you are ready.</p>
+              <strong>Indexing automatically</strong>
+              <p>Transcript ready. Search preparation continues without a required manual step.</p>
             </div>
             <div className="auth-preview__snippet">
               <span className="auth-preview__label">Search context</span>
@@ -371,8 +371,8 @@ export function KeycloakAuthEntrySurface({
             </div>
             <div className="auth-preview__card auth-preview__card--accent">
               <span className="auth-preview__label">Transcript state</span>
-              <strong>Ready to index</strong>
-              <p>Transcript reviewed. Publish to workspace search when you are ready.</p>
+              <strong>Indexing automatically</strong>
+              <p>Transcript ready. Search preparation continues without a required manual step.</p>
             </div>
             <div className="auth-preview__snippet">
               <span className="auth-preview__label">Search context</span>

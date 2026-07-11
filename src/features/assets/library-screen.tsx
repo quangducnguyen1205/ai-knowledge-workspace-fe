@@ -92,7 +92,7 @@ export function AssetLibraryScreen({
               {searchableCount > 0
                 ? 'At least one asset is searchable. Open the search screen to validate result quality and transcript context.'
                 : transcriptReadyCount > 0
-                  ? 'One or more assets are waiting for explicit indexing. Open an asset detail view and publish the transcript.'
+                  ? 'One or more assets are waiting for automatic indexing. Open an asset detail view if a fallback is needed.'
                   : 'Use this library to upload lecture videos, watch processing states, and keep the workspace organized.'}
             </p>
             <div className="guidance-card__actions">

@@ -270,8 +270,8 @@ export function SearchPanel({
           title="Search unlocks after indexing"
           message={
             isAssetScoped
-              ? 'This video is not searchable yet. Finish transcript review and explicit indexing first.'
-              : 'This workspace does not have any searchable assets yet. Finish transcript review and explicit indexing first.'
+              ? 'This video is not searchable yet. Automatic indexing may still be finishing; use the asset fallback only if needed.'
+              : 'This workspace does not have any searchable assets yet. Automatic indexing may still be finishing.'
           }
         />
       ) : null}

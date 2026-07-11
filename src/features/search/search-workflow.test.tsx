@@ -12,6 +12,7 @@ import type {
   TranscriptRow,
 } from '../../lib/api';
 import { AssetDetailScreen } from '../assets/detail-screen';
+import { shouldPollAssetStatus } from '../assets/assets';
 import { SearchPanel, resolveTranscriptLookupId } from './search';
 
 const workspaceName = 'Distributed Systems';
@@ -151,6 +152,12 @@ afterEach(() => {
 });
 
 describe('search-to-study workflow', () => {
+  it('polls through processing and transcript readiness, then stops at searchable', () => {
+    expect(
+      (['PROCESSING', 'TRANSCRIPT_READY', 'SEARCHABLE'] as const).map((status) => shouldPollAssetStatus(status)),
+    ).toEqual([true, true, false]);
+  });
+
   it('renders a labelled search control and initial state', () => {
     renderSearchPanel();
 
@@ -280,7 +287,7 @@ describe('search-to-study workflow', () => {
     expect(screen.getAllByText(/vector clocks preserve causal relationships/i)).not.toHaveLength(0);
   });
 
-  it('keeps manual indexing available only while the asset is transcript ready', () => {
+  it('keeps manual indexing as a fallback only while the asset is transcript ready', () => {
     const transcriptReadyAsset = { ...asset, assetStatus: 'TRANSCRIPT_READY' as const };
 
     renderAssetDetail({
@@ -293,17 +300,19 @@ describe('search-to-study workflow', () => {
     });
 
     expect(screen.getByRole('button', { name: 'Index transcript' })).toBeEnabled();
+    expect(screen.getByRole('heading', { name: 'Indexing fallback' })).toBeInTheDocument();
+    expect(screen.getByText(/automatic indexing has not completed/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ask' })).toBeDisabled();
   });
 
-  it('uses a backend SEARCHABLE detail status to hide manual indexing and enable the assistant', () => {
+  it('requires no manual indexing after automatic completion and enables the assistant', () => {
     renderAssetDetail({
       workspaceId: 'workspace-1',
       onOpenAssistantCitation: vi.fn(),
     });
 
     expect(screen.queryByRole('button', { name: /index transcript|re-index transcript/i })).not.toBeInTheDocument();
-    expect(screen.queryByText(/current asset step: ready to index/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/indexing fallback/i)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ask' })).toBeEnabled();
   });
 

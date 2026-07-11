@@ -132,7 +132,7 @@ export function AssetAssistantPanel({
     <Section
       title="Ask this asset"
       eyebrow={assetTitle}
-      actions={<span className="panel-pill">{isAssetSearchable ? 'Transcript sources ready' : 'Indexing required'}</span>}
+      actions={<span className="panel-pill">{isAssetSearchable ? 'Transcript sources ready' : 'Waiting for search'}</span>}
     >
       <form className="assistant-form" onSubmit={handleSubmit}>
         <label className="field assistant-form__field" htmlFor="asset-assistant-question">

@@ -8,7 +8,7 @@ This repo is the separate frontend for the AI Knowledge Workspace demo. It is in
 - workspace-scoped asset upload and listing
 - processing status polling
 - transcript retrieval
-- explicit indexing
+- automatic indexing as the normal lifecycle, with explicit indexing retained as a fallback
 - workspace search with result-to-asset study context
 - transcript-context follow-up around selected hits
 - search within the currently viewed video from Asset Detail
@@ -16,6 +16,7 @@ This repo is the separate frontend for the AI Knowledge Workspace demo. It is in
 - search disabled until the active workspace has at least one searchable asset
 - search/context state kept in sync across workspace switch, upload completion, indexing completion, and refreshed results
 - responsive product app shell with persistent desktop top navigation and compact mobile navigation
+- grounded Ask-this-asset answers with insufficient-context handling, actionable citations, and transcript-row navigation
 - incremental frontend module boundaries documented in `FRONTEND_STATUS.md`
 
 ## Navigation Model
@@ -27,7 +28,13 @@ Authenticated product screens use a horizontal top navigation model:
 - `Search` for workspace-scoped transcript search and opening relevant asset moments
 - `Settings` for workspace management and account context
 
-Asset detail remains a deep route under Library and exposes a breadcrumb back to the library. The shell includes a skip-to-content link, active navigation state with `aria-current`, a keyboard-operable compact mobile menu, and a single shell-level Upload action that routes to the existing Library upload flow. P3-F1 assistant context remains a backend retrieval-only API; this frontend phase does not add assistant answers, chat state, or fake AI output.
+Asset detail remains a deep route under Library and exposes a breadcrumb back to the library. The shell includes a skip-to-content link, active navigation state with `aria-current`, a keyboard-operable compact mobile menu, and a single shell-level Upload action that routes to the existing Library upload flow. The Ask-this-asset panel calls Spring only, renders grounded-answer states and citations, and opens compact transcript context routes. It never calls FastAPI or a provider directly.
+
+## Asset Processing And Indexing Lifecycle
+
+The frontend remains processing-mode agnostic. It polls Spring while an asset is `PROCESSING` or `TRANSCRIPT_READY`, stops when the backend reports `SEARCHABLE` or `FAILED`, and refreshes workspace/search state when the lifecycle advances. In the normal integrated path, indexing follows transcript readiness automatically. The `Index transcript` control remains available only in `TRANSCRIPT_READY` as an explicit fallback when automatic completion has not advanced the asset; it is not required after a normal transition to `SEARCHABLE`.
+
+This phase is validated with frontend tests and static builds only. A fresh integrated runtime fixture is still required to prove the new default launch path from upload through citation navigation.
 
 ## Search And Study Flow
 
@@ -89,7 +96,7 @@ Dockerized frontend build has also passed successfully, and the Docker local-dev
 - no production Keycloak deployment or auth-default cutover claimed
 - no token refresh, silent SSO, global Keycloak logout propagation, account-management wiring, or production deployment cutover yet
 - no full accessibility certification; P3-C4 was a targeted local browser smoke with keyboard/focus/error-state checks
-- no collaboration, chatbot/RAG, assistant answer UI, or generated answer placeholder
+- no collaboration, chat history, provider/model controls, or browser-to-provider access
 - no media player or timestamp-seek UI
 - no transcript timestamps invented on the frontend
 - no heavy design system or production-grade docs set
