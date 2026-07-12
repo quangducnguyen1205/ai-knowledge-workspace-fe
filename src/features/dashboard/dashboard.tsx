@@ -46,8 +46,8 @@ export function WorkspaceHomeScreen({
       }
     : transcriptReadyCount > 0
       ? {
-          title: 'Review a transcript that is ready to index',
-          description: 'At least one asset has transcript rows ready. Review it and explicitly publish it to search.',
+          title: 'Automatic indexing is still pending',
+          description: 'At least one asset has transcript rows ready. Review progress or use the indexing fallback for recovery.',
           buttonLabel: 'Open asset detail',
           onClick: () => onOpenAsset(
             assets.find((asset) => asset.assetStatus === 'TRANSCRIPT_READY')?.assetId ?? recentAssets[0]?.assetId ?? '',
