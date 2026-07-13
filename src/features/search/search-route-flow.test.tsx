@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AppShell } from '../../app/AppShell';
+import { AppRouter } from '../../app/AppRouter';
 import type { FrontendAuthConfig } from '../../lib/auth-config';
 import { AuthProvider } from '../auth/auth-provider';
 
@@ -136,7 +136,7 @@ function renderAppAt(hash: string, fetchMock = createFetchMock()) {
   render(
     <QueryClientProvider client={createQueryClient()}>
       <AuthProvider config={legacyConfig}>
-        <AppShell />
+        <AppRouter />
       </AuthProvider>
     </QueryClientProvider>,
   );

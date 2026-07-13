@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AppShell } from '../../app/AppShell';
+import { AppRouter } from '../../app/AppRouter';
 import type { FrontendAuthConfig } from '../../lib/auth-config';
 import type { OidcAuthClient } from '../../lib/oidc-client';
 import { AuthProvider } from './auth-provider';
@@ -62,7 +62,7 @@ function renderApp(config: FrontendAuthConfig, oidcClient = createOidcClientMock
   const app = (
     <QueryClientProvider client={createQueryClient()}>
       <AuthProvider config={config} oidcClientFactory={() => oidcClient}>
-        <AppShell />
+        <AppRouter />
       </AuthProvider>
     </QueryClientProvider>
   );

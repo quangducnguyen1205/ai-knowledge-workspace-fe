@@ -6,11 +6,15 @@ import { parseRoute, routeToHash } from '../../app/router';
 import type {
   AssetStatus,
   AssetSummary,
+} from '../assets/model/types';
+import type {
   SearchResponse,
   SearchResult,
+} from './api/search-api';
+import type {
   TranscriptContextResponse,
   TranscriptRow,
-} from '../../lib/api';
+} from '../../entities/transcript/model/types';
 import { AssetDetailScreen } from '../assets/detail-screen';
 import { shouldPollAssetStatus } from '../assets/assets';
 import { SearchPanel, resolveTranscriptLookupId } from './search';

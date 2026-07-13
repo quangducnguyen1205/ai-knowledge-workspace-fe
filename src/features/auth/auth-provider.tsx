@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { configureApiAuth } from '../../lib/api';
+import { configureApiAuth } from '../../shared/api/http-client';
 import {
   readFrontendAuthConfig,
   type AuthConfigurationIssue,

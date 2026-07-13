@@ -1,4 +1,6 @@
-import type { SearchResponse, SearchResult, TranscriptContextResponse, AssetSummary } from '../../lib/api';
+import type { AssetSummary } from '../assets/model/types';
+import type { TranscriptContextResponse } from '../../entities/transcript/model/types';
+import type { SearchResponse, SearchResult } from './api/search-api';
 import { Button, EmptyState, InfoBanner, Section } from '../../lib/ui';
 import { StatusBadge } from '../assets/assets';
 import { SearchPanel } from './search';

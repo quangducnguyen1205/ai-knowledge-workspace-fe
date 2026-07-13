@@ -3,12 +3,10 @@ import type {
   AssetStatus,
   AssetStatusResponse,
   AssetSummary,
-  AssistantAnswerCitation,
-  SearchResponse,
-  SearchResult,
-  TranscriptContextResponse,
-  TranscriptRow,
-} from '../../lib/api';
+} from './model/types';
+import type { AssistantAnswerCitation } from '../assistant/api/assistant-api';
+import type { SearchResponse, SearchResult } from '../search/api/search-api';
+import type { TranscriptContextResponse, TranscriptRow } from '../../entities/transcript/model/types';
 import { buildTranscriptDisplayRows, matchesTranscriptReference } from '../../entities/transcript/model/transcript-display';
 import { Button, EmptyState, ErrorBanner, InfoBanner, LoadingBlock, Section, formatDateTime } from '../../lib/ui';
 import { SelectedAssetPanel, SelectedAssetTranscriptPanel, StatusBadge } from './assets';

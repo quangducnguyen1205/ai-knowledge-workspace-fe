@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Workspace } from '../../lib/api';
+import type { Workspace } from '../../features/workspaces/api/workspaces-api';
 
 const lastWorkspaceSelectionStorageKey = 'akw:last-workspace-id';
 

@@ -1,13 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  ApiClientError,
-  answerAssistant,
-  configureApiAuth,
-  getCurrentUser,
-  listWorkspaces,
-  loginUser,
-  resetApiAuthForTests,
-} from './api';
+import { answerAssistant } from '../../features/assistant/api/assistant-api';
+import { getCurrentUser, loginUser } from '../../features/auth/api/auth-api';
+import { searchTranscript } from '../../features/search/api/search-api';
+import { uploadAsset } from '../../features/upload/api/upload-api';
+import { listWorkspaces } from '../../features/workspaces/api/workspaces-api';
+import { configureApiAuth, resetApiAuthForTests } from './http-client';
 
 function jsonResponse(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), {
@@ -165,5 +162,47 @@ describe('assistant answer API client', () => {
     expect(body).not.toHaveProperty('provider');
     expect(body).not.toHaveProperty('temperature');
     expect(body).not.toHaveProperty('timeout');
+  });
+});
+
+describe('asset and search API contracts', () => {
+  it('keeps upload multipart fields and optional title normalization unchanged', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({
+      assetId: 'asset-1',
+      processingJobId: 'job-1',
+      assetStatus: 'PROCESSING',
+      workspaceId: 'workspace-1',
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    const file = new File(['video'], 'lecture.mp4', { type: 'video/mp4' });
+
+    await uploadAsset({ workspaceId: 'workspace-1', file, title: '  Lecture title  ' });
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/assets/upload', expect.objectContaining({
+      credentials: 'include',
+      method: 'POST',
+    }));
+    const body = getRequestInit(fetchMock).body as FormData;
+    expect(body.get('workspaceId')).toBe('workspace-1');
+    expect(body.get('title')).toBe('Lecture title');
+    expect(body.get('file')).toBe(file);
+  });
+
+  it('keeps workspace, optional asset scope, and encoding in search query parameters', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({
+      query: 'vector clocks',
+      workspaceIdFilter: 'workspace one',
+      assetIdFilter: 'asset/1',
+      resultCount: 0,
+      results: [],
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await searchTranscript('vector clocks', 'workspace one', 'asset/1');
+
+    const calls = fetchMock.mock.calls as unknown as Array<[unknown, RequestInit]>;
+    expect(calls[0][0]).toBe(
+      '/api/search?q=vector+clocks&workspaceId=workspace+one&assetId=asset%2F1',
+    );
   });
 });

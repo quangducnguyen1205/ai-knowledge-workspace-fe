@@ -5,8 +5,8 @@ import {
   searchTranscript,
   type SearchResponse,
   type SearchResult,
-  type TranscriptContextResponse,
-} from '../../lib/api';
+} from './api/search-api';
+import type { TranscriptContextResponse } from '../../entities/transcript/model/types';
 import { buildTranscriptDisplayRows, matchesTranscriptReference } from '../../entities/transcript/model/transcript-display';
 import { Button, EmptyState, ErrorBanner, InfoBanner, LoadingBlock, Section, formatDateTime, formatScore } from '../../lib/ui';
 

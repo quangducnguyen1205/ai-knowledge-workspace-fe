@@ -1,6 +1,13 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { ApiClientError, getCurrentUser, loginUser, logoutUser, registerUser, type AuthCredentialsInput } from '../../lib/api';
+import { ApiClientError } from '../../shared/api/api-error';
+import {
+  getCurrentUser,
+  loginUser,
+  logoutUser,
+  registerUser,
+  type AuthCredentialsInput,
+} from './api/auth-api';
 import type { AuthConfigurationIssue } from '../../lib/auth-config';
 import { Button, ErrorBanner } from '../../lib/ui';
 import { useAuth } from './auth-provider';

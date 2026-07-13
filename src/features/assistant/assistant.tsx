@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
-  ApiClientError,
   answerAssistant,
-  isApiClientError,
   type AssistantAnswerCitation,
   type AssistantAnswerResponse,
-} from '../../lib/api';
+} from './api/assistant-api';
+import { ApiClientError, isApiClientError } from '../../shared/api/api-error';
 import { Button, EmptyState, ErrorBanner, InfoBanner, LoadingBlock, Section, formatDateTime } from '../../lib/ui';
 
 type AssistantResultState =

@@ -3,12 +3,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   deleteWorkspace,
   createWorkspace,
-  isApiClientError,
   listWorkspaces,
   updateWorkspaceName,
   type UpdateWorkspaceNameInput,
   type Workspace,
-} from '../../lib/api';
+} from './api/workspaces-api';
+import { isApiClientError } from '../../shared/api/api-error';
 import { Button, ErrorBanner, InfoBanner } from '../../lib/ui';
 import { getFriendlyLogoutErrorCopy } from '../auth/auth';
 

@@ -1,4 +1,4 @@
-import { type AssetSummary } from '../../lib/api';
+import type { AssetSummary } from './model/types';
 import { Button, Section } from '../../lib/ui';
 import { AssetsPanel } from './assets';
 

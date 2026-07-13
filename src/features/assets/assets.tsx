@@ -1,23 +1,24 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ApiClientError, isApiClientError } from '../../shared/api/api-error';
 import {
-  ApiClientError,
   deleteAsset,
   getAssetStatus,
   getAssetTranscript,
   indexAssetTranscript,
-  isApiClientError,
   listAssets,
   updateAssetTitle,
-  uploadAsset,
-  type AssetIndexResponse,
-  type AssetStatus,
-  type AssetStatusResponse,
-  type AssetSummary,
-  type ProcessingJobStatus,
-  type TranscriptRow,
-  type UpdateAssetTitleInput,
-} from '../../lib/api';
+} from './api/assets-api';
+import { uploadAsset } from '../upload/api/upload-api';
+import type {
+  AssetIndexResponse,
+  AssetStatus,
+  AssetStatusResponse,
+  AssetSummary,
+  ProcessingJobStatus,
+  UpdateAssetTitleInput,
+} from './model/types';
+import type { TranscriptRow } from '../../entities/transcript/model/types';
 import { buildTranscriptDisplayRows, matchesTranscriptReference } from '../../entities/transcript/model/transcript-display';
 import { Button, EmptyState, ErrorBanner, InfoBanner, LoadingBlock, Section, formatDateTime } from '../../lib/ui';
 
