@@ -64,6 +64,18 @@ The baseline was `0c4797436c9e7106146388a09322e2d32782fceb`. `AppShell.tsx` was 
 
 `shared/api/http-client.ts` is the only request boundary. It preserves Spring base URL resolution, proxy behavior, cookie credentials, in-memory bearer headers, JSON/multipart handling, `AbortSignal`, error parsing, and JWT boundary callbacks. Endpoint paths and DTOs live with auth, workspaces, assets, upload, search, and assistant features. Shared HTTP never imports a product feature.
 
+## Asset, upload, lifecycle, and search ownership
+
+- `useAssetSelection` owns the workspace list query, deep-link/preferred selection reconciliation, selected ID refs, and selection continuity across list refreshes.
+- `useAssetUpload` owns upload mutation state, workspace request mapping, list invalidation, scope reset, and a narrow post-success callback. `AssetUploadForm` owns only title/file validation and file-input reset behavior.
+- `useAssetLifecycle` is the sole status/transcript polling owner. It keeps the existing 3,000 ms interval, polls only `PROCESSING` and `TRANSCRIPT_READY`, passes `AbortSignal` to status/transcript reads, refreshes list/search caches after automatic progress, stops at terminal/searchable status, and exposes semantic capability flags.
+- `AssetIndexingRecoveryAction` renders explicit indexing only from lifecycle-derived recovery state. It retains the secondary button, current recovery explanation, existing POST endpoint, mutation errors, and post-success list/search refresh.
+- `useAssetManagement` owns rename/delete mutation state, cache reconciliation, success notices, and stale 404 cleanup. `AssetList`, `SelectedAssetPanel`, `AssetLifecyclePanel`, and `SelectedAssetTranscriptPanel` own their focused presentation boundaries.
+- `useSearchController` owns submitted query, workspace/optional-asset scope, abortable search/context queries, selected result, stale-result cleanup, and reset rules. Search presentation does not own assistant answers.
+- `useWorkspaceManagement` now owns workspace mutation notices and 404 reconciliation; bootstrap selection remains isolated in `useWorkspaceBootstrap`.
+
+Static assertions protect the neutral HTTP direction, shell/API separation, lifecycle/assistant separation, upload/polling separation, infrastructure URL ban, and absence of circular production imports.
+
 ## Compatibility and remaining work in this phase
 
-The baseline exposes no separate direct-upload browser endpoint; the retained upload contract is Spring `POST /api/assets/upload`. Explicit indexing remains available in `TRANSCRIPT_READY` as recovery. The next two commits move upload/lifecycle/asset/search and assistant/citation ownership out of `AppRouter` and the concentrated feature modules.
+The baseline exposes no separate direct-upload browser endpoint; the retained upload contract is Spring `POST /api/assets/upload`. Explicit indexing remains available in `TRANSCRIPT_READY` as recovery. Assistant request state, answer presentation, and citation navigation are the remaining concentrated boundary for the final commit. `AppRouter` still coordinates cross-feature route transitions and session-wide cache cleanup; those seams remain explicit because moving them into a feature would reverse dependency direction.

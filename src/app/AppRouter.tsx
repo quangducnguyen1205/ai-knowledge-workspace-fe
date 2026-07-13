@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useEffect, useMemo, useTransition } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ApiClientError } from '../shared/api/api-error';
-import type { AssetStatus, AssetSummary } from '../features/assets/model/types';
 import type { AssistantAnswerCitation } from '../features/assistant/api/assistant-api';
 import type { SearchResponse, SearchResult } from '../features/search/api/search-api';
 import { Button, EmptyState, ErrorBanner, LoadingBlock } from '../lib/ui';
@@ -19,48 +18,27 @@ import {
   useRegisterMutation,
 } from '../features/auth/auth';
 import { useAuth } from '../features/auth/auth-provider';
-import {
-  assetKeys,
-  deriveAssetStatus,
-  shouldPollAssetStatus,
-  useDeleteAssetMutation,
-  useRenameAssetMutation,
-  useAssetStatusQuery,
-  useAssetTranscriptQuery,
-  useAssetsQuery,
-  useIndexAssetMutation,
-  useUploadAssetMutation,
-} from '../features/assets/assets';
+import { assetKeys } from '../features/assets/hooks/asset-queries';
+import { useAssetSelection } from '../features/assets/hooks/use-asset-selection';
+import { useAssetLifecycle } from '../features/assets/hooks/use-asset-lifecycle';
+import { useAssetManagement } from '../features/assets/hooks/use-asset-management';
 import { AssetLibraryScreen } from '../features/assets/library-screen';
 import { AssetDetailScreen } from '../features/assets/detail-screen';
 import { resolveAssistantCitationReference } from '../features/assistant/assistant';
 import { WorkspaceHomeScreen } from '../features/dashboard/dashboard';
-import { searchKeys, resolveTranscriptLookupId, useSearchQuery, useTranscriptContextQuery } from '../features/search/search';
+import { searchKeys, useSearchController, useTranscriptContextQuery } from '../features/search/hooks/use-search-controller';
 import { getClearedStudyRoute, getSearchReturnRoute, getStudyRouteState } from '../features/search/model/study-route-state';
+import { resolveTranscriptLookupId } from '../features/search/model/search-result-reference';
 import { useRouteSearchHydration } from '../features/search/model/use-route-search-hydration';
 import { WorkspaceSearchScreen } from '../features/search/search-screen';
+import { useAssetUpload } from '../features/upload/hooks/use-asset-upload';
 import { SettingsScreen } from '../features/settings/settings';
 import {
-  useCreateWorkspaceMutation,
-  useDeleteWorkspaceMutation,
-  useRenameWorkspaceMutation,
   useWorkspacesQuery,
   WorkspaceBar,
   workspaceKeys,
 } from '../features/workspaces/workspaces';
-
-type SuccessNotice = {
-  title: string;
-  message: string;
-};
-
-function canLoadTranscript(assetStatus: AssetStatus | null, processingJobStatus?: string): boolean {
-  return (
-    assetStatus === 'TRANSCRIPT_READY' ||
-    assetStatus === 'SEARCHABLE' ||
-    processingJobStatus === 'SUCCEEDED'
-  );
-}
+import { useWorkspaceManagement } from '../features/workspaces/hooks/use-workspace-management';
 
 export function AppRouter() {
   const auth = useAuth();
@@ -88,9 +66,6 @@ export function AppRouter() {
         currentUserQuery.error.code === 'AUTH_MODE_UNAVAILABLE'));
 
   const workspacesQuery = useWorkspacesQuery(isAuthenticated);
-  const createWorkspaceMutation = useCreateWorkspaceMutation();
-  const renameWorkspaceMutation = useRenameWorkspaceMutation();
-  const deleteWorkspaceMutation = useDeleteWorkspaceMutation();
   const {
     selectedWorkspace,
     selectedWorkspaceId,
@@ -104,173 +79,34 @@ export function AppRouter() {
     startTransition,
   });
 
-  const assetsQuery = useAssetsQuery(selectedWorkspaceId);
-  const uploadMutation = useUploadAssetMutation();
-  const indexMutation = useIndexAssetMutation();
-  const deleteMutation = useDeleteAssetMutation();
-  const renameMutation = useRenameAssetMutation();
-  const [workspaceSuccessNotice, setWorkspaceSuccessNotice] = useState<SuccessNotice | null>(null);
-  const [assetLibrarySuccessNotice, setAssetLibrarySuccessNotice] = useState<SuccessNotice | null>(null);
-  const [assetDetailSuccessNotice, setAssetDetailSuccessNotice] = useState<SuccessNotice | null>(null);
-
-  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
-  const [preferredAssetId, setPreferredAssetId] = useState<string | null>(null);
-  const selectedAssetIdRef = useRef<string | null>(null);
-  const preferredAssetIdRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    setSelectedAssetId(null);
-    setPreferredAssetId(null);
-    setAssetLibrarySuccessNotice(null);
-    setAssetDetailSuccessNotice(null);
-  }, [selectedWorkspaceId]);
-
-  useEffect(() => {
-    setWorkspaceSuccessNotice(null);
-    setAssetLibrarySuccessNotice(null);
-    setAssetDetailSuccessNotice(null);
-  }, [currentUser?.id]);
-
-  useEffect(() => {
-    selectedAssetIdRef.current = selectedAssetId;
-  }, [selectedAssetId]);
-
-  useEffect(() => {
-    setAssetDetailSuccessNotice(null);
-  }, [selectedAssetId]);
-
-  useEffect(() => {
-    preferredAssetIdRef.current = preferredAssetId;
-  }, [preferredAssetId]);
-
   const routedAssetId = route.name === 'asset' ? route.assetId : null;
-
-  useEffect(() => {
-    if (!routedAssetId) {
-      return;
-    }
-
-    if (routedAssetId === selectedAssetIdRef.current || routedAssetId === preferredAssetIdRef.current) {
-      return;
-    }
-
-    setPreferredAssetId(routedAssetId);
-  }, [routedAssetId]);
-
-  useEffect(() => {
-    const assets = assetsQuery.data ?? [];
-
-    if (preferredAssetId) {
-      const preferredAsset = assets.find((asset) => asset.assetId === preferredAssetId);
-      if (preferredAsset) {
-        startTransition(() => setSelectedAssetId(preferredAsset.assetId));
-        setPreferredAssetId(null);
-        return;
-      }
-
-      if (assetsQuery.isFetching) {
-        return;
-      }
-    }
-
-    if (!assets.length) {
-      setSelectedAssetId(null);
-      return;
-    }
-
-    if (selectedAssetId && assets.some((asset) => asset.assetId === selectedAssetId)) {
-      return;
-    }
-
-    startTransition(() => setSelectedAssetId(assets[0].assetId));
-  }, [assetsQuery.data, assetsQuery.isFetching, preferredAssetId, selectedAssetId, startTransition]);
-
-  const selectedAsset = useMemo(
-    () => assetsQuery.data?.find((asset) => asset.assetId === selectedAssetId) ?? null,
-    [assetsQuery.data, selectedAssetId],
-  );
-
-  const [statusPollingEnabled, setStatusPollingEnabled] = useState(false);
-
-  useEffect(() => {
-    setStatusPollingEnabled(
-      Boolean(selectedAssetId) &&
-        shouldPollAssetStatus(selectedAsset?.assetStatus),
-    );
-  }, [selectedAsset?.assetStatus, selectedAssetId]);
-
-  useEffect(() => {
-    indexMutation.reset();
-  }, [indexMutation.reset, selectedAssetId]);
-
-  const assetStatusQuery = useAssetStatusQuery(selectedAssetId, statusPollingEnabled);
-
-  useEffect(() => {
-    if (!selectedWorkspaceId || !assetStatusQuery.data) {
-      return;
-    }
-
-    const observedAssetStatus = assetStatusQuery.data.assetStatus;
-
-    if (selectedAsset?.assetStatus !== observedAssetStatus) {
-      void Promise.all([
-        queryClient.invalidateQueries({ queryKey: assetKeys.list(selectedWorkspaceId) }),
-        queryClient.invalidateQueries({ queryKey: searchKeys.all }),
-      ]);
-    }
-
-    setStatusPollingEnabled(shouldPollAssetStatus(observedAssetStatus));
-  }, [assetStatusQuery.data, queryClient, selectedAsset?.assetStatus, selectedWorkspaceId]);
-
-  const transcriptQuery = useAssetTranscriptQuery(
+  const {
+    assetsQuery,
+    selectedAsset,
     selectedAssetId,
-    Boolean(selectedAssetId) &&
-      selectedAsset?.assetStatus !== 'FAILED' &&
-      canLoadTranscript(selectedAsset?.assetStatus ?? null, assetStatusQuery.data?.processingJobStatus),
-  );
-
-  useEffect(() => {
-    if (transcriptQuery.isSuccess && selectedWorkspaceId) {
-      void queryClient.invalidateQueries({ queryKey: assetKeys.list(selectedWorkspaceId) });
-    }
-  }, [queryClient, selectedWorkspaceId, transcriptQuery.dataUpdatedAt, transcriptQuery.isSuccess]);
-
-  useEffect(() => {
-    if (
-      transcriptQuery.error instanceof ApiClientError &&
-      transcriptQuery.error.status === 409 &&
-      selectedWorkspaceId &&
-      selectedAssetId
-    ) {
-      void queryClient.invalidateQueries({ queryKey: assetKeys.list(selectedWorkspaceId) });
-      void queryClient.invalidateQueries({ queryKey: assetKeys.status(selectedAssetId) });
-    }
-  }, [queryClient, selectedAssetId, selectedWorkspaceId, transcriptQuery.error]);
-
-  const resolvedAssetStatus = useMemo(
-    () =>
-      deriveAssetStatus(
-        selectedAsset,
-        assetStatusQuery.data,
-        transcriptQuery.data,
-        indexMutation.data?.assetId === selectedAssetId ? indexMutation.data : undefined,
-      ),
-    [assetStatusQuery.data, indexMutation.data, selectedAsset, selectedAssetId, transcriptQuery.data],
-  );
+    selectedAssetIdRef,
+    preferredAssetIdRef,
+    setSelectedAssetId,
+    setPreferredAssetId,
+    selectAsset,
+    clearSelection,
+  } = useAssetSelection({ workspaceId: selectedWorkspaceId, routedAssetId, startTransition });
+  const lifecycle = useAssetLifecycle({ asset: selectedAsset, workspaceId: selectedWorkspaceId });
 
   const displayAssets = useMemo(() => {
     const assets = assetsQuery.data ?? [];
+    const resolvedStatus = lifecycle.resolvedAssetStatus;
 
-    if (!selectedAssetId || !resolvedAssetStatus) {
+    if (!selectedAssetId || !resolvedStatus) {
       return assets;
     }
 
     return assets.map((asset) =>
-      asset.assetId === selectedAssetId && asset.assetStatus !== resolvedAssetStatus
-        ? { ...asset, assetStatus: resolvedAssetStatus }
+      asset.assetId === selectedAssetId && asset.assetStatus !== resolvedStatus
+        ? { ...asset, assetStatus: resolvedStatus }
         : asset,
     );
-  }, [assetsQuery.data, resolvedAssetStatus, selectedAssetId]);
+  }, [assetsQuery.data, lifecycle.resolvedAssetStatus, selectedAssetId]);
 
   const searchableAssetCount = useMemo(
     () => displayAssets.filter((asset) => asset.assetStatus === 'SEARCHABLE').length,
@@ -285,154 +121,77 @@ export function AppRouter() {
     [displayAssets],
   );
 
-  const [submittedSearch, setSubmittedSearch] = useState<string | null>(null);
-  const [selectedSearchResult, setSelectedSearchResult] = useState<SearchResult | null>(null);
-  const [searchResetToken, setSearchResetToken] = useState(0);
-  const selectedSearchResultRef = useRef<SearchResult | null>(null);
-  const [assetDetailSubmittedSearch, setAssetDetailSubmittedSearch] = useState<string | null>(null);
-  const [selectedAssetDetailSearchResult, setSelectedAssetDetailSearchResult] = useState<SearchResult | null>(null);
-  const [assetDetailSearchResetToken, setAssetDetailSearchResetToken] = useState(0);
-  const selectedAssetDetailSearchResultRef = useRef<SearchResult | null>(null);
+  const workspaceSearch = useSearchController({ workspaceId: selectedWorkspaceId });
+  const assetSearch = useSearchController({ workspaceId: selectedWorkspaceId, assetId: selectedAssetId });
 
-  useEffect(() => {
-    selectedSearchResultRef.current = selectedSearchResult;
-  }, [selectedSearchResult]);
-
-  useEffect(() => {
-    selectedAssetDetailSearchResultRef.current = selectedAssetDetailSearchResult;
-  }, [selectedAssetDetailSearchResult]);
-
-  useEffect(() => {
-    setSubmittedSearch(null);
-    setSelectedSearchResult(null);
-    setSearchResetToken((current) => current + 1);
-    setAssetDetailSubmittedSearch(null);
-    setSelectedAssetDetailSearchResult(null);
-    setAssetDetailSearchResetToken((current) => current + 1);
-  }, [selectedWorkspaceId]);
-
-  useEffect(() => {
-    setAssetDetailSubmittedSearch(null);
-    setSelectedAssetDetailSearchResult(null);
-    setAssetDetailSearchResetToken((current) => current + 1);
-  }, [selectedAssetId]);
-
-  useEffect(() => {
-    uploadMutation.reset();
-  }, [selectedWorkspaceId, uploadMutation.reset]);
-
-  useEffect(() => {
-    if (!renameMutation.isPending && renameMutation.variables?.assetId !== selectedAssetId) {
-      renameMutation.reset();
-    }
-  }, [renameMutation.isPending, renameMutation.reset, renameMutation.variables?.assetId, selectedAssetId]);
-
-  const searchQuery = useSearchQuery(
-    submittedSearch && selectedWorkspaceId ? { query: submittedSearch, workspaceId: selectedWorkspaceId } : null,
-  );
-  const handleRouteSearchSubmit = useCallback((query: string) => {
-    setSubmittedSearch(query);
-    setSelectedSearchResult(null);
-  }, []);
   const routeSearchQuery = useRouteSearchHydration({
     route,
     selectedWorkspaceId,
     searchableAssetCount,
-    submittedSearch,
-    onRouteSearchSubmit: handleRouteSearchSubmit,
+    submittedSearch: workspaceSearch.submittedSearch,
+    onRouteSearchSubmit: workspaceSearch.submit,
   });
-  const assetDetailSearchQuery = useSearchQuery(
-    assetDetailSubmittedSearch && selectedWorkspaceId && selectedAssetId
-      ? { query: assetDetailSubmittedSearch, workspaceId: selectedWorkspaceId, assetId: selectedAssetId }
-      : null,
-  );
-
-  const assetDetailContextLookupId = selectedAssetDetailSearchResult
-    ? resolveTranscriptLookupId(selectedAssetDetailSearchResult)
-    : null;
-
-  const contextQuery = useTranscriptContextQuery(null);
-  const assetDetailContextQuery = useTranscriptContextQuery(
-    selectedAssetDetailSearchResult && assetDetailContextLookupId
-      ? {
-          assetId: selectedAssetDetailSearchResult.assetId,
-          transcriptRowId: assetDetailContextLookupId,
-          window: 2,
-        }
-      : null,
-  );
-  const studyRouteState = getStudyRouteState(route, selectedWorkspaceId, submittedSearch);
+  const studyRouteState = getStudyRouteState(route, selectedWorkspaceId, workspaceSearch.submittedSearch);
   const routedStudyContextQuery = useTranscriptContextQuery(studyRouteState.contextParams);
 
+  const assetManagement = useAssetManagement({
+    currentUserId: currentUser?.id,
+    workspaceId: selectedWorkspaceId,
+    workspaceName: selectedWorkspace?.name,
+    selectedAsset,
+    selectedAssetId,
+    selectedAssetIdRef,
+    preferredAssetIdRef,
+    setSelectedAssetId,
+    setPreferredAssetId,
+    onClearAssetReferences: (assetId) => {
+      if (workspaceSearch.selectedResultRef.current?.assetId === assetId) workspaceSearch.setSelectedResult(null);
+      if (assetSearch.selectedResultRef.current?.assetId === assetId) assetSearch.setSelectedResult(null);
+      if (selectedAssetIdRef.current === assetId) assetSearch.reset();
+    },
+    onAssetTitleChanged: (assetId, title) => {
+      updateSearchResultTitles(assetId, title);
+      workspaceSearch.updateAssetTitle(assetId, title);
+      assetSearch.updateAssetTitle(assetId, title);
+    },
+    onDeletedSelectedRoute: (assetId) => {
+      if (route.name === 'asset' && route.assetId === assetId) navigate({ name: 'library' });
+    },
+  });
+
+  const upload = useAssetUpload({
+    workspaceId: selectedWorkspaceId,
+    onUploaded: (response, input) => {
+      selectAsset(response.assetId);
+      workspaceSearch.reset();
+      assetSearch.reset();
+      assetManagement.recordUploadSuccess(input.title?.trim() || input.file.name);
+      navigate({ name: 'asset', assetId: response.assetId });
+    },
+  });
+
+  const workspaceManagement = useWorkspaceManagement({
+    currentUserId: currentUser?.id,
+    selectedWorkspace,
+    selectedWorkspaceId,
+    setPreferredWorkspaceId,
+    setWorkspaceScopeRefreshAfter,
+    onClearWorkspaceScope: clearWorkspaceScopedState,
+    onDeletedWorkspaceRoute: () => navigate({ name: 'home' }),
+  });
+
   useEffect(() => {
-    const uploadedAssetId = uploadMutation.data?.assetId;
-
-    if (!uploadedAssetId) {
-      return;
-    }
-
-    setSubmittedSearch(null);
-    setSelectedSearchResult(null);
-    setSearchResetToken((current) => current + 1);
-    setAssetDetailSubmittedSearch(null);
-    setSelectedAssetDetailSearchResult(null);
-    setAssetDetailSearchResetToken((current) => current + 1);
-  }, [uploadMutation.data?.assetId]);
-
-  useEffect(() => {
-    const indexedAssetId = indexMutation.data?.assetId;
+    const indexedAssetId = lifecycle.indexResponse?.assetId;
 
     if (!indexedAssetId) {
       return;
     }
 
-    setSubmittedSearch(null);
-    setSelectedSearchResult(null);
-    setSearchResetToken((current) => current + 1);
+    workspaceSearch.reset();
     if (indexedAssetId === selectedAssetIdRef.current) {
-      setAssetDetailSubmittedSearch(null);
-      setSelectedAssetDetailSearchResult(null);
-      setAssetDetailSearchResetToken((current) => current + 1);
+      assetSearch.reset();
     }
-  }, [indexMutation.data?.assetId]);
-
-  useEffect(() => {
-    const results = searchQuery.data?.results;
-
-    if (!selectedSearchResult || !results) {
-      return;
-    }
-
-    const stillPresent = results.some(
-      (result) =>
-        result.assetId === selectedSearchResult.assetId &&
-        result.transcriptRowId === selectedSearchResult.transcriptRowId &&
-        result.segmentIndex === selectedSearchResult.segmentIndex,
-    );
-
-    if (!stillPresent) {
-      setSelectedSearchResult(null);
-    }
-  }, [searchQuery.data?.results, selectedSearchResult]);
-
-  useEffect(() => {
-    const results = assetDetailSearchQuery.data?.results;
-
-    if (!selectedAssetDetailSearchResult || !results) {
-      return;
-    }
-
-    const stillPresent = results.some(
-      (result) =>
-        result.assetId === selectedAssetDetailSearchResult.assetId &&
-        result.transcriptRowId === selectedAssetDetailSearchResult.transcriptRowId &&
-        result.segmentIndex === selectedAssetDetailSearchResult.segmentIndex,
-    );
-
-    if (!stillPresent) {
-      setSelectedAssetDetailSearchResult(null);
-    }
-  }, [assetDetailSearchQuery.data?.results, selectedAssetDetailSearchResult]);
+  }, [assetSearch.reset, lifecycle.indexResponse?.assetId, selectedAssetIdRef, workspaceSearch.reset]);
 
   useProtectedRouteFallback({
     route,
@@ -462,29 +221,12 @@ export function AppRouter() {
     }
   }, [assetsQuery.data, assetsQuery.isFetching, navigate, route, selectedWorkspace]);
 
-  function handleCreateWorkspace(name: string) {
-    setWorkspaceSuccessNotice(null);
-    createWorkspaceMutation.mutate(name, {
-      onSuccess: (workspace) => {
-        setPreferredWorkspaceId(workspace.id);
-        setWorkspaceSuccessNotice({
-          title: 'Workspace created',
-          message: `Created "${workspace.name}" and refreshed the visible workspace scope.`,
-        });
-      },
-    });
-  }
-
   function handleSelectWorkspace(workspaceId: string) {
-    setWorkspaceSuccessNotice(null);
+    workspaceManagement.clearSuccessNotice();
     setPreferredWorkspaceId(workspaceId);
-    setPreferredAssetId(null);
-    setSubmittedSearch(null);
-    setSelectedSearchResult(null);
-    setSearchResetToken((current) => current + 1);
-    setAssetDetailSubmittedSearch(null);
-    setSelectedAssetDetailSearchResult(null);
-    setAssetDetailSearchResetToken((current) => current + 1);
+    clearSelection();
+    workspaceSearch.reset();
+    assetSearch.reset();
     startTransition(() => setSelectedWorkspaceId(workspaceId));
   }
 
@@ -501,76 +243,12 @@ export function AppRouter() {
     queryClient.removeQueries({ queryKey: searchKeys.all });
 
     setPreferredWorkspaceId(null);
-    setSelectedAssetId(null);
-    setPreferredAssetId(null);
-    setStatusPollingEnabled(false);
-    setSubmittedSearch(null);
-    setSelectedSearchResult(null);
-    setAssetLibrarySuccessNotice(null);
-    setAssetDetailSuccessNotice(null);
-    setSearchResetToken((current) => current + 1);
-    setAssetDetailSubmittedSearch(null);
-    setSelectedAssetDetailSearchResult(null);
-    setAssetDetailSearchResetToken((current) => current + 1);
+    clearSelection();
+    workspaceSearch.reset();
+    assetSearch.reset();
+    assetManagement.clearNotices();
+    workspaceManagement.clearSuccessNotice();
     startTransition(() => setSelectedWorkspaceId(null));
-  }
-
-  function handleRenameWorkspace(input: { workspaceId: string; name: string }) {
-    setWorkspaceSuccessNotice(null);
-    renameWorkspaceMutation.mutate(input, {
-      onSuccess: (workspace) => {
-        setWorkspaceSuccessNotice({
-          title: 'Workspace renamed',
-          message: `Active workspace is now "${workspace.name}".`,
-        });
-      },
-      onError: async (error, variables) => {
-        if (error instanceof ApiClientError && error.status === 404) {
-          setWorkspaceScopeRefreshAfter(Date.now());
-          clearWorkspaceScopedState(variables.workspaceId);
-          await queryClient.invalidateQueries({ queryKey: workspaceKeys.all });
-        }
-      },
-    });
-  }
-
-  function handleDeleteWorkspace() {
-    if (!selectedWorkspace || deleteWorkspaceMutation.isPending) {
-      return;
-    }
-
-    const deletingWorkspaceName = selectedWorkspace.name;
-    const confirmed = window.confirm(
-      `Delete workspace "${deletingWorkspaceName}"?\n\nOnly empty non-default workspaces can be removed. This will refresh the visible workspace scope.`,
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    setWorkspaceSuccessNotice(null);
-    deleteWorkspaceMutation.mutate(
-      { workspaceId: selectedWorkspace.id },
-      {
-        onSuccess: async (_response, variables) => {
-          setWorkspaceScopeRefreshAfter(Date.now());
-          clearWorkspaceScopedState(variables.workspaceId);
-          navigate({ name: 'home' });
-          setWorkspaceSuccessNotice({
-            title: 'Workspace deleted',
-            message: `Removed "${deletingWorkspaceName}" and refreshed the visible workspace scope.`,
-          });
-          await queryClient.invalidateQueries({ queryKey: workspaceKeys.all });
-        },
-        onError: async (error, variables) => {
-          if (error instanceof ApiClientError && error.status === 404) {
-            setWorkspaceScopeRefreshAfter(Date.now());
-            clearWorkspaceScopedState(variables.workspaceId);
-            await queryClient.invalidateQueries({ queryKey: workspaceKeys.all });
-          }
-        },
-      },
-    );
   }
 
   function clearSessionScopedState() {
@@ -581,18 +259,11 @@ export function AppRouter() {
       queryClient.removeQueries({ queryKey: assetKeys.transcript(previousSelectedAssetId) });
     }
 
-    setSelectedAssetId(null);
-    setPreferredAssetId(null);
-    setStatusPollingEnabled(false);
-    setSubmittedSearch(null);
-    setSelectedSearchResult(null);
-    setWorkspaceSuccessNotice(null);
-    setAssetLibrarySuccessNotice(null);
-    setAssetDetailSuccessNotice(null);
-    setSearchResetToken((current) => current + 1);
-    setAssetDetailSubmittedSearch(null);
-    setSelectedAssetDetailSearchResult(null);
-    setAssetDetailSearchResetToken((current) => current + 1);
+    clearSelection();
+    workspaceSearch.reset();
+    assetSearch.reset();
+    workspaceManagement.clearSuccessNotice();
+    assetManagement.clearNotices();
     startTransition(() => setSelectedWorkspaceId(null));
 
     queryClient.removeQueries({ queryKey: searchKeys.all });
@@ -660,8 +331,7 @@ export function AppRouter() {
       return;
     }
 
-    setPreferredAssetId(assetId);
-    startTransition(() => setSelectedAssetId(assetId));
+    selectAsset(assetId);
     navigate({ name: 'asset', assetId });
   }
 
@@ -669,20 +339,19 @@ export function AppRouter() {
     const transcriptRowId = resolveTranscriptLookupId(result);
 
     if (!transcriptRowId) {
-      setSelectedSearchResult(null);
+      workspaceSearch.setSelectedResult(null);
       openAsset(result.assetId);
       return;
     }
 
-    setSelectedSearchResult(result);
-    setPreferredAssetId(result.assetId);
-    startTransition(() => setSelectedAssetId(result.assetId));
+    workspaceSearch.setSelectedResult(result);
+    selectAsset(result.assetId);
     navigate({
       name: 'asset',
       assetId: result.assetId,
       transcriptRowId,
       source: 'search',
-      searchQuery: submittedSearch ?? undefined,
+      searchQuery: workspaceSearch.submittedSearch ?? undefined,
     });
   }
 
@@ -693,9 +362,8 @@ export function AppRouter() {
       return;
     }
 
-    setSelectedAssetDetailSearchResult(null);
-    setPreferredAssetId(citation.assetId);
-    startTransition(() => setSelectedAssetId(citation.assetId));
+    assetSearch.setSelectedResult(null);
+    selectAsset(citation.assetId);
     navigate({
       name: 'asset',
       assetId: citation.assetId,
@@ -714,49 +382,6 @@ export function AppRouter() {
 
   function returnToSearchFromAsset() {
     navigate(getSearchReturnRoute(route));
-  }
-
-  function handleUpload(input: { file: File; title?: string }) {
-    if (!selectedWorkspaceId) {
-      return;
-    }
-
-    uploadMutation.mutate(
-      {
-        workspaceId: selectedWorkspaceId,
-        file: input.file,
-        title: input.title,
-      },
-      {
-        onSuccess: (response) => {
-          setPreferredAssetId(response.assetId);
-          setStatusPollingEnabled(true);
-          setAssetLibrarySuccessNotice({
-            title: 'Upload accepted',
-            message: `Added "${input.title?.trim() || input.file.name}" to ${selectedWorkspace?.name ?? 'the active workspace'}.`,
-          });
-          navigate({ name: 'asset', assetId: response.assetId });
-          void queryClient.invalidateQueries({ queryKey: assetKeys.list(response.workspaceId) });
-        },
-      },
-    );
-  }
-
-  function handleIndexAsset() {
-    if (!selectedAssetId) {
-      return;
-    }
-
-    indexMutation.mutate(selectedAssetId, {
-      onSuccess: async () => {
-        await Promise.all([
-          queryClient.invalidateQueries({
-            queryKey: selectedWorkspaceId ? assetKeys.list(selectedWorkspaceId) : assetKeys.all,
-          }),
-          queryClient.invalidateQueries({ queryKey: searchKeys.all }),
-        ]);
-      },
-    });
   }
 
   function updateSearchResultTitles(assetId: string, title: string) {
@@ -778,145 +403,6 @@ export function AppRouter() {
       return didChange ? { ...current, results } : current;
     });
   }
-
-  function clearAssetDependentState(assetId: string) {
-    if (selectedAssetIdRef.current === assetId) {
-      setSelectedAssetId(null);
-      setStatusPollingEnabled(false);
-      setAssetDetailSubmittedSearch(null);
-      setAssetDetailSearchResetToken((current) => current + 1);
-      queryClient.removeQueries({ queryKey: assetKeys.status(assetId) });
-      queryClient.removeQueries({ queryKey: assetKeys.transcript(assetId) });
-    }
-
-    if (preferredAssetIdRef.current === assetId) {
-      setPreferredAssetId(null);
-    }
-
-    if (selectedSearchResultRef.current?.assetId === assetId) {
-      setSelectedSearchResult(null);
-    }
-
-    if (selectedAssetDetailSearchResultRef.current?.assetId === assetId) {
-      setSelectedAssetDetailSearchResult(null);
-    }
-
-    queryClient.removeQueries({ queryKey: ['search', 'context', assetId] });
-  }
-
-  function handleDeleteAsset(asset: AssetSummary) {
-    if (deleteMutation.isPending) {
-      return;
-    }
-
-    const confirmed = window.confirm(
-      `Delete "${asset.title}" from ${selectedWorkspace?.name ?? 'this workspace'}?\n\nThis removes the asset and refreshes the workspace list.`,
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    setAssetLibrarySuccessNotice(null);
-    setAssetDetailSuccessNotice(null);
-    deleteMutation.mutate(
-      {
-        assetId: asset.assetId,
-        workspaceId: asset.workspaceId,
-      },
-      {
-        onSuccess: async (_response, variables) => {
-          clearAssetDependentState(variables.assetId);
-          if (route.name === 'asset' && route.assetId === variables.assetId) {
-            navigate({ name: 'library' });
-          }
-          setAssetLibrarySuccessNotice({
-            title: 'Asset deleted',
-            message: `Removed "${asset.title}" from ${selectedWorkspace?.name ?? 'the active workspace'}.`,
-          });
-
-          await Promise.all([
-            queryClient.invalidateQueries({ queryKey: assetKeys.list(variables.workspaceId) }),
-            queryClient.invalidateQueries({ queryKey: ['search', 'results', variables.workspaceId] }),
-          ]);
-        },
-        onError: async (error, variables) => {
-          if (error instanceof ApiClientError && error.status === 404) {
-            clearAssetDependentState(variables.assetId);
-
-            await Promise.all([
-              queryClient.invalidateQueries({ queryKey: assetKeys.list(variables.workspaceId) }),
-              queryClient.invalidateQueries({ queryKey: ['search', 'results', variables.workspaceId] }),
-            ]);
-          }
-        },
-      },
-    );
-  }
-
-  function handleRenameAsset(title: string) {
-    if (!selectedAsset) {
-      return;
-    }
-
-    setAssetDetailSuccessNotice(null);
-    renameMutation.mutate(
-      {
-        assetId: selectedAsset.assetId,
-        workspaceId: selectedAsset.workspaceId,
-        title,
-      },
-      {
-        onSuccess: (response, variables) => {
-          queryClient.setQueryData<AssetSummary[] | undefined>(assetKeys.list(variables.workspaceId), (current) =>
-            current?.map((asset) =>
-              asset.assetId === variables.assetId
-                ? {
-                    ...asset,
-                    title: response.title,
-                    assetStatus: response.status,
-                    workspaceId: response.workspaceId || asset.workspaceId,
-                    createdAt: response.createdAt ?? asset.createdAt,
-                  }
-                : asset,
-            ),
-          );
-
-          updateSearchResultTitles(variables.assetId, response.title);
-          setSelectedSearchResult((current) =>
-            current?.assetId === variables.assetId ? { ...current, assetTitle: response.title } : current,
-          );
-          setSelectedAssetDetailSearchResult((current) =>
-            current?.assetId === variables.assetId ? { ...current, assetTitle: response.title } : current,
-          );
-          setAssetDetailSuccessNotice({
-            title: 'Asset renamed',
-            message: `Title updated to "${response.title}".`,
-          });
-        },
-        onError: async (error, variables) => {
-          if (error instanceof ApiClientError && error.status === 404) {
-            if (selectedAssetIdRef.current === variables.assetId) {
-              clearAssetDependentState(variables.assetId);
-            }
-
-            await Promise.all([
-              queryClient.invalidateQueries({ queryKey: assetKeys.list(variables.workspaceId) }),
-              queryClient.invalidateQueries({ queryKey: ['search', 'results', variables.workspaceId] }),
-            ]);
-          }
-        },
-      },
-    );
-  }
-
-  const visibleDeleteError =
-    deleteMutation.error && deleteMutation.variables?.workspaceId === selectedWorkspaceId ? deleteMutation.error : null;
-  const deletingAssetId = deleteMutation.isPending ? deleteMutation.variables?.assetId ?? null : null;
-  const visibleRenameError =
-    renameMutation.error && renameMutation.variables?.assetId === selectedAssetId ? renameMutation.error : null;
-  const isRenamingSelectedAsset =
-    renameMutation.isPending && renameMutation.variables?.assetId === selectedAssetId;
 
   const isLogoutPending = auth.mode === 'legacy_session' && logoutMutation.isPending;
 
@@ -1020,18 +506,18 @@ export function AppRouter() {
             workspaceName={selectedWorkspace.name}
             assets={displayAssets}
             selectedAssetId={selectedAssetId}
-            successNotice={assetLibrarySuccessNotice}
+            successNotice={assetManagement.librarySuccessNotice}
             assetsError={assetsQuery.error}
-            deleteError={visibleDeleteError}
-            deleteBusy={deleteMutation.isPending}
-            deletingAssetId={deletingAssetId}
+            deleteError={assetManagement.visibleDeleteError}
+            deleteBusy={assetManagement.isDeleting}
+            deletingAssetId={assetManagement.deletingAssetId}
             assetsLoading={assetsQuery.isLoading}
-            uploadError={uploadMutation.error}
-            uploadSuccessId={uploadMutation.data?.assetId}
-            isUploading={uploadMutation.isPending}
+            uploadError={upload.error}
+            uploadSuccessId={upload.uploadedAssetId}
+            isUploading={upload.isUploading}
             onSelectAsset={openAsset}
-            onDeleteAsset={handleDeleteAsset}
-            onUpload={handleUpload}
+            onDeleteAsset={assetManagement.handleDeleteAsset}
+            onUpload={upload.submit}
             onOpenSearch={() => navigate({ name: 'search' })}
             onOpenSettings={() => navigate({ name: 'settings' })}
           />
@@ -1044,42 +530,39 @@ export function AppRouter() {
             workspaceName={selectedWorkspace.name}
             assets={displayAssets}
             asset={selectedAsset}
-            successNotice={assetDetailSuccessNotice}
-            resolvedAssetStatus={resolvedAssetStatus}
-            statusResponse={assetStatusQuery.data}
-            statusError={assetStatusQuery.error}
-            transcriptRows={transcriptQuery.data}
-            transcriptError={transcriptQuery.error}
-            transcriptLoading={transcriptQuery.isLoading || transcriptQuery.isFetching}
-            indexError={indexMutation.error}
-            indexResponse={indexMutation.data?.assetId === selectedAssetId ? indexMutation.data : undefined}
-            isIndexing={indexMutation.isPending}
-            isRenaming={Boolean(isRenamingSelectedAsset)}
-            renameError={visibleRenameError}
-            activeQuery={assetDetailSubmittedSearch}
-            searchResponse={assetDetailSearchQuery.data}
-            searchError={assetDetailSearchQuery.error}
-            isSearching={assetDetailSearchQuery.isLoading || assetDetailSearchQuery.isFetching}
-            contextResponse={assetDetailContextQuery.data}
-            contextError={assetDetailContextQuery.error}
-            isContextLoading={assetDetailContextQuery.isLoading || assetDetailContextQuery.isFetching}
-            selectedSearchResult={selectedAssetDetailSearchResult}
+            successNotice={assetManagement.detailSuccessNotice}
+            resolvedAssetStatus={lifecycle.resolvedAssetStatus}
+            statusResponse={lifecycle.statusResponse}
+            statusError={lifecycle.statusError}
+            transcriptRows={lifecycle.transcriptRows}
+            transcriptError={lifecycle.transcriptError}
+            transcriptLoading={lifecycle.transcriptLoading}
+            indexError={lifecycle.indexError}
+            indexResponse={lifecycle.indexResponse}
+            isIndexing={lifecycle.isIndexing}
+            isRenaming={Boolean(assetManagement.isRenamingSelectedAsset)}
+            renameError={assetManagement.visibleRenameError}
+            activeQuery={assetSearch.submittedSearch}
+            searchResponse={assetSearch.searchResponse}
+            searchError={assetSearch.searchError}
+            isSearching={assetSearch.isSearching}
+            contextResponse={assetSearch.contextResponse}
+            contextError={assetSearch.contextError}
+            isContextLoading={assetSearch.isContextLoading}
+            selectedSearchResult={assetSearch.selectedResult}
             focusedTranscriptRowId={studyRouteState.focusedTranscriptRowId}
             focusedTranscriptSource={studyRouteState.source}
             sourceSearchQuery={studyRouteState.sourceSearchQuery}
             studyContextResponse={routedStudyContextQuery.data}
             studyContextError={routedStudyContextQuery.error}
             isStudyContextLoading={routedStudyContextQuery.isLoading || routedStudyContextQuery.isFetching}
-            searchResetToken={assetDetailSearchResetToken}
+            searchResetToken={assetSearch.resetToken}
             searchableAssetCount={searchableAssetCount}
-            onIndex={handleIndexAsset}
-            onRename={handleRenameAsset}
-            onResetRename={() => renameMutation.reset()}
-            onSearchWithinAsset={(query) => {
-              setAssetDetailSubmittedSearch(query);
-              setSelectedAssetDetailSearchResult(null);
-            }}
-            onSelectSearchResult={setSelectedAssetDetailSearchResult}
+            onIndex={lifecycle.runRecoveryIndexing}
+            onRename={assetManagement.handleRenameAsset}
+            onResetRename={assetManagement.resetRename}
+            onSearchWithinAsset={assetSearch.submit}
+            onSelectSearchResult={assetSearch.setSelectedResult}
             onOpenLibrary={() => navigate({ name: 'library' })}
             onOpenSearch={() => navigate({ name: 'search' })}
             onOpenAsset={openAsset}
@@ -1094,24 +577,23 @@ export function AppRouter() {
           <WorkspaceSearchScreen
             workspaceName={selectedWorkspace.name}
             searchableAssetCount={searchableAssetCount}
-            resetToken={searchResetToken}
-            activeQuery={submittedSearch}
+            resetToken={workspaceSearch.resetToken}
+            activeQuery={workspaceSearch.submittedSearch}
             routeQuery={routeSearchQuery}
-            searchResponse={searchQuery.data}
-            searchError={searchQuery.error}
-            isSearching={searchQuery.isLoading || searchQuery.isFetching}
-            contextResponse={contextQuery.data}
-            contextError={contextQuery.error}
-            isContextLoading={contextQuery.isLoading || contextQuery.isFetching}
-            selectedResult={selectedSearchResult}
+            searchResponse={workspaceSearch.searchResponse}
+            searchError={workspaceSearch.searchError}
+            isSearching={workspaceSearch.isSearching}
+            contextResponse={workspaceSearch.contextResponse}
+            contextError={workspaceSearch.contextError}
+            isContextLoading={workspaceSearch.isContextLoading}
+            selectedResult={workspaceSearch.selectedResult}
             assets={displayAssets}
             onSearch={(query) => {
               const trimmedQuery = query.trim();
-              setSubmittedSearch(trimmedQuery);
-              setSelectedSearchResult(null);
+              workspaceSearch.submit(trimmedQuery);
               navigate({ name: 'search', searchQuery: trimmedQuery });
             }}
-            onSelectResult={setSelectedSearchResult}
+            onSelectResult={workspaceSearch.setSelectedResult}
             onOpenResultContext={openSearchResultInAsset}
             onOpenAsset={openAsset}
             onOpenLibrary={() => navigate({ name: 'library' })}
@@ -1129,28 +611,19 @@ export function AppRouter() {
                 selectedWorkspace={selectedWorkspace}
                 selectedWorkspaceId={selectedWorkspaceId}
                 isLoading={workspacesQuery.isLoading || workspacesQuery.isFetching || isTransitionPending}
-                successNotice={workspaceSuccessNotice}
-                createError={createWorkspaceMutation.error}
-                renameError={
-                  renameWorkspaceMutation.error &&
-                  renameWorkspaceMutation.variables?.workspaceId === selectedWorkspaceId
-                    ? renameWorkspaceMutation.error
-                    : null
-                }
-                deleteError={
-                  deleteWorkspaceMutation.error && deleteWorkspaceMutation.variables?.workspaceId === selectedWorkspaceId
-                    ? deleteWorkspaceMutation.error
-                    : null
-                }
+                successNotice={workspaceManagement.successNotice}
+                createError={workspaceManagement.createError}
+                renameError={workspaceManagement.renameError}
+                deleteError={workspaceManagement.deleteError}
                 logoutError={auth.mode === 'legacy_session' ? logoutMutation.error : null}
-                createSuccessId={createWorkspaceMutation.data?.id}
+                createSuccessId={workspaceManagement.createSuccessId}
                 onSelectWorkspace={handleSelectWorkspace}
-                onCreateWorkspace={handleCreateWorkspace}
-                onRenameWorkspace={handleRenameWorkspace}
-                onDeleteWorkspace={handleDeleteWorkspace}
-                isCreating={createWorkspaceMutation.isPending}
-                isRenaming={renameWorkspaceMutation.isPending}
-                isDeleting={deleteWorkspaceMutation.isPending}
+                onCreateWorkspace={workspaceManagement.createWorkspace}
+                onRenameWorkspace={workspaceManagement.renameWorkspace}
+                onDeleteWorkspace={workspaceManagement.deleteWorkspace}
+                isCreating={workspaceManagement.isCreating}
+                isRenaming={workspaceManagement.isRenaming}
+                isDeleting={workspaceManagement.isDeleting}
                 onLogout={handleLogout}
                 isLoggingOut={isLogoutPending}
               />
@@ -1167,7 +640,7 @@ export function AppRouter() {
             assets={displayAssets}
             selectedAsset={selectedAsset}
             searchableAssetCount={searchableAssetCount}
-            activeQuery={submittedSearch}
+            activeQuery={workspaceSearch.submittedSearch}
             onOpenLibrary={() => navigate({ name: 'library' })}
             onOpenSearch={() => navigate({ name: 'search' })}
             onOpenAsset={openAsset}

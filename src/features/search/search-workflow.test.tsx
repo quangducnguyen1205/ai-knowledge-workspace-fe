@@ -16,8 +16,9 @@ import type {
   TranscriptRow,
 } from '../../entities/transcript/model/types';
 import { AssetDetailScreen } from '../assets/detail-screen';
-import { shouldPollAssetStatus } from '../assets/assets';
-import { SearchPanel, resolveTranscriptLookupId } from './search';
+import { shouldPollAssetStatus } from '../assets/model/lifecycle';
+import { SearchPanel } from './search';
+import { resolveTranscriptLookupId } from './model/search-result-reference';
 
 const workspaceName = 'Distributed Systems';
 

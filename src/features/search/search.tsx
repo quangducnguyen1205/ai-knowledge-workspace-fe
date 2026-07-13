@@ -1,67 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import {
-  getTranscriptContext,
-  searchTranscript,
-  type SearchResponse,
-  type SearchResult,
-} from './api/search-api';
+import type { SearchResponse, SearchResult } from './api/search-api';
 import type { TranscriptContextResponse } from '../../entities/transcript/model/types';
 import { buildTranscriptDisplayRows, matchesTranscriptReference } from '../../entities/transcript/model/transcript-display';
 import { Button, EmptyState, ErrorBanner, InfoBanner, LoadingBlock, Section, formatDateTime, formatScore } from '../../lib/ui';
-
-export type SearchParams = {
-  query: string;
-  workspaceId: string;
-  assetId?: string | null;
-};
-
-export type TranscriptContextParams = {
-  assetId: string;
-  transcriptRowId: string;
-  window: number;
-};
-
-export const searchKeys = {
-  all: ['search'] as const,
-  results: (workspaceId: string, query: string, assetId?: string | null) =>
-    ['search', 'results', workspaceId, assetId ?? 'all-assets', query] as const,
-  context: (assetId: string, transcriptRowId: string, window: number) =>
-    ['search', 'context', assetId, transcriptRowId, window] as const,
-};
-
-export function resolveTranscriptLookupId(result: SearchResult): string | null {
-  if (result.transcriptRowId) {
-    return result.transcriptRowId;
-  }
-
-  return result.segmentIndex !== null ? `segment-${result.segmentIndex}` : null;
-}
-
-export function useSearchQuery(params: SearchParams | null) {
-  return useQuery({
-    queryKey: params
-      ? searchKeys.results(params.workspaceId, params.query, params.assetId)
-      : ['search', 'results', 'empty'],
-    queryFn: () => searchTranscript(params?.query ?? '', params?.workspaceId ?? '', params?.assetId),
-    enabled: Boolean(params?.query && params?.workspaceId),
-  });
-}
+import { resolveTranscriptLookupId } from './model/search-result-reference';
 
 type SearchPanelScope = {
   mode: 'workspace' | 'asset';
   assetTitle?: string;
 };
-
-export function useTranscriptContextQuery(params: TranscriptContextParams | null) {
-  return useQuery({
-    queryKey: params
-      ? searchKeys.context(params.assetId, params.transcriptRowId, params.window)
-      : ['search', 'context', 'empty'],
-    queryFn: () => getTranscriptContext(params?.assetId ?? '', params?.transcriptRowId ?? '', params?.window ?? 2),
-    enabled: Boolean(params?.assetId && params?.transcriptRowId),
-  });
-}
 
 export function SearchPanel({
   workspaceName,

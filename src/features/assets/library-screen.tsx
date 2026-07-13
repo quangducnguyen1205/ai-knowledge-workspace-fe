@@ -1,6 +1,7 @@
 import type { AssetSummary } from './model/types';
 import { Button, Section } from '../../lib/ui';
-import { AssetsPanel } from './assets';
+import { AssetList } from './components/asset-list';
+import { AssetUploadForm } from '../upload/components/asset-upload-form';
 
 type AssetLibraryScreenProps = {
   workspaceName: string;
@@ -48,8 +49,19 @@ export function AssetLibraryScreen({
   return (
     <div className="screen-grid screen-grid--library">
       <div className="screen-main">
-        <AssetsPanel
+      <Section
+        title="Asset Library"
+        eyebrow={workspaceName}
+        actions={<span className="panel-pill">{assets.length} {assets.length === 1 ? 'asset' : 'assets'}</span>}
+      >
+        <AssetUploadForm
           workspaceName={workspaceName}
+          uploadError={uploadError}
+          uploadSuccessId={uploadSuccessId}
+          isUploading={isUploading}
+          onUpload={onUpload}
+        />
+        <AssetList
           assets={assets}
           selectedAssetId={selectedAssetId}
           successNotice={successNotice}
@@ -58,13 +70,10 @@ export function AssetLibraryScreen({
           deleteBusy={deleteBusy}
           deletingAssetId={deletingAssetId}
           assetsLoading={assetsLoading}
-          uploadError={uploadError}
-          uploadSuccessId={uploadSuccessId}
-          isUploading={isUploading}
           onSelectAsset={onSelectAsset}
           onDeleteAsset={onDeleteAsset}
-          onUpload={onUpload}
         />
+      </Section>
       </div>
 
       <div className="screen-side">

@@ -1,6 +1,6 @@
 import type { AssetSummary } from '../assets/model/types';
 import { Button, EmptyState, Section, formatDateTime } from '../../lib/ui';
-import { StatusBadge } from '../assets/assets';
+import { StatusBadge } from '../assets/components/status-badge';
 
 type WorkspaceHomeScreenProps = {
   workspaceName: string;

@@ -37,12 +37,12 @@ export async function updateAssetTitle(input: UpdateAssetTitleInput): Promise<As
   });
 }
 
-export async function getAssetStatus(assetId: string): Promise<AssetStatusResponse> {
-  return request<AssetStatusResponse>(`/api/assets/${assetId}/status`);
+export async function getAssetStatus(assetId: string, signal?: AbortSignal): Promise<AssetStatusResponse> {
+  return request<AssetStatusResponse>(`/api/assets/${assetId}/status`, { signal });
 }
 
-export async function getAssetTranscript(assetId: string): Promise<TranscriptRow[]> {
-  return request<TranscriptRow[]>(`/api/assets/${assetId}/transcript`);
+export async function getAssetTranscript(assetId: string, signal?: AbortSignal): Promise<TranscriptRow[]> {
+  return request<TranscriptRow[]>(`/api/assets/${assetId}/transcript`, { signal });
 }
 
 export async function indexAssetTranscript(assetId: string): Promise<AssetIndexResponse> {

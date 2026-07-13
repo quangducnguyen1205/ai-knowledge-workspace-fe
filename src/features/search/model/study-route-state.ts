@@ -1,14 +1,11 @@
 import type { AppRoute } from '../../../app/router';
+import type { TranscriptContextParams } from '../hooks/use-search-controller';
 
 export type StudyRouteState = {
   focusedTranscriptRowId: string | null;
   source: 'search' | 'assistant' | null;
   sourceSearchQuery: string | null;
-  contextParams: {
-    assetId: string;
-    transcriptRowId: string;
-    window: number;
-  } | null;
+  contextParams: TranscriptContextParams | null;
 };
 
 export function getStudyRouteState(
