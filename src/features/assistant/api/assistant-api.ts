@@ -1,25 +1,5 @@
 import { request } from '../../../shared/api/http-client';
-
-export type AssistantAnswerCitation = {
-  sourceId: string;
-  assetId: string;
-  assetTitle: string;
-  transcriptRowId: string | null;
-  segmentIndex: number | null;
-  createdAt: string | null;
-};
-
-export type AssistantAnswerResponse = {
-  answer: string;
-  citations: AssistantAnswerCitation[];
-  insufficientContext: boolean;
-};
-
-export type AssistantAnswerInput = {
-  workspaceId: string;
-  assetId: string;
-  question: string;
-};
+import type { AssistantAnswerInput, AssistantAnswerResponse } from '../model/types';
 
 export async function answerAssistant(
   input: AssistantAnswerInput,

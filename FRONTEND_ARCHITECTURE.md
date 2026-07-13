@@ -76,6 +76,15 @@ The baseline was `0c4797436c9e7106146388a09322e2d32782fceb`. `AppShell.tsx` was 
 
 Static assertions protect the neutral HTTP direction, shell/API separation, lifecycle/assistant separation, upload/polling separation, infrastructure URL ban, and absence of circular production imports.
 
+## Assistant and citation ownership
+
+- `useAssetAssistant` exclusively owns question/validation state, the abortable Spring request, request identity checks, loading/error/unavailable/insufficient/success states, scope reset, and resubmission with the retained question after an error. It has no routing, DOM lookup, lifecycle, upload, or citation-rendering responsibility.
+- `AssetAssistantPanel` owns form association, disabled/loading semantics, live status announcements, and composition of the hook state. `AssistantAnswerPanel` owns answer versus insufficient-context presentation.
+- `AssistantCitationList` and `AssistantCitationItem` preserve the citation sequence already validated and de-duplicated by Spring, source IDs, segment compatibility references, invalid-reference fallback, accessible action names, and existing CSS/DOM meaning. They perform no API request.
+- `useAssistantCitationNavigation` is the only citation-to-source route owner. It validates the transcript/segment reference, clears the asset-search selection, preserves selected-asset continuity, and writes the existing `#/assets/:id?row=...&from=assistant` route.
+
+The import assertions additionally prevent assistant orchestration from importing answer/citation presentation and prevent citation presentation/navigation from making requests.
+
 ## Compatibility and remaining work in this phase
 
-The baseline exposes no separate direct-upload browser endpoint; the retained upload contract is Spring `POST /api/assets/upload`. Explicit indexing remains available in `TRANSCRIPT_READY` as recovery. Assistant request state, answer presentation, and citation navigation are the remaining concentrated boundary for the final commit. `AppRouter` still coordinates cross-feature route transitions and session-wide cache cleanup; those seams remain explicit because moving them into a feature would reverse dependency direction.
+The baseline exposes no separate direct-upload browser endpoint; the retained upload contract is Spring `POST /api/assets/upload`. Explicit indexing remains available in `TRANSCRIPT_READY` as recovery. `AppRouter` now coordinates only app-wide auth/bootstrap/cache reconciliation and explicit cross-feature route seams; it does not call upload, lifecycle, indexing, search, or assistant APIs. Remaining debt is the broad prop surface of `AssetDetailScreen` and the legacy combined workspace UI/query module. Those can be reduced later without changing the frozen route or product contracts.

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useTransition } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ApiClientError } from '../shared/api/api-error';
-import type { AssistantAnswerCitation } from '../features/assistant/api/assistant-api';
 import type { SearchResponse, SearchResult } from '../features/search/api/search-api';
 import { Button, EmptyState, ErrorBanner, LoadingBlock } from '../lib/ui';
 import { useHashRoute, type AppRoute } from './router';
@@ -24,7 +23,6 @@ import { useAssetLifecycle } from '../features/assets/hooks/use-asset-lifecycle'
 import { useAssetManagement } from '../features/assets/hooks/use-asset-management';
 import { AssetLibraryScreen } from '../features/assets/library-screen';
 import { AssetDetailScreen } from '../features/assets/detail-screen';
-import { resolveAssistantCitationReference } from '../features/assistant/assistant';
 import { WorkspaceHomeScreen } from '../features/dashboard/dashboard';
 import { searchKeys, useSearchController, useTranscriptContextQuery } from '../features/search/hooks/use-search-controller';
 import { getClearedStudyRoute, getSearchReturnRoute, getStudyRouteState } from '../features/search/model/study-route-state';
@@ -39,6 +37,7 @@ import {
   workspaceKeys,
 } from '../features/workspaces/workspaces';
 import { useWorkspaceManagement } from '../features/workspaces/hooks/use-workspace-management';
+import { useAssistantCitationNavigation } from './navigation/use-assistant-citation-navigation';
 
 export function AppRouter() {
   const auth = useAuth();
@@ -123,6 +122,11 @@ export function AppRouter() {
 
   const workspaceSearch = useSearchController({ workspaceId: selectedWorkspaceId });
   const assetSearch = useSearchController({ workspaceId: selectedWorkspaceId, assetId: selectedAssetId });
+  const openAssistantCitationInAsset = useAssistantCitationNavigation({
+    clearAssetSearchSelection: assetSearch.clearSelectedResult,
+    selectAsset,
+    navigate,
+  });
 
   const routeSearchQuery = useRouteSearchHydration({
     route,
@@ -352,23 +356,6 @@ export function AppRouter() {
       transcriptRowId,
       source: 'search',
       searchQuery: workspaceSearch.submittedSearch ?? undefined,
-    });
-  }
-
-  function openAssistantCitationInAsset(citation: AssistantAnswerCitation) {
-    const transcriptRowId = resolveAssistantCitationReference(citation);
-
-    if (!transcriptRowId) {
-      return;
-    }
-
-    assetSearch.setSelectedResult(null);
-    selectAsset(citation.assetId);
-    navigate({
-      name: 'asset',
-      assetId: citation.assetId,
-      transcriptRowId,
-      source: 'assistant',
     });
   }
 

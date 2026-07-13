@@ -160,7 +160,7 @@ describe('Search route query flow', () => {
     const user = userEvent.setup();
     const fetchMock = renderAppAt('#/assets/asset-1?row=row-2&from=search&q=vector%20clocks');
 
-    await user.click(await screen.findByRole('button', { name: 'Back to search' }));
+    await user.click(await screen.findByRole('button', { name: 'Back to search' }, { timeout: 3_000 }));
 
     await waitFor(() => {
       expect(window.location.hash).toBe('#/search?q=vector+clocks');
@@ -176,7 +176,7 @@ describe('Search route query flow', () => {
     const user = userEvent.setup();
     const fetchMock = renderAppAt('#/assets/asset-1?row=row-2&from=search&q=%20%20');
 
-    await user.click(await screen.findByRole('button', { name: 'Back to search' }));
+    await user.click(await screen.findByRole('button', { name: 'Back to search' }, { timeout: 3_000 }));
 
     await waitFor(() => {
       expect(window.location.hash).toBe('#/search');

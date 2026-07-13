@@ -4,7 +4,7 @@ import type {
   AssetStatusResponse,
   AssetSummary,
 } from './model/types';
-import type { AssistantAnswerCitation } from '../assistant/api/assistant-api';
+import type { AssistantAnswerCitation } from '../assistant/model/types';
 import type { SearchResponse, SearchResult } from '../search/api/search-api';
 import type { TranscriptContextResponse, TranscriptRow } from '../../entities/transcript/model/types';
 import { buildTranscriptDisplayRows, matchesTranscriptReference } from '../../entities/transcript/model/transcript-display';
@@ -12,7 +12,7 @@ import { Button, EmptyState, ErrorBanner, InfoBanner, LoadingBlock, Section, for
 import { SelectedAssetPanel } from './components/selected-asset-panel';
 import { SelectedAssetTranscriptPanel } from './components/selected-asset-transcript-panel';
 import { StatusBadge } from './components/status-badge';
-import { AssetAssistantPanel } from '../assistant/assistant';
+import { AssetAssistantPanel } from '../assistant/components/asset-assistant-panel';
 import { SearchPanel } from '../search/search';
 
 type AssetDetailScreenProps = {

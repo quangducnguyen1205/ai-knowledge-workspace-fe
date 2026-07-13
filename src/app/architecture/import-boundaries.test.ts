@@ -81,6 +81,18 @@ describe('frontend import boundaries', () => {
     expect(upload).not.toMatch(/use-asset-lifecycle|useAssetLifecycle|refetchInterval|setInterval/);
   });
 
+  it('keeps assistant orchestration independent from citation presentation and citations request-free', () => {
+    const assistantHook = readSource('features/assistant/hooks/use-asset-assistant.ts');
+    const citationList = readSource('features/assistant/components/assistant-citation-list.tsx');
+    const citationItem = readSource('features/assistant/components/assistant-citation-item.tsx');
+    const citationNavigation = readSource('app/navigation/use-assistant-citation-navigation.ts');
+
+    expect(assistantHook).not.toMatch(/components\/assistant-(answer|citation)/);
+    for (const citationSource of [citationList, citationItem, citationNavigation]) {
+      expect(citationSource).not.toMatch(/answerAssistant|request\s*\(|fetch\s*\(|\/api\//);
+    }
+  });
+
   it('contains no circular production imports', () => {
     const sources = productionSources();
     const sourceSet = new Set(sources);

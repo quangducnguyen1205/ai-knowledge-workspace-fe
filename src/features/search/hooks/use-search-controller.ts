@@ -81,6 +81,7 @@ export function useSearchController({
   const updateAssetTitle = useCallback((targetAssetId: string, title: string) => {
     setSelectedResult((current) => current?.assetId === targetAssetId ? { ...current, assetTitle: title } : current);
   }, []);
+  const clearSelectedResult = useCallback(() => setSelectedResult(null), []);
 
   return {
     submittedSearch,
@@ -94,6 +95,7 @@ export function useSearchController({
     contextError: contextQuery.error,
     isContextLoading: contextQuery.isLoading || contextQuery.isFetching,
     setSelectedResult,
+    clearSelectedResult,
     submit,
     reset,
     updateAssetTitle,
