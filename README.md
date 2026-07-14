@@ -1,6 +1,9 @@
 # AI Knowledge Workspace Frontend Demo
 
-This repo is the separate frontend for the AI Knowledge Workspace demo. It is intentionally narrow, depends only on the Spring product API from Repo B, and does not call Repo A directly.
+This repo is the separate frontend for the AI Knowledge Workspace product. It is intentionally
+narrow, depends only on the Spring product API, and does not call the internal FastAPI service
+directly. See the [Project3 v1 final baseline](https://github.com/quangducnguyen1205/ai-knowledge-workspace/blob/project3-submission-v1/docs/submission/project3-final-baseline.md)
+for cross-repository ownership and evidence.
 
 ## Current Demo Scope
 
@@ -34,7 +37,10 @@ Asset detail remains a deep route under Library and exposes a breadcrumb back to
 
 The frontend remains processing-mode agnostic. It polls Spring while an asset is `PROCESSING` or `TRANSCRIPT_READY`, stops when the backend reports `SEARCHABLE` or `FAILED`, and refreshes workspace/search state when the lifecycle advances. In the normal integrated path, indexing follows transcript readiness automatically. The `Index transcript` control remains available only in `TRANSCRIPT_READY` as an explicit fallback when automatic completion has not advanced the asset; it is not required after a normal transition to `SEARCHABLE`.
 
-This phase is validated with frontend tests and static builds only. A fresh integrated runtime fixture is still required to prove the new default launch path from upload through citation navigation.
+The frontend tests, typecheck and production build are green. The bounded B4 browser
+validation also passed upload through automatic indexing, SEARCHABLE, search, grounded
+assistant answer, citation navigation and desktop/mobile checks. This does not claim
+production-scale capacity, security certification or unrestricted chatbot behavior.
 
 ## Search And Study Flow
 
@@ -74,6 +80,8 @@ Recently verified in the browser:
 - failed asset flow
 - invalid or rejected upload flow
 - empty search results for nonsense queries
+- automatic Project3 lifecycle through SEARCHABLE, search, grounded assistant answer and
+  citation navigation without a direct browser request to FastAPI
 - P3-C4 local Keycloak browser smoke: legacy auth entry remained visually available, and opt-in `keycloak_jwt` completed browser Authorization Code + PKCE through Keycloak, returned to the frontend, called Spring `/api/me`, rendered the authenticated product shell, and returned to the local Keycloak entry surface after frontend logout
 - P3-FE1 product shell foundation: route-aware top navigation, mobile menu Escape handling, skip link, active destination state, and visible account/workspace context are covered by frontend tests. Browser verification for this phase is Vite-only and does not claim authenticated backend integration when Spring/auth runtime is not running.
 

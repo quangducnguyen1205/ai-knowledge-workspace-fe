@@ -14,7 +14,8 @@ This repo now implements a small product-grade frontend for AI Knowledge Workspa
 - search-to-asset study context
 - transcript context around selected hits
 
-It is intentionally not a chatbot surface, not a RAG shell, and not an AI assistant experience.
+It is not a general-purpose chatbot or chat-history product. It does include the current
+asset-scoped grounded assistant answer and citation-navigation experience.
 
 ## 2. Current Stack
 
@@ -79,6 +80,8 @@ This refactor preserves existing routes, API request shapes, auth defaults, toke
 - Return to Search from a detail page that originated from a workspace result, preserving the safe query as `#/search?q=<query>` when available
 - Optionally restrict search to the current asset from Asset Detail
 - Open transcript context around a selected result
+- Ask a grounded question about the selected asset through Spring and render validated
+  citations with transcript navigation
 - Keep orientation through the top navigation active state, page heading, workspace status, visible account summary, and asset-detail breadcrumb
 
 ## 6. Backend API Surface Used
@@ -135,6 +138,9 @@ This refactor preserves existing routes, API request shapes, auth defaults, toke
 - P3-FE2 component tests cover the Search page labelled query control, result readability, route/state produced by opening a result, loading/empty/error states, selected transcript context on Asset Detail, canonical transcript display without a selected row, missing-row feedback, Search return behavior, and keyboard activation for the context-opening action.
 - P3-FE2 browser checks are public/auth-surface only when no real authenticated backend session is available; search and asset study behavior are validated through frontend component tests without fake backend sessions.
 - P3-FE2.2 modularized app routing/bootstrap, Search route hydration, study route interpretation, and transcript display ownership without changing routes, API calls, auth defaults, or visible UX.
+- P3-S5.B4.R1 passed the bounded browser flow from upload through automatic indexing,
+  SEARCHABLE, search, grounded assistant answer, citation navigation and responsive checks.
+  This remains bounded local evidence, not a production-scale claim.
 
 ## 10. Design / Product Notes
 
@@ -145,8 +151,10 @@ This refactor preserves existing routes, API request shapes, auth defaults, toke
 - Workspace Search opens relevant results into Asset Detail so the learner can continue reading nearby transcript context without losing the source Search orientation
 - Search return links carry only compact route state and reuse the existing product search path; result rows are not cached, fabricated, or serialized into the URL
 - Asset Detail can reuse the same transcript-hit/context search pattern, but scoped to the current asset
-- No assistant/chat UI, no fake AI affordances, and no unsupported media seek behavior were added
-- P3-F1 assistant context remains a backend retrieval-only endpoint in this phase; no frontend answer generation, provider integration, or persisted chat state has been added.
+- No general-purpose chat history, provider controls or fake AI affordances were added.
+  The supported asset-scoped grounded answer and citation UI calls Spring only.
+- Unsupported media seek behavior, provider inference in the browser and persisted chat state
+  remain out of scope.
 
 ## 11. Intentionally Deferred
 
