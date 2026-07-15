@@ -7,6 +7,7 @@ import type { AssetSummary } from './model/types';
 import { SelectedAssetPanel } from './components/selected-asset-panel';
 import { deriveAssetStatus, shouldPollAssetStatus } from './model/lifecycle';
 import { AssetUploadForm } from '../upload/components/asset-upload-form';
+import { ApiClientError } from '../../shared/api/api-error';
 
 const asset: AssetSummary = {
   assetId: 'asset-1',
@@ -167,5 +168,70 @@ describe('asset upload characterization', () => {
     rerender(<AssetUploadForm {...baseProps} isUploading />);
     expect(screen.getByRole('button', { name: /uploading to distributed systems/i })).toBeDisabled();
     expect(screen.getByText('Upload in progress')).toBeInTheDocument();
+  });
+
+  it('rejects an unsupported selected file before it can submit an upload request', async () => {
+    const user = userEvent.setup({ applyAccept: false });
+    const onUpload = vi.fn();
+    render(
+      <AssetUploadForm
+        workspaceName="Distributed Systems"
+        uploadError={null}
+        isUploading={false}
+        onUpload={onUpload}
+      />,
+    );
+    const fileInput = screen.getByLabelText(/source file/i) as HTMLInputElement;
+    const invalidFile = new File(['notes'], 'notes.txt', { type: 'video/mp4' });
+
+    expect(fileInput).toHaveAttribute(
+      'accept',
+      '.mp4,.mov,.m4v,.webm,.avi,video/mp4,video/quicktime,video/x-m4v,video/webm,application/webm,video/x-msvideo,video/avi,video/msvideo',
+    );
+    await user.upload(fileInput, invalidFile);
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Choose an MP4, MOV, M4V, WebM, or AVI video file.');
+    expect(screen.getByText('notes.txt')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Upload to workspace' })).toBeDisabled();
+    expect(onUpload).not.toHaveBeenCalled();
+  });
+
+  it('clears a client validation error after a compatible video is selected', async () => {
+    const user = userEvent.setup({ applyAccept: false });
+    const onUpload = vi.fn();
+    render(
+      <AssetUploadForm
+        workspaceName="Distributed Systems"
+        uploadError={null}
+        isUploading={false}
+        onUpload={onUpload}
+      />,
+    );
+    const fileInput = screen.getByLabelText(/source file/i) as HTMLInputElement;
+
+    await user.upload(fileInput, new File(['notes'], 'notes.txt', { type: 'text/plain' }));
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+
+    const validFile = new File(['video'], 'lecture.webm', { type: 'video/webm' });
+    await user.upload(fileInput, validFile);
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Upload to workspace' })).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: 'Upload to workspace' }));
+    expect(onUpload).toHaveBeenCalledWith({ file: validFile, title: undefined });
+  });
+
+  it('renders the server invalid-upload response with the same safe format guidance', () => {
+    render(
+      <AssetUploadForm
+        workspaceName="Distributed Systems"
+        uploadError={new ApiClientError(400, 'Only MP4, MOV, M4V, WebM, and AVI video files are supported', 'INVALID_UPLOAD_FILE')}
+        isUploading={false}
+        onUpload={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Upload was rejected');
+    expect(screen.getByRole('alert')).toHaveTextContent('Choose an MP4, MOV, M4V, WebM, or AVI video file.');
   });
 });

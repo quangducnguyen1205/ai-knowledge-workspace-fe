@@ -18,6 +18,13 @@ function getTechnicalDetail(error: ApiClientError): string | undefined {
 
 export function getFriendlyUploadErrorCopy(error: unknown): FriendlyMessageCopy | null {
   if (!isApiClientError(error)) return null;
+  if (error.status === 400 && error.code === 'INVALID_UPLOAD_FILE') {
+    return {
+      title: 'Upload was rejected',
+      message: 'Choose an MP4, MOV, M4V, WebM, or AVI video file.',
+      detail: getTechnicalDetail(error),
+    };
+  }
   if (error.status === 0) {
     return { title: 'Upload is temporarily unavailable', message: 'We could not reach the service, so the upload did not start.' };
   }

@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Button, ErrorBanner, InfoBanner } from '../../../lib/ui';
 import { getFriendlyUploadErrorCopy } from '../../assets/model/error-copy';
+import {
+  getUploadMediaValidationError,
+  SUPPORTED_UPLOAD_MEDIA_ACCEPT,
+} from '../model/supported-upload-media';
 
 export function AssetUploadForm({
   workspaceName,
@@ -17,6 +21,7 @@ export function AssetUploadForm({
 }) {
   const [title, setTitle] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [fileValidationError, setFileValidationError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const uploadErrorCopy = getFriendlyUploadErrorCopy(uploadError);
 
@@ -24,13 +29,19 @@ export function AssetUploadForm({
     if (!uploadSuccessId) return;
     setTitle('');
     setFile(null);
+    setFileValidationError(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, [uploadSuccessId]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!file) return;
+    if (!file || fileValidationError || isUploading) return;
     onUpload({ file, title: title.trim() || undefined });
+  }
+
+  function handleFileSelection(file: File | null) {
+    setFile(file);
+    setFileValidationError(file ? getUploadMediaValidationError(file) : null);
   }
 
   return (
@@ -60,14 +71,23 @@ export function AssetUploadForm({
             ref={fileInputRef}
             className="field__input field__input--file"
             type="file"
-            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-            accept="video/*,.mp4,.mov,.m4v,.webm,.avi"
+            onChange={(event) => handleFileSelection(event.target.files?.[0] ?? null)}
+            accept={SUPPORTED_UPLOAD_MEDIA_ACCEPT}
+            aria-describedby={fileValidationError ? 'upload-file-error' : 'upload-file-hint'}
+            aria-invalid={Boolean(fileValidationError)}
           />
-          <span className="field__hint">Use a lecture video file for the current product flow. MP4 works well for local smoke checks.</span>
+          <span id="upload-file-hint" className="field__hint">
+            Use an MP4, MOV, M4V, WebM, or AVI lecture video. MP4 works well for local smoke checks.
+          </span>
+          {fileValidationError ? (
+            <span id="upload-file-error" className="field__hint field__hint--error" role="alert">
+              {fileValidationError}
+            </span>
+          ) : null}
         </label>
 
         <div className="upload-card__actions">
-          <Button type="submit" disabled={isUploading || !file}>
+          <Button type="submit" disabled={isUploading || !file || Boolean(fileValidationError)}>
             {isUploading ? `Uploading to ${workspaceName}...` : 'Upload to workspace'}
           </Button>
           <span className="upload-card__hint">Uploaded assets appear in the library first, then move through processing.</span>
