@@ -572,6 +572,47 @@ code {
   align-items: end;
 }
 
+.workspace-delete-dialog__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(18, 24, 38, 0.42);
+}
+
+.workspace-delete-dialog {
+  display: grid;
+  gap: 16px;
+  width: min(100%, 520px);
+  padding: 28px;
+  border: 1px solid rgba(18, 24, 38, 0.12);
+  border-radius: var(--radius-xl);
+  background: var(--surface-strong);
+  box-shadow: var(--shadow-lg);
+}
+
+.workspace-delete-dialog h2,
+.workspace-delete-dialog p {
+  margin: 0;
+}
+
+.workspace-delete-dialog__eyebrow {
+  color: var(--primary-strong);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.workspace-delete-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .workspace-focus__title {
   display: block;
   font-size: 1.15rem;

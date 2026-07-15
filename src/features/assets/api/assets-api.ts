@@ -25,6 +25,10 @@ export async function listAssets(workspaceId: string): Promise<AssetSummary[]> {
   return Array.isArray(response) ? response : response.items;
 }
 
+export async function getAsset(assetId: string): Promise<AssetRecordResponse> {
+  return request<AssetRecordResponse>(`/api/assets/${assetId}`);
+}
+
 export async function deleteAsset(assetId: string): Promise<void> {
   await request<void>(`/api/assets/${assetId}`, { method: 'DELETE' });
 }

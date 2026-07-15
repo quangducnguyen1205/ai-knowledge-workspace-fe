@@ -82,6 +82,17 @@ function createFetchMock() {
       return jsonResponse([asset]);
     }
 
+    if (url === '/api/assets/asset-1') {
+      return jsonResponse({
+        id: asset.assetId,
+        title: asset.title,
+        status: asset.assetStatus,
+        workspaceId: asset.workspaceId,
+        createdAt: asset.createdAt,
+        updatedAt: asset.createdAt,
+      });
+    }
+
     if (url === '/api/assets/asset-1/status') {
       return jsonResponse({
         assetId: 'asset-1',

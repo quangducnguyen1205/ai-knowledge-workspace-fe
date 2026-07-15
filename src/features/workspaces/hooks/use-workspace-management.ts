@@ -13,7 +13,6 @@ type SuccessNotice = { title: string; message: string };
 
 export function useWorkspaceManagement({
   currentUserId,
-  selectedWorkspace,
   selectedWorkspaceId,
   setPreferredWorkspaceId,
   setWorkspaceScopeRefreshAfter,
@@ -21,7 +20,6 @@ export function useWorkspaceManagement({
   onDeletedWorkspaceRoute,
 }: {
   currentUserId?: string;
-  selectedWorkspace: Workspace | null;
   selectedWorkspaceId: string | null;
   setPreferredWorkspaceId: (workspaceId: string | null) => void;
   setWorkspaceScopeRefreshAfter: (refreshedAfter: number | null) => void;
@@ -68,33 +66,34 @@ export function useWorkspaceManagement({
     });
   }
 
-  function deleteWorkspace() {
-    if (!selectedWorkspace || deleteMutation.isPending) return;
+  function deleteWorkspace(workspace: Workspace) {
+    if (deleteMutation.isPending) return;
 
-    const deletingWorkspaceName = selectedWorkspace.name;
-    const confirmed = window.confirm(
-      `Delete workspace "${deletingWorkspaceName}"?\n\nOnly empty non-default workspaces can be removed. This will refresh the visible workspace scope.`,
-    );
-    if (!confirmed) return;
-
+    const deletingWorkspaceName = workspace.name;
+    const isDeletingSelectedWorkspace = workspace.id === selectedWorkspaceId;
     setSuccessNotice(null);
     deleteMutation.mutate(
-      { workspaceId: selectedWorkspace.id },
+      { workspaceId: workspace.id },
       {
         onSuccess: async (_response, variables) => {
-          setWorkspaceScopeRefreshAfter(Date.now());
-          onClearWorkspaceScope(variables.workspaceId);
-          onDeletedWorkspaceRoute();
+          if (isDeletingSelectedWorkspace) {
+            setWorkspaceScopeRefreshAfter(Date.now());
+            onClearWorkspaceScope(variables.workspaceId);
+            onDeletedWorkspaceRoute();
+          }
           setSuccessNotice({
             title: 'Workspace deleted',
-            message: `Removed "${deletingWorkspaceName}" and refreshed the visible workspace scope.`,
+            message: isDeletingSelectedWorkspace
+              ? `Removed "${deletingWorkspaceName}" and refreshed the visible workspace scope.`
+              : `Removed "${deletingWorkspaceName}" without changing the current workspace scope.`,
           });
           await queryClient.invalidateQueries({ queryKey: workspaceKeys.all });
         },
         onError: async (error, variables) => {
-          if (error instanceof ApiClientError && error.status === 404) {
+          if (isDeletingSelectedWorkspace && error instanceof ApiClientError && error.status === 404) {
             setWorkspaceScopeRefreshAfter(Date.now());
             onClearWorkspaceScope(variables.workspaceId);
+            onDeletedWorkspaceRoute();
             await queryClient.invalidateQueries({ queryKey: workspaceKeys.all });
           }
         },
@@ -112,12 +111,11 @@ export function useWorkspaceManagement({
     renameError: renameMutation.error && renameMutation.variables?.workspaceId === selectedWorkspaceId
       ? renameMutation.error
       : null,
-    deleteError: deleteMutation.error && deleteMutation.variables?.workspaceId === selectedWorkspaceId
-      ? deleteMutation.error
-      : null,
+    deleteError: deleteMutation.error,
     createSuccessId: createMutation.data?.id,
     isCreating: createMutation.isPending,
     isRenaming: renameMutation.isPending,
     isDeleting: deleteMutation.isPending,
+    resetDelete: deleteMutation.reset,
   };
 }

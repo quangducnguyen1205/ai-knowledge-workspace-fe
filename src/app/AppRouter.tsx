@@ -17,7 +17,7 @@ import {
   useRegisterMutation,
 } from '../features/auth/auth';
 import { useAuth } from '../features/auth/auth-provider';
-import { assetKeys } from '../features/assets/hooks/asset-queries';
+import { assetKeys, useAssetRouteQuery } from '../features/assets/hooks/asset-queries';
 import { useAssetSelection } from '../features/assets/hooks/use-asset-selection';
 import { useAssetLifecycle } from '../features/assets/hooks/use-asset-lifecycle';
 import { useAssetManagement } from '../features/assets/hooks/use-asset-management';
@@ -38,6 +38,8 @@ import {
 } from '../features/workspaces/workspaces';
 import { useWorkspaceManagement } from '../features/workspaces/hooks/use-workspace-management';
 import { useAssistantCitationNavigation } from './navigation/use-assistant-citation-navigation';
+import { useAssetRouteWorkspaceHydration } from './bootstrap/use-asset-route-workspace-hydration';
+import type { AssetSummary } from '../features/assets/model/types';
 
 export function AppRouter() {
   const auth = useAuth();
@@ -79,6 +81,7 @@ export function AppRouter() {
   });
 
   const routedAssetId = route.name === 'asset' ? route.assetId : null;
+  const assetRouteQuery = useAssetRouteQuery(routedAssetId, isAuthenticated);
   const {
     assetsQuery,
     selectedAsset,
@@ -176,13 +179,59 @@ export function AppRouter() {
 
   const workspaceManagement = useWorkspaceManagement({
     currentUserId: currentUser?.id,
-    selectedWorkspace,
     selectedWorkspaceId,
     setPreferredWorkspaceId,
     setWorkspaceScopeRefreshAfter,
     onClearWorkspaceScope: clearWorkspaceScopedState,
     onDeletedWorkspaceRoute: () => navigate({ name: 'home' }),
   });
+
+  const assetRouteWorkspace = useAssetRouteWorkspaceHydration({
+    route,
+    asset: assetRouteQuery.data,
+    isAssetLoading: assetRouteQuery.isLoading || assetRouteQuery.isFetching,
+    isAssetError: assetRouteQuery.isError,
+    workspaces: workspacesQuery.data,
+    isWorkspaceLoading: workspacesQuery.isLoading || workspacesQuery.isFetching,
+    selectedWorkspaceId,
+    onSelectAuthorizedWorkspace: handleSelectWorkspace,
+    onUnavailableRoute: () => navigate({ name: 'library' }),
+  });
+
+  useEffect(() => {
+    const routedAsset = assetRouteQuery.data;
+
+    if (!routedAsset) {
+      return;
+    }
+
+    const summary: AssetSummary = {
+      assetId: routedAsset.id,
+      title: routedAsset.title,
+      assetStatus: routedAsset.status,
+      workspaceId: routedAsset.workspaceId,
+      createdAt: routedAsset.createdAt ?? '',
+    };
+
+    queryClient.setQueryData<AssetSummary[]>(assetKeys.list(routedAsset.workspaceId), (current = []) => {
+      const existing = current.find((asset) => asset.assetId === summary.assetId);
+
+      if (!existing) {
+        return [...current, summary];
+      }
+
+      if (
+        existing.title === summary.title &&
+        existing.assetStatus === summary.assetStatus &&
+        existing.workspaceId === summary.workspaceId &&
+        existing.createdAt === summary.createdAt
+      ) {
+        return current;
+      }
+
+      return current.map((asset) => (asset.assetId === summary.assetId ? { ...asset, ...summary } : asset));
+    });
+  }, [assetRouteQuery.data, queryClient]);
 
   useEffect(() => {
     const indexedAssetId = lifecycle.indexResponse?.assetId;
@@ -209,21 +258,6 @@ export function AppRouter() {
     workspaceCount: workspacesQuery.data?.length ?? 0,
     navigate,
   });
-
-  useEffect(() => {
-    if (route.name !== 'asset') {
-      return;
-    }
-
-    if (!selectedWorkspace || assetsQuery.isFetching) {
-      return;
-    }
-
-    const availableAssets = assetsQuery.data ?? [];
-    if (!availableAssets.length || !availableAssets.some((asset) => asset.assetId === route.assetId)) {
-      navigate({ name: 'library' });
-    }
-  }, [assetsQuery.data, assetsQuery.isFetching, navigate, route, selectedWorkspace]);
 
   function handleSelectWorkspace(workspaceId: string) {
     workspaceManagement.clearSuccessNotice();
@@ -467,6 +501,14 @@ export function AppRouter() {
     );
   }
 
+  if (route.name === 'asset' && (assetRouteWorkspace.isHydrating || assetRouteWorkspace.isUnavailable)) {
+    return (
+      <div className="app-shell app-shell--centered">
+        <LoadingBlock label="Resolving the authorized asset workspace..." />
+      </div>
+    );
+  }
+
   let screenContent;
 
   if (!selectedWorkspace) {
@@ -608,6 +650,7 @@ export function AppRouter() {
                 onCreateWorkspace={workspaceManagement.createWorkspace}
                 onRenameWorkspace={workspaceManagement.renameWorkspace}
                 onDeleteWorkspace={workspaceManagement.deleteWorkspace}
+                onResetDelete={workspaceManagement.resetDelete}
                 isCreating={workspaceManagement.isCreating}
                 isRenaming={workspaceManagement.isRenaming}
                 isDeleting={workspaceManagement.isDeleting}

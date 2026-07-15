@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   deleteWorkspace,
@@ -11,6 +11,7 @@ import {
 import { isApiClientError } from '../../shared/api/api-error';
 import { Button, ErrorBanner, InfoBanner } from '../../lib/ui';
 import { getFriendlyLogoutErrorCopy } from '../auth/auth';
+import { WorkspaceDeleteDialog } from './components/workspace-delete-dialog';
 
 export const workspaceKeys = {
   all: ['workspaces'] as const,
@@ -117,56 +118,6 @@ function getFriendlyWorkspaceRenameErrorCopy(
   };
 }
 
-function getFriendlyWorkspaceDeleteErrorCopy(
-  error: unknown,
-): (FriendlyMessageCopy & { tone: 'warning' | 'error' }) | null {
-  if (!isApiClientError(error)) {
-    return null;
-  }
-
-  if (error.status === 409 && error.code === 'DEFAULT_WORKSPACE_DELETE_FORBIDDEN') {
-    return {
-      tone: 'warning',
-      title: 'Default workspace stays protected',
-      message: 'The default workspace cannot be deleted. Switch to another workspace if you want to remove it instead.',
-      detail: getTechnicalDetail(error),
-    };
-  }
-
-  if (error.status === 409 && error.code === 'WORKSPACE_NOT_EMPTY') {
-    return {
-      tone: 'warning',
-      title: 'Workspace still contains assets',
-      message: 'Delete the assets in this workspace first. Workspace deletion stays blocked until it is empty.',
-      detail: getTechnicalDetail(error),
-    };
-  }
-
-  if (error.status === 404) {
-    return {
-      tone: 'warning',
-      title: 'Workspace already unavailable',
-      message: 'This workspace is no longer visible. The shell will refresh and move to another visible workspace.',
-      detail: getTechnicalDetail(error),
-    };
-  }
-
-  if (error.status === 0) {
-    return {
-      tone: 'error',
-      title: 'Delete is temporarily unavailable',
-      message: 'We could not reach the service, so the workspace was not removed.',
-    };
-  }
-
-  return {
-    tone: 'error',
-    title: 'Workspace delete failed',
-    message: 'The workspace was not removed. The current shell scope stays in place until deletion is confirmed.',
-    detail: getTechnicalDetail(error),
-  };
-}
-
 export function WorkspaceBar({
   workspaces,
   selectedWorkspace,
@@ -182,6 +133,7 @@ export function WorkspaceBar({
   onCreateWorkspace,
   onRenameWorkspace,
   onDeleteWorkspace,
+  onResetDelete,
   isCreating,
   isRenaming,
   isDeleting,
@@ -201,7 +153,8 @@ export function WorkspaceBar({
   onSelectWorkspace: (workspaceId: string) => void;
   onCreateWorkspace: (name: string) => void;
   onRenameWorkspace: (input: UpdateWorkspaceNameInput) => void;
-  onDeleteWorkspace: () => void;
+  onDeleteWorkspace: (workspace: Workspace) => void;
+  onResetDelete: () => void;
   isCreating: boolean;
   isRenaming: boolean;
   isDeleting: boolean;
@@ -210,9 +163,10 @@ export function WorkspaceBar({
 }) {
   const [workspaceName, setWorkspaceName] = useState('');
   const [renameWorkspaceName, setRenameWorkspaceName] = useState('');
+  const [deleteDialogWorkspace, setDeleteDialogWorkspace] = useState<Workspace | null>(null);
+  const deleteButtonRef = useRef<HTMLButtonElement>(null);
   const logoutErrorCopy = getFriendlyLogoutErrorCopy(logoutError);
   const renameErrorCopy = getFriendlyWorkspaceRenameErrorCopy(renameError);
-  const deleteErrorCopy = getFriendlyWorkspaceDeleteErrorCopy(deleteError);
   const workspaceActionBusy = isCreating || isRenaming || isDeleting;
 
   useEffect(() => {
@@ -224,6 +178,17 @@ export function WorkspaceBar({
   useEffect(() => {
     setRenameWorkspaceName(selectedWorkspace?.name ?? '');
   }, [selectedWorkspace?.id, selectedWorkspace?.name]);
+
+  useEffect(() => {
+    if (
+      deleteDialogWorkspace &&
+      !isDeleting &&
+      !deleteError &&
+      !workspaces.some((workspace) => workspace.id === deleteDialogWorkspace.id)
+    ) {
+      setDeleteDialogWorkspace(null);
+    }
+  }, [deleteDialogWorkspace, deleteError, isDeleting, workspaces]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -253,6 +218,25 @@ export function WorkspaceBar({
       workspaceId: selectedWorkspace.id,
       name: trimmedName,
     });
+  }
+
+  function openDeleteDialog() {
+    if (!selectedWorkspace || workspaceActionBusy) {
+      return;
+    }
+
+    onResetDelete();
+    setDeleteDialogWorkspace({ ...selectedWorkspace });
+  }
+
+  function closeDeleteDialog() {
+    if (isDeleting) {
+      return;
+    }
+
+    onResetDelete();
+    setDeleteDialogWorkspace(null);
+    requestAnimationFrame(() => deleteButtonRef.current?.focus());
   }
 
   return (
@@ -356,9 +340,15 @@ export function WorkspaceBar({
             >
               {isRenaming ? 'Saving...' : 'Rename workspace'}
             </Button>
-            <Button type="button" tone="ghost" disabled={workspaceActionBusy || !selectedWorkspace} onClick={onDeleteWorkspace}>
+            <button
+              ref={deleteButtonRef}
+              type="button"
+              className="button button--ghost"
+              disabled={workspaceActionBusy || !selectedWorkspace}
+              onClick={openDeleteDialog}
+            >
               {isDeleting ? 'Deleting...' : 'Delete workspace'}
-            </Button>
+            </button>
           </div>
         </form>
       </div>
@@ -399,22 +389,13 @@ export function WorkspaceBar({
           detail={renameErrorCopy.detail}
         />
       ) : null}
-      {deleteErrorCopy?.tone === 'warning' ? (
-        <InfoBanner
-          className="workspace-bar__error"
-          tone="warning"
-          title={deleteErrorCopy.title}
-          message={deleteErrorCopy.message}
-          detail={deleteErrorCopy.detail}
-        />
-      ) : null}
-      {deleteErrorCopy?.tone === 'error' ? (
-        <ErrorBanner
+      {deleteDialogWorkspace ? (
+        <WorkspaceDeleteDialog
+          workspace={deleteDialogWorkspace}
+          isDeleting={isDeleting}
           error={deleteError}
-          className="workspace-bar__error"
-          title={deleteErrorCopy.title}
-          message={deleteErrorCopy.message}
-          detail={deleteErrorCopy.detail}
+          onConfirm={() => onDeleteWorkspace(deleteDialogWorkspace)}
+          onCancel={closeDeleteDialog}
         />
       ) : null}
     </div>
