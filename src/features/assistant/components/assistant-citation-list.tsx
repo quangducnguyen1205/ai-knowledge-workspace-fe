@@ -13,8 +13,8 @@ export function AssistantCitationList({
     return (
       <InfoBanner
         tone="warning"
-        title="No citations returned"
-        message="No transcript references were returned with this answer. Review the transcript directly before relying on it."
+        title="No supporting moments"
+        message="Review the transcript directly before relying on this answer."
       />
     );
   }
@@ -22,8 +22,8 @@ export function AssistantCitationList({
   return (
     <div className="assistant-citations-block">
       <div className="panel-block__header">
-        <h3>Cited transcript references</h3>
-        <span className="context-panel__hint">{citations.length} {citations.length === 1 ? 'source' : 'sources'}</span>
+        <h3>Supporting moments</h3>
+        <span className="context-panel__hint">{citations.length} {citations.length === 1 ? 'citation' : 'citations'}</span>
       </div>
       <ol className="assistant-citations">
         {citations.map((citation, index) => (

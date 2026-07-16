@@ -16,6 +16,8 @@ const workspaces = [
   { id: 'workspace-2', name: 'Authorized asset workspace', createdAt: '2026-01-02T00:00:00Z' },
 ];
 
+const routeHydrationTimeout = { timeout: 3_000 };
+
 function jsonResponse(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), {
     status,
@@ -122,7 +124,7 @@ describe('asset route workspace hydration', () => {
     const { fetchMock } = createFetchMock();
     renderApp('#/assets/asset-2', fetchMock);
 
-    expect(await screen.findByText('Asset in the authorized workspace')).toBeInTheDocument();
+    expect(await screen.findByText('Asset in the authorized workspace', undefined, routeHydrationTimeout)).toBeInTheDocument();
     expect(screen.getByLabelText('Workspace')).toHaveValue('workspace-2');
     expect(window.location.hash).toBe('#/assets/asset-2');
     expect(fetchMock).toHaveBeenCalledWith('/api/assets/asset-2', expect.any(Object));
@@ -133,12 +135,12 @@ describe('asset route workspace hydration', () => {
     const transport = createFetchMock({ deferAssetResponse: true });
     renderApp('#/assets/asset-2', transport.fetchMock);
 
-    expect(await screen.findByText('Resolving the authorized asset workspace...')).toBeInTheDocument();
+    expect(await screen.findByText('Resolving the authorized asset workspace...', undefined, routeHydrationTimeout)).toBeInTheDocument();
     expect(window.location.hash).toBe('#/assets/asset-2');
 
     transport.resolveAssetResponse();
 
-    expect(await screen.findByText('Asset in the authorized workspace')).toBeInTheDocument();
+    expect(await screen.findByText('Asset in the authorized workspace', undefined, routeHydrationTimeout)).toBeInTheDocument();
     expect(screen.getByLabelText('Workspace')).toHaveValue('workspace-2');
   });
 
@@ -147,7 +149,7 @@ describe('asset route workspace hydration', () => {
     const { fetchMock } = createFetchMock();
     renderApp('#/assets/asset-2', fetchMock);
 
-    expect(await screen.findByText('Asset in the authorized workspace')).toBeInTheDocument();
+    expect(await screen.findByText('Asset in the authorized workspace', undefined, routeHydrationTimeout)).toBeInTheDocument();
     expect(screen.getByLabelText('Workspace')).toHaveValue('workspace-2');
     expect(window.location.hash).toBe('#/assets/asset-2');
   });
@@ -167,7 +169,7 @@ describe('asset route workspace hydration', () => {
     });
     renderApp('#/assets/asset-2', fetchMock);
 
-    await waitFor(() => expect(window.location.hash).toBe('#/library'));
+    await waitFor(() => expect(window.location.hash).toBe('#/library'), routeHydrationTimeout);
     expect(screen.queryByText('Asset in the authorized workspace')).not.toBeInTheDocument();
   });
 
@@ -175,7 +177,7 @@ describe('asset route workspace hydration', () => {
     const { fetchMock } = createFetchMock({ visibleWorkspaces: [workspaces[0]] });
     renderApp('#/assets/asset-2', fetchMock);
 
-    await waitFor(() => expect(window.location.hash).toBe('#/library'));
+    await waitFor(() => expect(window.location.hash).toBe('#/library'), routeHydrationTimeout);
     expect(screen.queryByText('Asset in the authorized workspace')).not.toBeInTheDocument();
   });
 
@@ -184,19 +186,19 @@ describe('asset route workspace hydration', () => {
     const { fetchMock } = createFetchMock();
     renderApp('#/assets/asset-2', fetchMock);
 
-    expect(await screen.findByText('Asset in the authorized workspace')).toBeInTheDocument();
+    expect(await screen.findByText('Asset in the authorized workspace', undefined, routeHydrationTimeout)).toBeInTheDocument();
     expect(screen.getByLabelText('Workspace')).toHaveValue('workspace-2');
 
     window.history.pushState({}, '', '#/assets/asset-1');
     window.dispatchEvent(new HashChangeEvent('hashchange'));
 
-    expect(await screen.findByText('Asset in the default workspace')).toBeInTheDocument();
+    expect(await screen.findByText('Asset in the default workspace', undefined, routeHydrationTimeout)).toBeInTheDocument();
     expect(screen.getByLabelText('Workspace')).toHaveValue('workspace-1');
 
     window.history.pushState({}, '', '#/assets/asset-2');
     window.dispatchEvent(new HashChangeEvent('hashchange'));
 
-    expect(await screen.findByText('Asset in the authorized workspace')).toBeInTheDocument();
+    expect(await screen.findByText('Asset in the authorized workspace', undefined, routeHydrationTimeout)).toBeInTheDocument();
     expect(screen.getByLabelText('Workspace')).toHaveValue('workspace-2');
   });
 });

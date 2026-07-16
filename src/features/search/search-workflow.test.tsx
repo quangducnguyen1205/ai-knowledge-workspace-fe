@@ -106,7 +106,6 @@ function renderSearchPanel(overrides: Partial<ComponentProps<typeof SearchPanel>
 function renderAssetDetail(overrides: Partial<ComponentProps<typeof AssetDetailScreen>> = {}) {
   const props: ComponentProps<typeof AssetDetailScreen> = {
     workspaceName,
-    assets: [asset],
     asset,
     successNotice: null,
     resolvedAssetStatus: asset.assetStatus as AssetStatus,
@@ -119,6 +118,7 @@ function renderAssetDetail(overrides: Partial<ComponentProps<typeof AssetDetailS
     indexResponse: undefined,
     isIndexing: false,
     isRenaming: false,
+    isDeleting: false,
     renameError: null,
     activeQuery: null,
     searchResponse: undefined,
@@ -134,15 +134,14 @@ function renderAssetDetail(overrides: Partial<ComponentProps<typeof AssetDetailS
     studyContextError: null,
     isStudyContextLoading: false,
     searchResetToken: 0,
-    searchableAssetCount: 1,
     onIndex: vi.fn(),
     onRename: vi.fn(),
     onResetRename: vi.fn(),
+    onDelete: vi.fn(),
+    onOpenAssistantCitation: vi.fn(),
     onSearchWithinAsset: vi.fn(),
     onSelectSearchResult: vi.fn(),
     onOpenLibrary: vi.fn(),
-    onOpenSearch: vi.fn(),
-    onOpenAsset: vi.fn(),
     ...overrides,
   };
 
@@ -153,6 +152,7 @@ function renderAssetDetail(overrides: Partial<ComponentProps<typeof AssetDetailS
 
 afterEach(() => {
   cleanup();
+  vi.unstubAllGlobals();
   window.history.pushState({}, '', '/');
 });
 
@@ -166,9 +166,9 @@ describe('search-to-study workflow', () => {
   it('renders a labelled search control and initial state', () => {
     renderSearchPanel();
 
-    expect(screen.getByLabelText(/search transcript text/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/search workspace/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^search$/i })).toBeDisabled();
-    expect(screen.getByText(/search this workspace/i)).toBeInTheDocument();
+    expect(screen.getByText(/search your learning workspace/i)).toBeInTheDocument();
   });
 
   it('shows result asset identity and a context-opening action', () => {
@@ -180,8 +180,8 @@ describe('search-to-study workflow', () => {
 
     expect(screen.getByText('Vector Clocks Lecture')).toBeInTheDocument();
     expect(screen.getByText(/vector clocks preserve causal relationships/i)).toBeInTheDocument();
-    expect(screen.getByText(/moment: segment 2/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /study result 1 in vector clocks lecture/i })).toBeEnabled();
+    expect(screen.getByText(/moment 2/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /open result 1 in vector clocks lecture/i })).toBeEnabled();
   });
 
   it('opens an existing Asset Detail route with asset and transcript-row identity', async () => {
@@ -206,7 +206,7 @@ describe('search-to-study workflow', () => {
       },
     });
 
-    await user.click(screen.getByRole('button', { name: /study result 1 in vector clocks lecture/i }));
+    await user.click(screen.getByRole('button', { name: /open result 1 in vector clocks lecture/i }));
 
     expect(parseRoute(window.location.hash)).toEqual({
       name: 'asset',
@@ -236,7 +236,7 @@ describe('search-to-study workflow', () => {
       />,
     );
 
-    expect(screen.getByText(/searching transcript content/i)).toBeInTheDocument();
+    expect(screen.getByText(/searching your workspace/i)).toBeInTheDocument();
 
     rerender(
       <SearchPanel
@@ -256,7 +256,7 @@ describe('search-to-study workflow', () => {
       />,
     );
 
-    expect(screen.getByText(/no matches in this workspace/i)).toBeInTheDocument();
+    expect(screen.getByText(/no matches found/i)).toBeInTheDocument();
 
     rerender(
       <SearchPanel
@@ -276,8 +276,8 @@ describe('search-to-study workflow', () => {
       />,
     );
 
-    expect(screen.getByText('Đã xảy ra lỗi')).toBeInTheDocument();
-    expect(screen.getByText('Không thể hoàn tất thao tác. Vui lòng thử lại sau.')).toBeInTheDocument();
+    expect(screen.getByText('Something went wrong')).toBeInTheDocument();
+    expect(screen.getByText('The action could not be completed. Try again later.')).toBeInTheDocument();
     expect(screen.queryByText(/search service unavailable/i)).not.toBeInTheDocument();
   });
 
@@ -288,27 +288,26 @@ describe('search-to-study workflow', () => {
       studyContextResponse: contextResponse,
     });
 
-    expect(screen.getByRole('heading', { name: /study this moment/i })).toBeInTheDocument();
-    expect(screen.getByText(/opened from workspace search/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/search hit/i)).not.toHaveLength(0);
+    expect(screen.getByRole('heading', { name: /search result in context/i })).toBeInTheDocument();
+    expect(screen.getByText(/showing the moment found for/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/selected/i)).not.toHaveLength(0);
     expect(screen.getAllByText(/vector clocks preserve causal relationships/i)).not.toHaveLength(0);
   });
 
-  it('keeps manual indexing as a fallback only while the asset is transcript ready', () => {
+  it('keeps manual search preparation as a disclosed fallback only while the transcript is ready', async () => {
+    const user = userEvent.setup();
     const transcriptReadyAsset = { ...asset, assetStatus: 'TRANSCRIPT_READY' as const };
 
     renderAssetDetail({
       workspaceId: 'workspace-1',
-      assets: [transcriptReadyAsset],
       asset: transcriptReadyAsset,
       resolvedAssetStatus: 'TRANSCRIPT_READY',
-      searchableAssetCount: 0,
       onOpenAssistantCitation: vi.fn(),
     });
 
-    expect(screen.getByRole('button', { name: 'Index transcript' })).toBeEnabled();
-    expect(screen.getByRole('heading', { name: 'Indexing fallback' })).toBeInTheDocument();
-    expect(screen.getByText(/automatic indexing has not completed/i)).toBeInTheDocument();
+    await user.click(screen.getByText('Processing details'));
+    expect(screen.getByRole('button', { name: 'Retry search preparation' })).toBeEnabled();
+    expect(screen.getByRole('heading', { name: 'Search preparation needs attention' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ask' })).toBeDisabled();
   });
 
@@ -318,17 +317,41 @@ describe('search-to-study workflow', () => {
       onOpenAssistantCitation: vi.fn(),
     });
 
-    expect(screen.queryByRole('button', { name: /index transcript|re-index transcript/i })).not.toBeInTheDocument();
-    expect(screen.queryByText(/indexing fallback/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /retry search preparation/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ask' })).toBeEnabled();
   });
 
-  it('preserves canonical transcript display without a selected row', () => {
+  it('composes transcript, ask, and details as focused study views', () => {
     renderAssetDetail();
 
-    expect(screen.queryByRole('heading', { name: /study this moment/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /transcript review/i })).toBeInTheDocument();
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['Transcript', 'Ask', 'Details']);
+    expect(screen.queryByRole('heading', { name: /search result in context/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /^transcript$/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /ask this video/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /^details$/i })).toBeInTheDocument();
     expect(screen.getByText(/first we define happens-before/i)).toBeInTheDocument();
+  });
+
+  it('uses deliberate Transcript, Ask, and Details tabs in the mobile study layout', async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal('matchMedia', vi.fn(() => ({
+      matches: true,
+      media: '(max-width: 760px)',
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })));
+
+    renderAssetDetail();
+
+    expect(document.getElementById('study-pane-ask')).toHaveAttribute('hidden');
+    await user.click(screen.getByRole('tab', { name: 'Ask' }));
+    expect(screen.getByRole('tab', { name: 'Ask' })).toHaveAttribute('aria-selected', 'true');
+    expect(document.getElementById('study-pane-transcript')).toHaveAttribute('hidden');
+    expect(screen.getByRole('heading', { name: 'Ask this video' })).toBeInTheDocument();
   });
 
   it('shows safe feedback when the selected row is missing from the visible transcript', () => {
@@ -338,8 +361,8 @@ describe('search-to-study workflow', () => {
       studyContextResponse: undefined,
     });
 
-    expect(screen.getByText(/context not available yet/i)).toBeInTheDocument();
-    expect(screen.getByText(/selected search row is not visible in this transcript/i)).toBeInTheDocument();
+    expect(screen.getByText(/context unavailable/i)).toBeInTheDocument();
+    expect(screen.getByText(/selected moment is not visible/i)).toBeInTheDocument();
   });
 
   it('keeps a search-return action when detail was opened from search', async () => {
@@ -368,7 +391,7 @@ describe('search-to-study workflow', () => {
       onOpenResultContext,
     });
 
-    const action = screen.getByRole('button', { name: /study result 1 in vector clocks lecture/i });
+    const action = screen.getByRole('button', { name: /open result 1 in vector clocks lecture/i });
     action.focus();
     await user.keyboard('{Enter}');
 

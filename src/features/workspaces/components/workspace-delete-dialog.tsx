@@ -13,47 +13,47 @@ function getDeleteErrorCopy(error: unknown): DeleteErrorCopy | null {
   if (!isApiClientError(error)) {
     return error ? {
       tone: 'error',
-      title: 'Không thể xóa workspace',
-      message: 'Workspace chưa bị xóa. Vui lòng thử lại sau.',
+      title: 'Could not delete workspace',
+      message: 'The workspace was not deleted. Try again later.',
     } : null;
   }
 
   if (error.status === 409 && error.code === 'DEFAULT_WORKSPACE_DELETE_FORBIDDEN') {
     return {
       tone: 'warning',
-      title: 'Không thể xóa workspace mặc định',
-      message: 'Workspace mặc định được bảo vệ và không thể xóa.',
+      title: 'Default workspace cannot be deleted',
+      message: 'The default workspace is protected.',
     };
   }
 
   if (error.status === 409 && error.code === 'WORKSPACE_NOT_EMPTY') {
     return {
       tone: 'warning',
-      title: 'Workspace vẫn còn tài liệu',
-      message: 'Hãy xóa các tài liệu trong workspace trước rồi thử lại.',
+      title: 'Workspace still contains videos',
+      message: 'Delete its videos before trying again.',
     };
   }
 
   if (error.status === 404) {
     return {
       tone: 'warning',
-      title: 'Không tìm thấy workspace',
-      message: 'Workspace không còn tồn tại hoặc bạn không có quyền truy cập.',
+      title: 'Workspace not found',
+      message: 'It no longer exists or you do not have access.',
     };
   }
 
   if (error.status === 0) {
     return {
       tone: 'error',
-      title: 'Chưa thể xóa workspace',
-      message: 'Kiểm tra kết nối mạng rồi thử lại. Workspace chưa bị xóa.',
+      title: 'Could not delete workspace',
+      message: 'Check your connection and try again. The workspace was not deleted.',
     };
   }
 
   return {
     tone: 'error',
-    title: 'Không thể xóa workspace',
-    message: 'Workspace chưa bị xóa. Vui lòng thử lại sau.',
+    title: 'Could not delete workspace',
+    message: 'The workspace was not deleted. Try again later.',
   };
 }
 
@@ -71,6 +71,7 @@ export function WorkspaceDeleteDialog({
   onCancel: () => void;
 }) {
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLElement>(null);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const errorCopy = getDeleteErrorCopy(error);
   const isBusy = isDeleting || hasSubmitted;
@@ -91,6 +92,20 @@ export function WorkspaceDeleteDialog({
       if (event.key === 'Escape' && !isBusy) {
         event.preventDefault();
         onCancel();
+        return;
+      }
+
+      if (event.key !== 'Tab') return;
+      const focusable = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>('button:not([disabled])') ?? []);
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
       }
     }
 
@@ -110,6 +125,7 @@ export function WorkspaceDeleteDialog({
   return (
     <div className="workspace-delete-dialog__backdrop" role="presentation">
       <section
+        ref={dialogRef}
         className="workspace-delete-dialog"
         role="dialog"
         aria-modal="true"

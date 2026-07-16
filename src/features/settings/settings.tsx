@@ -1,50 +1,50 @@
 import type { ReactNode } from 'react';
-import { Section } from '../../lib/ui';
+import { Button, ErrorBanner, Section } from '../../lib/ui';
+import { getFriendlyLogoutErrorCopy } from '../auth/auth';
 
 type SettingsScreenProps = {
   currentUserEmail: string;
-  selectedWorkspaceName: string | null;
   workspaceManagement: ReactNode;
+  logoutError: unknown;
+  isLoggingOut: boolean;
+  onLogout: () => void;
 };
 
 export function SettingsScreen({
   currentUserEmail,
-  selectedWorkspaceName,
   workspaceManagement,
+  logoutError,
+  isLoggingOut,
+  onLogout,
 }: SettingsScreenProps) {
-  return (
-    <div className="screen-grid screen-grid--settings">
-      <div className="screen-main">{workspaceManagement}</div>
+  const logoutErrorCopy = getFriendlyLogoutErrorCopy(logoutError);
 
-      <div className="screen-side">
-        <Section title="Account" eyebrow="Authenticated session">
-          <div className="summary-list">
-            <div className="summary-list__item">
-              <span className="summary-list__label">Signed in as</span>
-              <strong>{currentUserEmail}</strong>
-            </div>
-            <div className="summary-list__item">
-              <span className="summary-list__label">Current workspace</span>
-              <strong>{selectedWorkspaceName ?? 'No workspace selected'}</strong>
-            </div>
-          </div>
+  return (
+    <div className="screen-stack settings-screen">
+      <header className="page-header">
+        <div className="page-header__copy">
+          <p className="hero__eyebrow">Settings</p>
+          <h1>Workspace and account</h1>
+          <p>Manage your current workspace or sign out.</p>
+        </div>
+      </header>
+
+      <div className="settings-layout">
+        <Section title="Workspace management" className="settings-workspace">
+          {workspaceManagement}
         </Section>
 
-        <Section title="Current product rules" eyebrow="Product lifecycle">
-          <div className="summary-list">
-            <div className="summary-list__item">
-              <span className="summary-list__label">Upload flow</span>
-              <strong>Lecture video first</strong>
-            </div>
-            <div className="summary-list__item">
-              <span className="summary-list__label">Search availability</span>
-              <strong>After automatic indexing</strong>
-            </div>
-            <div className="summary-list__item">
-              <span className="summary-list__label">Workspace delete</span>
-              <strong>Only empty non-default workspaces</strong>
-            </div>
+        <Section title="Account" className="settings-account">
+          <div className="account-details">
+            <span>Email</span>
+            <strong>{currentUserEmail}</strong>
           </div>
+          <Button type="button" tone="ghost" onClick={onLogout} disabled={isLoggingOut}>
+            {isLoggingOut ? 'Signing out...' : 'Sign out'}
+          </Button>
+          {logoutError ? (
+            <ErrorBanner error={logoutError} title={logoutErrorCopy?.title} message={logoutErrorCopy?.message} />
+          ) : null}
         </Section>
       </div>
     </div>

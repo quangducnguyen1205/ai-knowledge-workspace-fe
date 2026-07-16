@@ -105,6 +105,8 @@ describe('auth mode UI boundary', () => {
 
     renderApp(legacyConfig);
 
+    expect(await screen.findByRole('heading', { name: /turn long videos into knowledge/i })).toBeInTheDocument();
+    await userEvent.click(screen.getAllByRole('link', { name: /^sign in$/i })[0]!);
     expect(await screen.findByRole('heading', { name: /sign in to your workspace/i })).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText(/email/i), 'learner@example.com');
     await userEvent.type(screen.getByLabelText(/password/i), passwordInput);
@@ -122,6 +124,19 @@ describe('auth mode UI boundary', () => {
     });
   });
 
+  it('navigates between the signed-out landing, login, and registration routes', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ code: 'AUTHENTICATION_REQUIRED' }, 401)));
+    renderApp(legacyConfig);
+
+    await userEvent.click((await screen.findAllByRole('link', { name: 'Get started' }))[0]!);
+    expect(window.location.hash).toBe('#/register');
+    expect(await screen.findByRole('heading', { name: 'Create your account' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    expect(window.location.hash).toBe('#/login');
+    expect(await screen.findByRole('heading', { name: 'Sign in to your workspace' })).toBeInTheDocument();
+  });
+
   it('shows only the Keycloak action in JWT mode and does not use legacy password login', async () => {
     const fetchMock = vi.fn(async (_input?: RequestInfo | URL, _init?: RequestInit) =>
       jsonResponse({ code: 'AUTHENTICATION_REQUIRED' }, 401),
@@ -131,10 +146,11 @@ describe('auth mode UI boundary', () => {
 
     renderApp(keycloakConfig, oidcClient);
 
-    expect(await screen.findByRole('button', { name: /continue with keycloak/i })).toBeInTheDocument();
+    await userEvent.click((await screen.findAllByRole('link', { name: /^sign in$/i }))[0]!);
+    expect(await screen.findByRole('button', { name: /continue to sign in/i })).toBeInTheDocument();
     expect(screen.queryByLabelText(/password/i)).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: /continue with keycloak/i }));
+    await userEvent.click(screen.getByRole('button', { name: /continue to sign in/i }));
 
     expect(oidcClient.startLogin).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls.some(([input]) => String(input) === '/api/auth/login')).toBe(false);
@@ -154,9 +170,10 @@ describe('auth mode UI boundary', () => {
 
     renderApp(missingConfig, oidcClient);
 
-    expect(await screen.findByText('Cấu hình đăng nhập chưa sẵn sàng')).toBeInTheDocument();
+    await userEvent.click((await screen.findAllByRole('link', { name: /^sign in$/i }))[0]!);
+    expect(await screen.findByText('Sign in is not configured')).toBeInTheDocument();
     expect(screen.queryByText(/VITE_KEYCLOAK_REALM/)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /continue with keycloak/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /continue to sign in/i })).toBeDisabled();
     expect(oidcClient.startLogin).not.toHaveBeenCalled();
   });
 
@@ -191,7 +208,8 @@ describe('auth mode UI boundary', () => {
 
     renderApp(keycloakConfig, oidcClient);
 
-    expect(await screen.findAllByText('spring-product@example.com')).not.toHaveLength(0);
+    await userEvent.click(await screen.findByRole('button', { name: 'Open account menu' }));
+    expect(await screen.findByText('spring-product@example.com')).toBeInTheDocument();
     expect(requestHeaders(fetchMock, '/api/me').get('Authorization')).toBe(`Bearer ${bearerValue}`);
     expect(screen.queryByText(/workspace-admin/i)).not.toBeInTheDocument();
     expect(window.location.search).toBe('');
@@ -224,14 +242,14 @@ describe('auth mode UI boundary', () => {
 
     renderApp(legacyConfig);
 
-    expect(await screen.findByRole('heading', { name: /workspace home/i, level: 1 })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /welcome back/i, level: 1 })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /skip to content/i })).toHaveAttribute('href', '#main-content');
-    expect(screen.getByRole('navigation', { name: /product navigation/i })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: /primary navigation/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: 'Library' })).toHaveAttribute('href', '#/library');
     expect(screen.getByRole('button', { name: 'Upload' })).toBeEnabled();
 
-    const menuButton = screen.getByRole('button', { name: /menu/i });
+    const menuButton = screen.getByRole('button', { name: /^menu$/i });
     await user.click(menuButton);
     expect(menuButton).toHaveAttribute('aria-expanded', 'true');
 
@@ -268,10 +286,11 @@ describe('auth mode UI boundary', () => {
 
     renderApp(keycloakConfig, oidcClient, { strictMode: true });
 
-    expect(await screen.findByText(/completing keycloak sign-in/i)).toBeInTheDocument();
+    expect(await screen.findByText(/completing sign in/i)).toBeInTheDocument();
     resolveCallback({ accessToken: bearerValue });
 
-    expect(await screen.findAllByText('strict-mode-product@example.com')).not.toHaveLength(0);
+    await userEvent.click(await screen.findByRole('button', { name: 'Open account menu' }));
+    expect(await screen.findByText('strict-mode-product@example.com')).toBeInTheDocument();
     expect(oidcClient.completeSignInRedirect).toHaveBeenCalledTimes(1);
     expect(requestHeaders(fetchMock, '/api/me').get('Authorization')).toBe(`Bearer ${bearerValue}`);
     expect(window.location.search).toBe('');
@@ -295,7 +314,7 @@ describe('auth mode UI boundary', () => {
 
     renderApp(keycloakConfig, oidcClient);
 
-    expect(await screen.findByText('Phương thức đăng nhập chưa sẵn sàng')).toBeInTheDocument();
+    expect(await screen.findByText('Sign in is temporarily unavailable')).toBeInTheDocument();
     expect(screen.queryByText(/Legacy session authentication/)).not.toBeInTheDocument();
     expect(oidcClient.startLogin).not.toHaveBeenCalled();
     expect(fetchMock.mock.calls.filter(([input]) => String(input) === '/api/me')).toHaveLength(1);

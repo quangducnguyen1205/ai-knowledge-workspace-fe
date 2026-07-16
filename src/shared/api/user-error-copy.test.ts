@@ -9,8 +9,8 @@ describe('getUserSafeErrorCopy', () => {
       'raw provider response from http://internal-service:8000',
       'INVALID_UPLOAD_FILE',
     ))).toEqual({
-      title: 'Tệp tải lên không được hỗ trợ',
-      message: 'Chọn tệp video MP4, MOV, M4V, WebM hoặc AVI hợp lệ.',
+      title: 'Video format is not supported',
+      message: 'Choose an MP4, MOV, M4V, WebM, or AVI video.',
     });
   });
 
@@ -21,15 +21,15 @@ describe('getUserSafeErrorCopy', () => {
       'ASSISTANT_SERVICE_UNAVAILABLE',
     ));
 
-    expect(copy.title).toBe('Trợ lý tạm thời chưa sẵn sàng');
+    expect(copy.title).toBe('Answers are temporarily unavailable');
     expect(JSON.stringify(copy)).not.toMatch(/FastAPI|Elasticsearch|HTTP 500|raw body/i);
   });
 
   it('uses HTTP status when the code is unknown', () => {
     expect(getUserSafeErrorCopy(new ApiClientError(404, 'java.package.InternalException', 'UNKNOWN_CODE')))
       .toEqual({
-        title: 'Không tìm thấy nội dung',
-        message: 'Nội dung không còn tồn tại hoặc bạn không có quyền truy cập.',
+        title: 'Content not found',
+        message: 'It no longer exists or you do not have access.',
       });
   });
 

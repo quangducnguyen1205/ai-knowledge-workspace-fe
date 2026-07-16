@@ -1,20 +1,17 @@
 import type { FormEvent } from 'react';
 import type { AssistantAnswerCitation } from '../model/types';
-import { Button, EmptyState, ErrorBanner, InfoBanner, LoadingBlock, Section } from '../../../lib/ui';
+import { Button, ErrorBanner, LoadingBlock, Section } from '../../../lib/ui';
 import { useAssetAssistant } from '../hooks/use-asset-assistant';
 import { getGenericAssistantErrorMessage } from '../model/assistant-state';
 import { AssistantAnswerPanel } from './assistant-answer-panel';
 
 export function AssetAssistantPanel({
   workspaceId,
-  workspaceName,
   assetId,
-  assetTitle,
   isAssetSearchable,
   onOpenCitationContext,
 }: {
   workspaceId: string;
-  workspaceName: string;
   assetId: string;
   assetTitle: string;
   isAssetSearchable: boolean;
@@ -30,11 +27,7 @@ export function AssetAssistantPanel({
   }
 
   return (
-    <Section
-      title="Ask this asset"
-      eyebrow={assetTitle}
-      actions={<span className="panel-pill">{isAssetSearchable ? 'Transcript sources ready' : 'Waiting for search'}</span>}
-    >
+    <Section title="Ask this video" className="assistant-panel">
       <form className="assistant-form" onSubmit={handleSubmit}>
         <label className="field assistant-form__field" htmlFor="asset-assistant-question">
           <span className="field__label">Question</span>
@@ -43,18 +36,14 @@ export function AssetAssistantPanel({
             className="field__input field__input--textarea"
             value={assistant.question}
             onChange={(event) => assistant.updateQuestion(event.target.value)}
-            placeholder={isAssetSearchable
-              ? 'Ask a focused question about this transcript...'
-              : 'Index this asset before asking transcript-grounded questions'}
+            placeholder={isAssetSearchable ? 'Ask a question about this video' : 'Available when this video is ready'}
             disabled={assistant.isLoading || !isAssetSearchable}
             aria-describedby={assistant.validationError ? `${questionHintId} ${questionErrorId}` : questionHintId}
             aria-invalid={Boolean(assistant.validationError)}
-            rows={4}
+            rows={3}
             maxLength={500}
           />
-          <span id={questionHintId} className="field__hint">
-            Answers stay scoped to {workspaceName} and this asset.
-          </span>
+          <span id={questionHintId} className="field__hint">Answers include links to supporting transcript moments.</span>
           {assistant.validationError ? (
             <span id={questionErrorId} className="field__hint field__hint--error" role="alert">
               {assistant.validationError}
@@ -68,27 +57,13 @@ export function AssetAssistantPanel({
         </div>
       </form>
 
-      <InfoBanner
-        title="Source check"
-        message="Review the cited transcript sources before relying on this answer."
-        detail="Answers are generated from transcript context for the active workspace and asset."
-      />
-      {!isAssetSearchable ? (
-        <InfoBanner
-          tone="warning"
-          title="Assistant unlocks after indexing"
-          message="This asset must be searchable before the assistant can answer with transcript citations."
-        />
-      ) : null}
+      {!isAssetSearchable ? <p className="assistant-availability" role="status">Ask will be available when this video is ready.</p> : null}
 
       <div className="assistant-status" aria-live="polite" aria-atomic="false">
-        {assistant.result.status === 'idle' ? (
-          <EmptyState
-            title="Ask about this transcript"
-            description="Submit one focused question to get a concise answer with transcript references for this asset."
-          />
+        {assistant.result.status === 'idle' && isAssetSearchable ? (
+          <p className="assistant-idle">Ask about a concept, argument, or detail from this video.</p>
         ) : null}
-        {assistant.result.status === 'loading' ? <LoadingBlock label="Generating answer from transcript sources..." /> : null}
+        {assistant.result.status === 'loading' ? <LoadingBlock label="Finding an answer..." compact /> : null}
         {assistant.result.status === 'success' || assistant.result.status === 'insufficient' ? (
           <AssistantAnswerPanel
             question={assistant.result.question}
@@ -99,16 +74,12 @@ export function AssetAssistantPanel({
         {assistant.result.status === 'unavailable' ? (
           <ErrorBanner
             error={assistant.result.error}
-            title="Assistant answers are unavailable"
-            message="Answers are not available right now. You can still review the transcript and search results for this asset."
+            title="Answers are temporarily unavailable"
+            message="You can still read and search this transcript. Try asking again later."
           />
         ) : null}
         {assistant.result.status === 'error' ? (
-          <ErrorBanner
-            error={assistant.result.error}
-            title="Assistant request failed"
-            message={getGenericAssistantErrorMessage(assistant.result.error)}
-          />
+          <ErrorBanner error={assistant.result.error} title="Could not answer this question" message={getGenericAssistantErrorMessage(assistant.result.error)} />
         ) : null}
       </div>
     </Section>

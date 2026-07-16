@@ -67,7 +67,7 @@ function getInitialKeycloakPhase(config: FrontendAuthConfig): KeycloakAuthPhase 
 }
 
 function getErrorMessage(_error: unknown): string {
-  return 'Không thể hoàn tất đăng nhập. Vui lòng thử lại.';
+  return 'Sign in could not be completed. Try again.';
 }
 
 export function AuthProvider({
@@ -110,7 +110,7 @@ export function AuthProvider({
     }
 
     clearBearerToken();
-    setAuthErrorMessage('Phương thức đăng nhập hiện tại chưa được hệ thống chấp nhận.');
+    setAuthErrorMessage('The current sign-in method is not available.');
     setKeycloakPhase('auth_mode_unavailable');
     queryClient.removeQueries({ queryKey: ['auth', 'me'] });
   }, [clearBearerToken, config.mode, queryClient]);

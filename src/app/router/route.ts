@@ -1,6 +1,8 @@
 export type AppRoute =
   | { name: 'home' }
-  | { name: 'library' }
+  | { name: 'login' }
+  | { name: 'register' }
+  | { name: 'library'; upload?: boolean }
   | {
       name: 'asset';
       assetId: string;
@@ -26,8 +28,16 @@ export function parseRoute(hash: string): AppRoute {
   const searchParams = new URLSearchParams(queryString);
   const segments = pathname.split('/').filter(Boolean);
 
+  if (segments[0] === 'login') {
+    return { name: 'login' };
+  }
+
+  if (segments[0] === 'register') {
+    return { name: 'register' };
+  }
+
   if (segments[0] === 'library') {
-    return { name: 'library' };
+    return searchParams.get('upload') === '1' ? { name: 'library', upload: true } : { name: 'library' };
   }
 
   if (segments[0] === 'search') {
@@ -62,8 +72,12 @@ export function routeToHash(route: AppRoute): string {
   switch (route.name) {
     case 'home':
       return '#/';
+    case 'login':
+      return '#/login';
+    case 'register':
+      return '#/register';
     case 'library':
-      return '#/library';
+      return route.upload ? '#/library?upload=1' : '#/library';
     case 'search':
       {
         const params = new URLSearchParams();

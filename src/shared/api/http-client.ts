@@ -45,8 +45,8 @@ export function buildQueryString(params: Record<string, string | undefined>): st
 
 function getSafeTransportErrorMessage(status: number): string {
   return status === 0
-    ? 'Không thể kết nối đến dịch vụ.'
-    : 'Yêu cầu không thể hoàn tất.';
+    ? 'Could not connect to the service.'
+    : 'The request could not be completed.';
 }
 
 function getErrorCode(payload: unknown): string | undefined {

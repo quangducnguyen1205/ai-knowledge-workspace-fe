@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import type { SearchResponse, SearchResult } from './api/search-api';
 import type { TranscriptContextResponse } from '../../entities/transcript/model/types';
 import { buildTranscriptDisplayRows, matchesTranscriptReference } from '../../entities/transcript/model/transcript-display';
-import { Button, EmptyState, ErrorBanner, InfoBanner, LoadingBlock, Section, formatDateTime, formatScore } from '../../lib/ui';
+import { Button, EmptyState, ErrorBanner, LoadingBlock, Section } from '../../lib/ui';
 import { resolveTranscriptLookupId } from './model/search-result-reference';
 
 type SearchPanelScope = {
@@ -24,6 +24,7 @@ export function SearchPanel({
   selectedResult,
   routeQuery,
   scope,
+  embedded = false,
   onSearch,
   onSelectResult,
   onOpenResultContext,
@@ -41,340 +42,199 @@ export function SearchPanel({
   selectedResult: SearchResult | null;
   routeQuery?: string | null;
   scope?: SearchPanelScope;
+  embedded?: boolean;
   onSearch: (query: string) => void;
   onSelectResult: (result: SearchResult) => void;
   onOpenResultContext?: (result: SearchResult) => void;
 }) {
   const [searchInput, setSearchInput] = useState('');
-  const [contextSpotlightActive, setContextSpotlightActive] = useState(false);
-  const contextPanelRef = useRef<HTMLDivElement | null>(null);
-  const contextSpotlightTimeoutRef = useRef<number | null>(null);
   const routeQueryDraft = routeQuery?.trim() || null;
   const isAssetScoped = scope?.mode === 'asset';
-  const scopeTitle = isAssetScoped ? scope?.assetTitle ?? 'Current video' : workspaceName;
-  const searchTitle = isAssetScoped ? 'Search within this video' : 'Workspace Search';
-  const resultScopeCopy = isAssetScoped ? 'Scoped to this video' : 'Scoped to the active workspace';
-  const opensAssetContext = Boolean(onOpenResultContext);
-  const contextActionCopy = opensAssetContext ? 'Study this moment' : 'Open transcript context';
   const searchEnabled = searchableAssetCount > 0;
-  const searchAvailabilityLabel = isAssetScoped
-    ? searchEnabled
-      ? 'Searchable now'
-      : 'Not searchable yet'
-    : `${searchableAssetCount} searchable ${searchableAssetCount === 1 ? 'asset' : 'assets'}`;
   const hasSearchResults = Boolean(searchResponse?.results.length);
-  const selectedResultKey = !opensAssetContext && selectedResult
-    ? `${selectedResult.assetId}-${selectedResult.transcriptRowId ?? 'no-row'}-${selectedResult.segmentIndex ?? 'na'}`
-    : null;
   const displayContextRows = useMemo(
     () => (contextResponse?.rows.length ? buildTranscriptDisplayRows(contextResponse.rows) : []),
     [contextResponse?.rows],
   );
-  const searchPromptState = !activeQuery
-    ? {
-        title: isAssetScoped ? 'Search within this video' : 'Search this workspace',
-        description: isAssetScoped
-          ? 'Run a query after this video is indexed. Results stay limited to the current asset.'
-          : 'Run a query after at least one asset is indexed. Results stay scoped to the active workspace.',
-      }
-    : hasSearchResults
-      ? {
-          title: opensAssetContext ? 'Choose a result to study' : 'Choose a result to open context',
-          description: opensAssetContext
-            ? 'Open a result in its asset detail page to keep reading nearby transcript context.'
-            : 'Choose a result to inspect the surrounding transcript rows for that hit.',
-        }
-      : {
-          title: 'No transcript context selected yet',
-          description: 'Run a query with at least one hit, then open a result to inspect transcript context.',
-      };
-  const contextEmptyState = !activeQuery
-    ? {
-        title: 'Search first, then open context',
-        description: isAssetScoped
-          ? 'Run a video search to choose one result and open its transcript context window.'
-          : opensAssetContext
-            ? 'Run a workspace search to choose one result and open it in the asset detail study surface.'
-            : 'Run a workspace search to choose one result and open its transcript context window.',
-      }
-    : hasSearchResults
-      ? {
-          title: 'Choose a result to open context',
-          description: opensAssetContext
-            ? 'Use a result action above to open the matching asset and nearby transcript context.'
-            : 'Choose one enabled result card above to inspect the surrounding transcript rows for that hit.',
-        }
-      : {
-          title: 'No transcript context available yet',
-          description: 'The current query returned no hits in this workspace, so there is no transcript context to open.',
-        };
+  const resultGroups = useMemo(() => {
+    if (isAssetScoped) return [];
+    const groups = new Map<string, { assetTitle: string; results: SearchResult[] }>();
+    for (const result of searchResponse?.results ?? []) {
+      const group = groups.get(result.assetId) ?? { assetTitle: result.assetTitle, results: [] };
+      group.results.push(result);
+      groups.set(result.assetId, group);
+    }
+    return Array.from(groups.entries()).map(([assetId, group]) => ({ assetId, ...group }));
+  }, [isAssetScoped, searchResponse?.results]);
 
   useEffect(() => {
-    if (routeQueryDraft) {
-      setSearchInput(routeQueryDraft);
-      return;
-    }
-
-    setSearchInput('');
+    setSearchInput(routeQueryDraft ?? '');
   }, [resetToken, routeQueryDraft, workspaceName]);
-
-  useEffect(() => {
-    if (contextSpotlightTimeoutRef.current !== null) {
-      window.clearTimeout(contextSpotlightTimeoutRef.current);
-      contextSpotlightTimeoutRef.current = null;
-    }
-
-    if (!selectedResultKey) {
-      setContextSpotlightActive(false);
-      return;
-    }
-
-    setContextSpotlightActive(true);
-
-    const frameId = window.requestAnimationFrame(() => {
-      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-      contextPanelRef.current?.scrollIntoView({
-        behavior: prefersReducedMotion ? 'auto' : 'smooth',
-        block: 'start',
-      });
-    });
-
-    contextSpotlightTimeoutRef.current = window.setTimeout(() => {
-      setContextSpotlightActive(false);
-      contextSpotlightTimeoutRef.current = null;
-    }, 1800);
-
-    return () => {
-      window.cancelAnimationFrame(frameId);
-
-      if (contextSpotlightTimeoutRef.current !== null) {
-        window.clearTimeout(contextSpotlightTimeoutRef.current);
-        contextSpotlightTimeoutRef.current = null;
-      }
-    };
-  }, [selectedResultKey]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmedQuery = searchInput.trim();
-
-    if (!trimmedQuery || !searchEnabled) {
-      return;
-    }
-
-    onSearch(trimmedQuery);
+    if (trimmedQuery && searchEnabled) onSearch(trimmedQuery);
   }
 
-  return (
-    <Section
-      title={searchTitle}
-      eyebrow={scopeTitle}
-      actions={<span className="panel-pill">{searchAvailabilityLabel}</span>}
-    >
-      <form className="stack" onSubmit={handleSubmit}>
-        <label className="field">
-          <span className="field__label">{isAssetScoped ? 'Search transcript text in this video' : 'Search transcript text'}</span>
-          <div className="search-form">
-            <input
-              className="field__input"
-              type="text"
-              value={searchInput}
-              onChange={(event) => setSearchInput(event.target.value)}
-              placeholder={
-                searchEnabled
-                  ? 'consensus, paging, normalization, binary trees...'
-                  : isAssetScoped
-                    ? 'Index this video to enable search within it'
-                    : 'Index one asset in this workspace to enable search'
-              }
-              disabled={!searchEnabled}
-            />
-            <Button type="submit" disabled={!searchEnabled || !searchInput.trim() || isSearching}>
-              {isSearching ? 'Searching...' : 'Search'}
-            </Button>
+  function renderResult(result: SearchResult, index: number): ReactNode {
+    const lookupId = resolveTranscriptLookupId(result);
+    const hasContextAction = Boolean(lookupId);
+    const isSelected =
+      selectedResult?.assetId === result.assetId &&
+      selectedResult?.transcriptRowId === result.transcriptRowId &&
+      selectedResult?.segmentIndex === result.segmentIndex;
+
+    return (
+      <article
+        className={`search-result ${isSelected ? 'search-result--selected' : ''} ${!hasContextAction ? 'search-result--disabled' : ''}`}
+        aria-current={isSelected ? 'true' : undefined}
+      >
+        <div className="search-result__header">
+          <span className="search-result__rank">Moment {result.segmentIndex ?? index + 1}</span>
+        </div>
+        <p>{result.text}</p>
+        <div className="search-result__footer">
+          <Button
+            type="button"
+            tone={onOpenResultContext ? 'primary' : 'secondary'}
+            className="search-result__action-button"
+            onClick={() => onOpenResultContext ? onOpenResultContext(result) : onSelectResult(result)}
+            disabled={!hasContextAction}
+            aria-label={onOpenResultContext
+              ? `Open result ${index + 1} in ${result.assetTitle}`
+              : `Show transcript context for result ${index + 1} in ${result.assetTitle}`}
+          >
+            {!hasContextAction ? 'Unavailable' : onOpenResultContext ? 'Open in video' : isSelected ? 'Context shown' : 'Show context'}
+          </Button>
+        </div>
+      </article>
+    );
+  }
+
+  const content = (
+    <div className={`search-panel ${isAssetScoped ? 'search-panel--asset' : 'search-panel--workspace'}`}>
+      {isAssetScoped ? (
+        <div className="study-pane__header search-panel__heading">
+          <div>
+            <p className="panel__eyebrow">Transcript</p>
+            <h2>Find in transcript</h2>
           </div>
+          <span className="panel-pill">{searchEnabled ? 'Ready' : 'Unavailable'}</span>
+        </div>
+      ) : null}
+
+      <form className="search-form" onSubmit={handleSubmit} role="search">
+        <label className="field field--grow">
+          <span className="field__label">{isAssetScoped ? 'Find in transcript' : 'Search workspace'}</span>
+          <input
+            className="field__input search-form__input"
+            type="search"
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            placeholder={searchEnabled
+              ? isAssetScoped ? 'Find a word or phrase' : 'Search across video transcripts'
+              : isAssetScoped ? 'Available when this video is ready' : 'Upload a video to begin searching'}
+            disabled={!searchEnabled}
+          />
         </label>
+        <Button type="submit" disabled={!searchEnabled || !searchInput.trim() || isSearching}>
+          {isSearching ? 'Searching...' : 'Search'}
+        </Button>
       </form>
 
-      <InfoBanner
-        title={`Search scope: ${scopeTitle}`}
-        message={
-          isAssetScoped
-            ? 'Only indexed transcript rows inside this video are considered by this search panel.'
-            : 'Only indexed assets inside the active workspace are considered by this search panel.'
-        }
-        detail={
-          isAssetScoped
-            ? `Workspace: ${workspaceName}.`
-            : `${searchableAssetCount} searchable asset${searchableAssetCount === 1 ? '' : 's'} currently available.`
-        }
-      />
-
       {!searchEnabled ? (
-        <InfoBanner
-          tone="warning"
-          title="Search unlocks after indexing"
-          message={
-            isAssetScoped
-              ? 'This video is not searchable yet. Automatic indexing may still be finishing; use the asset fallback only if needed.'
-              : 'This workspace does not have any searchable assets yet. Automatic indexing may still be finishing.'
-          }
-        />
+        <p className="search-availability" role="status">
+          {isAssetScoped ? 'Find in transcript will be available when this video is ready.' : 'Search will be available when a video is ready.'}
+        </p>
       ) : null}
 
       {searchError ? <ErrorBanner error={searchError} /> : null}
+      {isSearching ? <LoadingBlock label={isAssetScoped ? 'Searching this transcript...' : 'Searching your workspace...'} compact /> : null}
 
-      {activeQuery ? (
-        <div className="search-summary">
-          <strong>{searchResponse?.resultCount ?? 0}</strong>
-          <span>
-            results for <code>{activeQuery}</code> in {isAssetScoped ? 'this video' : workspaceName}
-          </span>
-        </div>
-      ) : (
-        <EmptyState title={searchPromptState.title} description={searchPromptState.description} />
-      )}
-
-      {isSearching ? <LoadingBlock label="Searching transcript content..." /> : null}
-
-      {!isSearching && activeQuery && !searchError && !searchResponse?.results.length ? (
+      {!activeQuery && !isSearching ? (
         <EmptyState
-          title={isAssetScoped ? 'No matches in this video' : 'No matches in this workspace'}
-          description={
-            isAssetScoped
-              ? 'Try a different phrase or a broader topic from this video transcript.'
-              : 'Try a different phrase, broader topic, or another indexed asset in this workspace.'
-          }
+          title={isAssetScoped ? 'Find an exact moment' : 'Search your learning workspace'}
+          description={isAssetScoped ? 'Enter a word or phrase from this video.' : 'Enter a topic or phrase to find it across your videos.'}
         />
       ) : null}
 
-      {searchResponse?.results.length ? (
-        <ul className="search-results">
-          {searchResponse.results.map((result, index) => {
-            const lookupId = resolveTranscriptLookupId(result);
-            const hasContextAction = Boolean(lookupId);
-            const isSelected =
-              selectedResult?.assetId === result.assetId &&
-              selectedResult?.transcriptRowId === result.transcriptRowId &&
-              selectedResult?.segmentIndex === result.segmentIndex;
-
-            return (
-              <li key={`${result.assetId}-${lookupId ?? 'no-row'}-${result.segmentIndex ?? 'na'}`}>
-                <article
-                  className={`search-result ${isSelected ? 'search-result--selected' : ''} ${!hasContextAction ? 'search-result--disabled' : ''}`}
-                  aria-current={isSelected ? 'true' : undefined}
-                >
-                  <div className="search-result__header">
-                    <div className="search-result__title">
-                      <span className="search-result__rank">Result {index + 1}</span>
-                      <strong>{result.assetTitle}</strong>
-                    </div>
-                    <span className="search-result__score">score {formatScore(result.score)}</span>
-                  </div>
-                  <p>{result.text}</p>
-                  <div className="search-result__meta">
-                    <span>Moment: Segment {result.segmentIndex ?? 'n/a'}</span>
-                    <span>{formatDateTime(result.createdAt)}</span>
-                    <span>{workspaceName}</span>
-                  </div>
-                  <div className="search-result__footer">
-                    <span className="search-result__scope">{resultScopeCopy}</span>
-                    <Button
-                      type="button"
-                      tone={opensAssetContext ? 'primary' : 'secondary'}
-                      className="search-result__action-button"
-                      onClick={() => {
-                        if (onOpenResultContext) {
-                          onOpenResultContext(result);
-                          return;
-                        }
-
-                        onSelectResult(result);
-                      }}
-                      disabled={!hasContextAction}
-                      aria-label={
-                        opensAssetContext
-                          ? `Study result ${index + 1} in ${result.assetTitle}`
-                          : `Open transcript context for result ${index + 1} in ${result.assetTitle}`
-                      }
-                    >
-                      {!hasContextAction ? 'Context unavailable' : isSelected ? 'Context shown below' : contextActionCopy}
-                    </Button>
-                  </div>
-                </article>
-              </li>
-            );
-          })}
-        </ul>
+      {!isSearching && activeQuery && !searchError && !hasSearchResults ? (
+        <EmptyState
+          title="No matches found"
+          description={isAssetScoped ? 'Try a broader phrase from this transcript.' : 'Try a broader phrase or a different topic.'}
+        />
       ) : null}
 
-      {!opensAssetContext ? (
-        <div
-          ref={contextPanelRef}
-          className={`context-panel ${contextSpotlightActive ? 'context-panel--spotlight' : ''}`}
-        >
-          <div className="panel-block__header">
-            <h3>Transcript context</h3>
-            <span className="context-panel__hint">Context window: 2 rows around the hit</span>
-          </div>
+      {activeQuery && hasSearchResults ? (
+        <p className="search-summary" role="status">
+          <strong>{searchResponse?.resultCount ?? searchResponse?.results.length ?? 0}</strong>{' '}
+          {(searchResponse?.resultCount ?? 0) === 1 ? 'match' : 'matches'} for “{activeQuery}”
+        </p>
+      ) : null}
 
-          {selectedResult ? (
-            <div className={`context-window__selected ${isContextLoading ? 'context-window__selected--pending' : ''}`}>
-              <p className="context-window__label">
-                {contextResponse
-                  ? 'Opened from selected result'
-                  : isContextLoading
-                    ? 'Loading selected result'
-                    : contextError
-                      ? 'Selected result with context error'
-                      : 'Selected result'}
-              </p>
-              <strong>{selectedResult.assetTitle}</strong>
-              <span>
-                Matched <code>{activeQuery ?? 'current query'}</code> inside {isAssetScoped ? 'this video' : workspaceName}
-              </span>
-              <p className="context-window__selected-copy">{selectedResult.text}</p>
-            </div>
-          ) : null}
+      {isAssetScoped && searchResponse?.results.length ? (
+        <ol className="search-results search-results--compact">
+          {searchResponse.results.map((result, index) => (
+            <li key={`${result.assetId}-${resolveTranscriptLookupId(result) ?? 'no-row'}-${result.segmentIndex ?? index}`}>
+              {renderResult(result, index)}
+            </li>
+          ))}
+        </ol>
+      ) : null}
 
-          {isContextLoading ? <LoadingBlock label="Loading transcript context..." compact /> : null}
-          {!isContextLoading && contextError ? <ErrorBanner error={contextError} /> : null}
-          {!isContextLoading && !contextError && !contextResponse ? (
-            <EmptyState title={contextEmptyState.title} description={contextEmptyState.description} />
-          ) : null}
-
-          {contextResponse ? (
-            <div className="context-window">
-              <div className="context-window__meta">
-                <span>Hit segment: {contextResponse.hitSegmentIndex ?? 'n/a'}</span>
-                <span>Window size: {contextResponse.window}</span>
-              </div>
-
-              <ol className="transcript-list transcript-list--compact">
-                {displayContextRows.map(({ row, displayText, overlapHidden }) => {
-                  const isHit = matchesTranscriptReference(row, contextResponse.transcriptRowId);
-
-                  return (
-                    <li
-                      key={row.id ?? `segment-${row.segmentIndex ?? 'missing'}`}
-                      className={`transcript-list__item ${isHit ? 'transcript-list__item--active' : ''}`}
-                    >
-                      <div className="transcript-list__meta">
-                        <span>Segment {row.segmentIndex ?? 'n/a'}</span>
-                        <span>{formatDateTime(row.createdAt)}</span>
-                        {overlapHidden ? <span className="transcript-overlap-note">Overlap hidden</span> : null}
-                        {isHit ? <span className="hit-pill">Hit row</span> : null}
-                      </div>
-                      <p>{displayText}</p>
-                    </li>
-                  );
-                })}
+      {!isAssetScoped && resultGroups.length ? (
+        <div className="search-result-groups">
+          {resultGroups.map((group, groupIndex) => (
+            <section key={group.assetId} className="search-result-group" aria-labelledby={`search-group-${groupIndex}`}>
+              <header>
+                <h2 id={`search-group-${groupIndex}`}>{group.assetTitle}</h2>
+                <span>{group.results.length} {group.results.length === 1 ? 'match' : 'matches'}</span>
+              </header>
+              <ol className="search-results">
+                {group.results.map((result, index) => (
+                  <li key={`${result.assetId}-${resolveTranscriptLookupId(result) ?? 'no-row'}-${result.segmentIndex ?? index}`}>
+                    {renderResult(result, index)}
+                  </li>
+                ))}
               </ol>
-            </div>
-          ) : null}
+            </section>
+          ))}
         </div>
       ) : null}
-    </Section>
+
+      {isAssetScoped && selectedResult ? (
+        <section className="context-panel" aria-labelledby="local-context-title">
+          <div className="panel-block__header">
+            <h2 id="local-context-title">Selected context</h2>
+            <span className="context-panel__hint">Around the matching moment</span>
+          </div>
+          {isContextLoading ? <LoadingBlock label="Loading context..." compact /> : null}
+          {!isContextLoading && contextError ? <ErrorBanner error={contextError} /> : null}
+          {!isContextLoading && !contextError && !contextResponse ? (
+            <EmptyState title="Choose a result" description="Select a match above to read the surrounding transcript." />
+          ) : null}
+          {contextResponse ? (
+            <ol className="transcript-list transcript-list--compact">
+              {displayContextRows.map(({ row, displayText }) => {
+                const isHit = matchesTranscriptReference(row, contextResponse.transcriptRowId);
+                return (
+                  <li key={row.id ?? `segment-${row.segmentIndex ?? 'missing'}`} className={`transcript-list__item ${isHit ? 'transcript-list__item--active' : ''}`}>
+                    <div className="transcript-list__meta">
+                      <span>Moment {row.segmentIndex ?? '—'}</span>
+                      {isHit ? <span className="hit-pill">Match</span> : null}
+                    </div>
+                    <p>{displayText}</p>
+                  </li>
+                );
+              })}
+            </ol>
+          ) : null}
+        </section>
+      ) : null}
+    </div>
   );
+
+  if (embedded) return content;
+  return <Section title={isAssetScoped ? 'Find in transcript' : 'Workspace Search'} eyebrow={isAssetScoped ? scope?.assetTitle : workspaceName}>{content}</Section>;
 }

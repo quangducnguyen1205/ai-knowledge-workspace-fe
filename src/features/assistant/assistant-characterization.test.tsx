@@ -13,7 +13,6 @@ function jsonResponse(payload: unknown, status = 200): Response {
 function renderAssistant(overrides: Partial<Parameters<typeof AssetAssistantPanel>[0]> = {}) {
   const props: Parameters<typeof AssetAssistantPanel>[0] = {
     workspaceId: 'workspace-1',
-    workspaceName: 'Distributed Systems',
     assetId: 'asset-1',
     assetTitle: 'Vector Clocks Lecture',
     isAssetSearchable: true,
@@ -76,11 +75,11 @@ describe('asset assistant characterization', () => {
       assetId: 'asset-1',
       question: 'What do vector clocks capture?',
     });
-    expect(screen.getAllByText(/source [12]/i).map((node) => node.textContent)).toEqual(['Source 1', 'Source 2']);
+    expect(screen.getAllByText(/citation [12]/i).map((node) => node.textContent)).toEqual(['Citation 1', 'Citation 2']);
 
     await user.click(
       screen.getByRole('button', {
-        name: 'Open transcript context for citation 2 in Vector Clocks Lecture',
+        name: 'Open citation 2 in transcript for Vector Clocks Lecture',
       }),
     );
     expect(props.onOpenCitationContext).toHaveBeenCalledWith(expect.objectContaining({ sourceId: 'source-4' }));
@@ -98,9 +97,8 @@ describe('asset assistant characterization', () => {
     await user.type(screen.getByRole('textbox', { name: /question/i }), 'What is not covered?');
     await user.click(screen.getByRole('button', { name: 'Ask' }));
 
-    expect(await screen.findByText('Insufficient context')).toBeInTheDocument();
     expect(screen.getByText(/does not contain enough context/i)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /open transcript context for citation/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /open citation .* in transcript/i })).not.toBeInTheDocument();
   });
 
   it('keeps invalid citations visible but non-interactive', async () => {
@@ -122,8 +120,8 @@ describe('asset assistant characterization', () => {
     await user.type(screen.getByRole('textbox', { name: /question/i }), 'Show the source.');
     await user.click(screen.getByRole('button', { name: 'Ask' }));
 
-    expect(await screen.findByText('Transcript context unavailable')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /open transcript context for citation/i })).not.toBeInTheDocument();
+    expect(await screen.findByText('Transcript moment unavailable')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /open citation .* in transcript/i })).not.toBeInTheDocument();
   });
 
   it('aborts the active request and resets answer state when asset scope changes', async () => {
@@ -141,12 +139,12 @@ describe('asset assistant characterization', () => {
 
     await user.type(screen.getByRole('textbox', { name: /question/i }), 'What is causality?');
     await user.click(screen.getByRole('button', { name: 'Ask' }));
-    expect(screen.getByText('Generating answer from transcript sources...')).toBeInTheDocument();
+    expect(screen.getByText('Finding an answer...')).toBeInTheDocument();
 
     rerender(<AssetAssistantPanel {...props} assetId="asset-2" assetTitle="Other Lecture" />);
     expect(requestSignal?.aborted).toBe(true);
     expect(screen.getByRole('textbox', { name: /question/i })).toHaveValue('');
-    expect(screen.getByText('Ask about this transcript')).toBeInTheDocument();
+    expect(screen.getByText('Ask about a concept, argument, or detail from this video.')).toBeInTheDocument();
 
     resolveRequest(jsonResponse({ answer: 'Stale answer', citations: [], insufficientContext: false }));
     await waitFor(() => expect(screen.queryByText('Stale answer')).not.toBeInTheDocument());
@@ -163,7 +161,7 @@ describe('asset assistant characterization', () => {
     rerender(<AssetAssistantPanel {...props} isAssetSearchable={false} />);
     expect(screen.getByRole('textbox', { name: /question/i })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Ask' })).toBeDisabled();
-    expect(screen.getByText('Assistant unlocks after indexing')).toBeInTheDocument();
+    expect(screen.getByText('Ask will be available when this video is ready.')).toBeInTheDocument();
   });
 
   it('keeps the question available for retry after a provider failure', async () => {
@@ -190,7 +188,7 @@ describe('asset assistant characterization', () => {
 
     await user.type(screen.getByRole('textbox', { name: /question/i }), 'What is causality?');
     await user.click(screen.getByRole('button', { name: 'Ask' }));
-    expect(await screen.findByText('Assistant answers are unavailable')).toBeInTheDocument();
+    expect(await screen.findByText('Answers are temporarily unavailable')).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: /question/i })).toHaveValue('What is causality?');
 
     await user.click(screen.getByRole('button', { name: 'Ask' }));

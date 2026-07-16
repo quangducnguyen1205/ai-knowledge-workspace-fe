@@ -10,7 +10,6 @@ import {
 } from './api/workspaces-api';
 import { isApiClientError } from '../../shared/api/api-error';
 import { Button, ErrorBanner, InfoBanner } from '../../lib/ui';
-import { getFriendlyLogoutErrorCopy } from '../auth/auth';
 import { WorkspaceDeleteDialog } from './components/workspace-delete-dialog';
 
 export const workspaceKeys = {
@@ -74,31 +73,31 @@ function getFriendlyWorkspaceRenameErrorCopy(
   if (error.status === 400 && error.code === 'INVALID_WORKSPACE_NAME') {
     return {
       tone: 'warning',
-      title: 'Tên workspace chưa hợp lệ',
-      message: 'Nhập tên workspace không để trống và nằm trong giới hạn cho phép.',
+      title: 'Workspace name is not valid',
+      message: 'Enter a non-empty name within the allowed length.',
     };
   }
 
   if (error.status === 404) {
     return {
       tone: 'warning',
-      title: 'Không tìm thấy workspace',
-      message: 'Workspace không còn tồn tại hoặc bạn không có quyền truy cập.',
+      title: 'Workspace not found',
+      message: 'It no longer exists or you do not have access.',
     };
   }
 
   if (error.status === 0) {
     return {
       tone: 'error',
-      title: 'Chưa thể đổi tên workspace',
-      message: 'Kiểm tra kết nối mạng rồi thử lại. Tên cũ vẫn được giữ nguyên.',
+      title: 'Could not rename workspace',
+      message: 'Check your connection and try again. The previous name was kept.',
     };
   }
 
   return {
     tone: 'error',
-    title: 'Không thể đổi tên workspace',
-    message: 'Tên cũ vẫn được giữ nguyên. Vui lòng thử lại sau.',
+    title: 'Could not rename workspace',
+    message: 'The previous name was kept. Try again later.',
   };
 }
 
@@ -111,7 +110,6 @@ export function WorkspaceBar({
   createError,
   renameError,
   deleteError,
-  logoutError,
   createSuccessId,
   onSelectWorkspace,
   onCreateWorkspace,
@@ -121,8 +119,6 @@ export function WorkspaceBar({
   isCreating,
   isRenaming,
   isDeleting,
-  onLogout,
-  isLoggingOut,
 }: {
   workspaces: Workspace[];
   selectedWorkspace: Workspace | null;
@@ -132,7 +128,6 @@ export function WorkspaceBar({
   createError: unknown;
   renameError: unknown;
   deleteError: unknown;
-  logoutError: unknown;
   createSuccessId?: string;
   onSelectWorkspace: (workspaceId: string) => void;
   onCreateWorkspace: (name: string) => void;
@@ -142,14 +137,11 @@ export function WorkspaceBar({
   isCreating: boolean;
   isRenaming: boolean;
   isDeleting: boolean;
-  onLogout: () => void;
-  isLoggingOut: boolean;
 }) {
   const [workspaceName, setWorkspaceName] = useState('');
   const [renameWorkspaceName, setRenameWorkspaceName] = useState('');
   const [deleteDialogWorkspace, setDeleteDialogWorkspace] = useState<Workspace | null>(null);
   const deleteButtonRef = useRef<HTMLButtonElement>(null);
-  const logoutErrorCopy = getFriendlyLogoutErrorCopy(logoutError);
   const renameErrorCopy = getFriendlyWorkspaceRenameErrorCopy(renameError);
   const workspaceActionBusy = isCreating || isRenaming || isDeleting;
 
@@ -225,34 +217,9 @@ export function WorkspaceBar({
 
   return (
     <div className="workspace-bar">
-      <div className="workspace-bar__top">
-        <div className={`workspace-bar__intro ${isLoading ? 'workspace-bar__intro--busy' : ''}`}>
-          <div>
-            <span className="workspace-focus__eyebrow">Workspace shell</span>
-            <strong className="workspace-focus__title">
-              {selectedWorkspace ? selectedWorkspace.name : 'Create your first workspace'}
-            </strong>
-          </div>
-          <p className="workspace-bar__intro-copy">
-            Keep uploads, transcript review, indexing, and search scoped to one workspace at a time.
-          </p>
-        </div>
-
-        <div className="workspace-bar__pills">
-          <div className="pill">
-            <span className="pill__label">Visible workspaces</span>
-            <span className="pill__value">{workspaces.length}</span>
-          </div>
-
-          <Button type="button" tone="ghost" onClick={onLogout} disabled={isLoggingOut}>
-            {isLoggingOut ? 'Signing out...' : 'Sign out'}
-          </Button>
-        </div>
-      </div>
-
       <div className="workspace-bar__cluster">
         <label className="field">
-          <span className="field__label">Workspace scope</span>
+          <span className="field__label">Current workspace</span>
           <select
             className="field__input"
             value={selectedWorkspaceId ?? ''}
@@ -266,35 +233,37 @@ export function WorkspaceBar({
               </option>
             ))}
           </select>
-          <span className="field__hint">
-            {selectedWorkspace
-              ? `Currently viewing ${selectedWorkspace.name}. Switching workspace updates assets, transcript state, and search in place.`
-              : 'Choose a workspace after you create one to start uploading and searching content.'}
-          </span>
         </label>
 
-        <form className="workspace-create" onSubmit={handleSubmit}>
+        <form className="workspace-create settings-action" onSubmit={handleSubmit}>
+          <div className="settings-action__heading">
+            <h3>Create workspace</h3>
+            <p>Use a short name that is easy to recognize in the header.</p>
+          </div>
           <label className="field field--grow">
-            <span className="field__label">Create workspace</span>
+            <span className="field__label">Workspace name</span>
             <input
               className="field__input"
               type="text"
               value={workspaceName}
               onChange={(event) => setWorkspaceName(event.target.value)}
-              placeholder="Algorithms, Databases, Distributed Systems..."
+              placeholder="Algorithms, Databases, Distributed Systems"
               maxLength={255}
               disabled={workspaceActionBusy}
             />
-            <span className="field__hint">Use focused workspace names that make future search scope obvious.</span>
           </label>
-          <Button type="submit" tone="secondary" disabled={workspaceActionBusy || !workspaceName.trim()}>
+          <Button type="submit" disabled={workspaceActionBusy || !workspaceName.trim()}>
             {isCreating ? 'Creating...' : 'Create workspace'}
           </Button>
         </form>
 
-        <form className="workspace-manage" onSubmit={handleRenameSubmit}>
+        <form className="workspace-manage settings-action" onSubmit={handleRenameSubmit}>
+          <div className="settings-action__heading">
+            <h3>Rename or delete</h3>
+            <p>Changes apply to the current workspace.</p>
+          </div>
           <label className="field field--grow">
-            <span className="field__label">Rename current workspace</span>
+            <span className="field__label">Workspace name</span>
             <input
               className="field__input"
               type="text"
@@ -304,17 +273,12 @@ export function WorkspaceBar({
               maxLength={255}
               disabled={!selectedWorkspace || workspaceActionBusy}
             />
-            <span className="field__hint">
-              {selectedWorkspace
-                ? 'Delete only works for non-default empty workspaces. Backend rules stay conservative on purpose.'
-                : 'Select a workspace first to rename it or request deletion.'}
-            </span>
           </label>
 
           <div className="workspace-manage__actions">
             <Button
               type="submit"
-              tone="ghost"
+              tone="secondary"
               disabled={
                 workspaceActionBusy ||
                 !selectedWorkspace ||
@@ -343,14 +307,6 @@ export function WorkspaceBar({
           tone="success"
           title={successNotice.title}
           message={successNotice.message}
-        />
-      ) : null}
-      {logoutError ? (
-        <ErrorBanner
-          error={logoutError}
-          className="workspace-bar__error"
-          title={logoutErrorCopy?.title}
-          message={logoutErrorCopy?.message}
         />
       ) : null}
       {createError ? <ErrorBanner error={createError} className="workspace-bar__error" /> : null}

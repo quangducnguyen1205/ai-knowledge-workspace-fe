@@ -51,11 +51,7 @@ export function useAssetManagement({
 
   useEffect(() => setDetailSuccessNotice(null), [selectedAssetId]);
 
-  useEffect(() => {
-    if (!renameMutation.isPending && renameMutation.variables?.assetId !== selectedAssetId) {
-      renameMutation.reset();
-    }
-  }, [renameMutation.isPending, renameMutation.reset, renameMutation.variables?.assetId, selectedAssetId]);
+  useEffect(() => renameMutation.reset(), [currentUserId, renameMutation.reset, selectedAssetId, workspaceId]);
 
   function clearAssetDependentState(assetId: string) {
     if (selectedAssetIdRef.current === assetId) {
@@ -84,7 +80,7 @@ export function useAssetManagement({
           clearAssetDependentState(variables.assetId);
           onDeletedSelectedRoute(variables.assetId);
           setLibrarySuccessNotice({
-            title: 'Asset deleted',
+            title: 'Video deleted',
             message: `Removed "${asset.title}" from ${workspaceName ?? 'the active workspace'}.`,
           });
           await Promise.all([
@@ -105,11 +101,12 @@ export function useAssetManagement({
     );
   }
 
-  function handleRenameAsset(title: string) {
-    if (!selectedAsset) return;
+  function handleRenameAsset(title: string, targetAsset: AssetSummary | null = selectedAsset) {
+    if (!targetAsset) return;
+    setLibrarySuccessNotice(null);
     setDetailSuccessNotice(null);
     renameMutation.mutate(
-      { assetId: selectedAsset.assetId, workspaceId: selectedAsset.workspaceId, title },
+      { assetId: targetAsset.assetId, workspaceId: targetAsset.workspaceId, title },
       {
         onSuccess: (response, variables) => {
           queryClient.setQueryData<AssetSummary[] | undefined>(assetKeys.list(variables.workspaceId), (current) =>
@@ -124,7 +121,10 @@ export function useAssetManagement({
               : asset),
           );
           onAssetTitleChanged(variables.assetId, response.title);
-          setDetailSuccessNotice({ title: 'Asset renamed', message: `Title updated to "${response.title}".` });
+          setLibrarySuccessNotice({ title: 'Video renamed', message: `Title updated to "${response.title}".` });
+          if (selectedAssetIdRef.current === variables.assetId) {
+            setDetailSuccessNotice({ title: 'Video renamed', message: `Title updated to "${response.title}".` });
+          }
         },
         onError: async (error, variables) => {
           if (error instanceof ApiClientError && error.status === 404) {
@@ -143,7 +143,7 @@ export function useAssetManagement({
     librarySuccessNotice,
     detailSuccessNotice,
     recordUploadSuccess: (title: string) => setLibrarySuccessNotice({
-      title: 'Upload accepted',
+      title: 'Video uploaded',
       message: `Added "${title}" to ${workspaceName ?? 'the active workspace'}.`,
     }),
     clearNotices: () => {
@@ -156,7 +156,8 @@ export function useAssetManagement({
     visibleDeleteError: deleteMutation.error && deleteMutation.variables?.workspaceId === workspaceId ? deleteMutation.error : null,
     deletingAssetId: deleteMutation.isPending ? deleteMutation.variables?.assetId ?? null : null,
     isDeleting: deleteMutation.isPending,
-    visibleRenameError: renameMutation.error && renameMutation.variables?.assetId === selectedAssetId ? renameMutation.error : null,
+    visibleRenameError: renameMutation.error && renameMutation.variables?.workspaceId === workspaceId ? renameMutation.error : null,
+    renamingAssetId: renameMutation.isPending ? renameMutation.variables?.assetId ?? null : null,
     isRenamingSelectedAsset: renameMutation.isPending && renameMutation.variables?.assetId === selectedAssetId,
   };
 }

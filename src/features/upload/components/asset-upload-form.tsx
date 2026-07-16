@@ -45,16 +45,10 @@ export function AssetUploadForm({
   }
 
   return (
-    <div className="upload-card">
-      <div className="upload-card__copy">
-        <p className="panel__eyebrow">Add source material</p>
-        <h3>Upload a lecture video</h3>
-        <p>Every uploaded asset moves through transcript preparation, automatic indexing, and focused workspace search.</p>
-      </div>
-
-      <form className="stack" onSubmit={handleSubmit}>
+    <form className="upload-form stack" onSubmit={handleSubmit}>
+      <p className="upload-form__intro">Choose a video to add to this workspace. You can leave the title blank to use its filename.</p>
         <label className="field">
-          <span className="field__label">Asset title</span>
+          <span className="field__label">Video title <small>(optional)</small></span>
           <input
             className="field__input"
             type="text"
@@ -66,7 +60,7 @@ export function AssetUploadForm({
         </label>
 
         <label className="field">
-          <span className="field__label">Source file</span>
+          <span className="field__label">Video file</span>
           <input
             ref={fileInputRef}
             className="field__input field__input--file"
@@ -77,7 +71,7 @@ export function AssetUploadForm({
             aria-invalid={Boolean(fileValidationError)}
           />
           <span id="upload-file-hint" className="field__hint">
-            Use an MP4, MOV, M4V, WebM, or AVI lecture video. MP4 works well for local smoke checks.
+            MP4, MOV, M4V, WebM, or AVI.
           </span>
           {fileValidationError ? (
             <span id="upload-file-error" className="field__hint field__hint--error" role="alert">
@@ -86,18 +80,17 @@ export function AssetUploadForm({
           ) : null}
         </label>
 
-        <div className="upload-card__actions">
+        <div className="upload-form__actions">
           <Button type="submit" disabled={isUploading || !file || Boolean(fileValidationError)}>
-            {isUploading ? `Uploading to ${workspaceName}...` : 'Upload to workspace'}
+            {isUploading ? 'Uploading video...' : 'Upload video'}
           </Button>
-          <span className="upload-card__hint">Uploaded assets appear in the library first, then move through processing.</span>
         </div>
 
-        {file ? <div className="selected-file"><strong>Selected file</strong><span>{file.name}</span></div> : null}
+        {file ? <div className="selected-file"><strong>Selected</strong><span>{file.name}</span></div> : null}
         {isUploading ? (
           <InfoBanner
-            title="Upload in progress"
-            message={`Adding the selected file to ${workspaceName}. It will appear in the library and continue processing in place.`}
+            title="Uploading video"
+            message={`Adding the selected file to ${workspaceName}. Keep this dialog open until the upload finishes.`}
           />
         ) : null}
         {uploadError ? (
@@ -108,7 +101,6 @@ export function AssetUploadForm({
             detail={uploadErrorCopy?.detail}
           />
         ) : null}
-      </form>
-    </div>
+    </form>
   );
 }

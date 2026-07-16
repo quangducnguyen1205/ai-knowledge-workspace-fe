@@ -22,5 +22,5 @@ export function getGenericAssistantErrorMessage(error: unknown): string {
     return 'Use a focused, non-empty question about this asset transcript.';
   }
 
-  return 'Không thể hoàn tất câu hỏi. Hãy thử diễn đạt ngắn gọn hơn hoặc xem trực tiếp transcript và kết quả tìm kiếm.';
+  return 'Try a shorter question, or review the transcript and search results directly.';
 }

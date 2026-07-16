@@ -7,171 +7,54 @@ export type UserSafeErrorCopy = {
 
 const COPY_BY_CODE: Record<string, UserSafeErrorCopy> = {
   AUTHENTICATION_REQUIRED: {
-    title: 'Cần đăng nhập',
-    message: 'Phiên đăng nhập không còn hợp lệ. Hãy đăng nhập lại để tiếp tục.',
+    title: 'Sign in required',
+    message: 'Your session is no longer valid. Sign in again to continue.',
   },
   INVALID_CREDENTIALS: {
-    title: 'Email hoặc mật khẩu chưa đúng',
-    message: 'Kiểm tra lại thông tin đăng nhập rồi thử lại.',
+    title: 'Email or password is incorrect',
+    message: 'Check your details and try again.',
   },
   EMAIL_ALREADY_REGISTERED: {
-    title: 'Email đã được đăng ký',
-    message: 'Hãy đăng nhập bằng email này hoặc sử dụng một địa chỉ email khác.',
+    title: 'Email already registered',
+    message: 'Sign in with this email or use a different address.',
   },
-  INVALID_EMAIL: {
-    title: 'Email chưa hợp lệ',
-    message: 'Nhập đầy đủ một địa chỉ email hợp lệ rồi thử lại.',
-  },
-  INVALID_PASSWORD: {
-    title: 'Mật khẩu chưa hợp lệ',
-    message: 'Kiểm tra yêu cầu về mật khẩu rồi thử lại.',
-  },
-  INVALID_AUTH_REQUEST: {
-    title: 'Thông tin đăng nhập chưa đầy đủ',
-    message: 'Kiểm tra các trường trong biểu mẫu rồi gửi lại.',
-  },
-  AUTH_MODE_UNAVAILABLE: {
-    title: 'Chưa thể đăng nhập',
-    message: 'Phương thức đăng nhập hiện tại tạm thời chưa sẵn sàng.',
-  },
-  INVALID_WORKSPACE_NAME: {
-    title: 'Tên workspace chưa hợp lệ',
-    message: 'Nhập tên workspace không để trống và nằm trong giới hạn cho phép.',
-  },
-  WORKSPACE_NOT_FOUND: {
-    title: 'Không tìm thấy workspace',
-    message: 'Workspace không còn tồn tại hoặc bạn không có quyền truy cập.',
-  },
-  DEFAULT_WORKSPACE_DELETE_FORBIDDEN: {
-    title: 'Không thể xóa workspace mặc định',
-    message: 'Workspace mặc định được bảo vệ và không thể xóa.',
-  },
-  WORKSPACE_NOT_EMPTY: {
-    title: 'Workspace vẫn còn tài liệu',
-    message: 'Hãy xóa các tài liệu trong workspace trước rồi thử lại.',
-  },
-  INVALID_UPLOAD_FILE: {
-    title: 'Tệp tải lên không được hỗ trợ',
-    message: 'Chọn tệp video MP4, MOV, M4V, WebM hoặc AVI hợp lệ.',
-  },
-  INVALID_ASSET_TITLE: {
-    title: 'Tiêu đề chưa hợp lệ',
-    message: 'Nhập tiêu đề không để trống và nằm trong giới hạn cho phép.',
-  },
-  ASSET_NOT_FOUND: {
-    title: 'Không tìm thấy tài liệu',
-    message: 'Tài liệu không còn tồn tại hoặc bạn không có quyền truy cập.',
-  },
-  PROCESSING_JOB_NOT_FOUND: {
-    title: 'Không tìm thấy tiến trình xử lý',
-    message: 'Tải lại trang để cập nhật trạng thái mới nhất của tài liệu.',
-  },
-  TRANSCRIPT_ROW_NOT_FOUND: {
-    title: 'Không tìm thấy đoạn transcript',
-    message: 'Đoạn transcript đã chọn không còn khả dụng.',
-  },
-  PROCESSING_SERVICE_UNAVAILABLE: {
-    title: 'Xử lý video tạm thời chưa sẵn sàng',
-    message: 'Tệp chưa được gửi đi xử lý. Vui lòng thử lại sau.',
-  },
-  FASTAPI_CONNECTIVITY_ERROR: {
-    title: 'Xử lý video tạm thời chưa sẵn sàng',
-    message: 'Tệp chưa được gửi đi xử lý. Vui lòng thử lại sau.',
-  },
-  FASTAPI_INTEGRATION_ERROR: {
-    title: 'Xử lý video tạm thời chưa sẵn sàng',
-    message: 'Tệp chưa được gửi đi xử lý. Vui lòng thử lại sau.',
-  },
-  SEARCH_SERVICE_UNAVAILABLE: {
-    title: 'Tìm kiếm tạm thời chưa sẵn sàng',
-    message: 'Chưa thể hoàn tất thao tác tìm kiếm. Vui lòng thử lại sau.',
-  },
-  ELASTICSEARCH_UNAVAILABLE: {
-    title: 'Tìm kiếm tạm thời chưa sẵn sàng',
-    message: 'Chưa thể hoàn tất thao tác tìm kiếm. Vui lòng thử lại sau.',
-  },
-  ELASTICSEARCH_INTEGRATION_ERROR: {
-    title: 'Tìm kiếm tạm thời chưa sẵn sàng',
-    message: 'Chưa thể hoàn tất thao tác tìm kiếm. Vui lòng thử lại sau.',
-  },
-  STORAGE_SERVICE_UNAVAILABLE: {
-    title: 'Lưu trữ tạm thời chưa sẵn sàng',
-    message: 'Tệp chưa được lưu. Vui lòng thử lại sau.',
-  },
-  OBJECT_STORAGE_ERROR: {
-    title: 'Lưu trữ tạm thời chưa sẵn sàng',
-    message: 'Tệp chưa được lưu. Vui lòng thử lại sau.',
-  },
-  ASSISTANT_SERVICE_UNAVAILABLE: {
-    title: 'Trợ lý tạm thời chưa sẵn sàng',
-    message: 'Chưa thể tạo câu trả lời. Bạn vẫn có thể đọc transcript và kết quả tìm kiếm.',
-  },
-  ASSISTANT_PROVIDER_UNAVAILABLE: {
-    title: 'Trợ lý tạm thời chưa sẵn sàng',
-    message: 'Chưa thể tạo câu trả lời. Bạn vẫn có thể đọc transcript và kết quả tìm kiếm.',
-  },
+  INVALID_EMAIL: { title: 'Enter a valid email', message: 'Use a complete email address and try again.' },
+  INVALID_PASSWORD: { title: 'Password is not valid', message: 'Check the password requirements and try again.' },
+  INVALID_AUTH_REQUEST: { title: 'Complete the form', message: 'Check the fields and submit again.' },
+  AUTH_MODE_UNAVAILABLE: { title: 'Sign in is unavailable', message: 'The current sign-in method is temporarily unavailable.' },
+  INVALID_WORKSPACE_NAME: { title: 'Workspace name is not valid', message: 'Enter a non-empty name within the allowed length.' },
+  WORKSPACE_NOT_FOUND: { title: 'Workspace not found', message: 'It no longer exists or you do not have access.' },
+  DEFAULT_WORKSPACE_DELETE_FORBIDDEN: { title: 'Default workspace cannot be deleted', message: 'The default workspace is protected.' },
+  WORKSPACE_NOT_EMPTY: { title: 'Workspace still contains videos', message: 'Delete its videos before trying again.' },
+  INVALID_UPLOAD_FILE: { title: 'Video format is not supported', message: 'Choose an MP4, MOV, M4V, WebM, or AVI video.' },
+  INVALID_ASSET_TITLE: { title: 'Video title is not valid', message: 'Enter a non-empty title within the allowed length.' },
+  ASSET_NOT_FOUND: { title: 'Video not found', message: 'It no longer exists or you do not have access.' },
+  PROCESSING_JOB_NOT_FOUND: { title: 'Video status is unavailable', message: 'Reload the page to get the latest status.' },
+  TRANSCRIPT_ROW_NOT_FOUND: { title: 'Transcript moment not found', message: 'The selected moment is no longer available.' },
+  PROCESSING_SERVICE_UNAVAILABLE: { title: 'Video processing is unavailable', message: 'The video was not sent for processing. Try again later.' },
+  FASTAPI_CONNECTIVITY_ERROR: { title: 'Video processing is unavailable', message: 'The video was not sent for processing. Try again later.' },
+  FASTAPI_INTEGRATION_ERROR: { title: 'Video processing is unavailable', message: 'The video was not sent for processing. Try again later.' },
+  SEARCH_SERVICE_UNAVAILABLE: { title: 'Search is temporarily unavailable', message: 'Try your search again later.' },
+  ELASTICSEARCH_UNAVAILABLE: { title: 'Search is temporarily unavailable', message: 'Try your search again later.' },
+  ELASTICSEARCH_INTEGRATION_ERROR: { title: 'Search is temporarily unavailable', message: 'Try your search again later.' },
+  STORAGE_SERVICE_UNAVAILABLE: { title: 'Upload is temporarily unavailable', message: 'The video was not saved. Try again later.' },
+  OBJECT_STORAGE_ERROR: { title: 'Upload is temporarily unavailable', message: 'The video was not saved. Try again later.' },
+  ASSISTANT_SERVICE_UNAVAILABLE: { title: 'Answers are temporarily unavailable', message: 'You can still read and search the transcript.' },
+  ASSISTANT_PROVIDER_UNAVAILABLE: { title: 'Answers are temporarily unavailable', message: 'You can still read and search the transcript.' },
 };
 
 export function getUserSafeErrorCopy(error: unknown): UserSafeErrorCopy {
   if (!isApiClientError(error)) {
-    return {
-      title: 'Đã xảy ra lỗi',
-      message: 'Không thể hoàn tất thao tác. Vui lòng thử lại sau.',
-    };
+    return { title: 'Something went wrong', message: 'The action could not be completed. Try again later.' };
   }
 
-  if (error.code && COPY_BY_CODE[error.code]) {
-    return COPY_BY_CODE[error.code];
-  }
-
-  if (error.status === 0) {
-    return {
-      title: 'Không thể kết nối',
-      message: 'Kiểm tra kết nối mạng rồi thử lại.',
-    };
-  }
-
-  if (error.status === 400 || error.status === 413 || error.status === 415 || error.status === 422) {
-    return {
-      title: 'Yêu cầu chưa hợp lệ',
-      message: 'Kiểm tra thông tin đã nhập rồi thử lại.',
-    };
-  }
-
-  if (error.status === 401) {
-    return COPY_BY_CODE.AUTHENTICATION_REQUIRED;
-  }
-
-  if (error.status === 403) {
-    return {
-      title: 'Không có quyền thực hiện',
-      message: 'Bạn không có quyền thực hiện thao tác này.',
-    };
-  }
-
-  if (error.status === 404) {
-    return {
-      title: 'Không tìm thấy nội dung',
-      message: 'Nội dung không còn tồn tại hoặc bạn không có quyền truy cập.',
-    };
-  }
-
-  if (error.status === 409) {
-    return {
-      title: 'Chưa thể hoàn tất thao tác',
-      message: 'Trạng thái hiện tại chưa cho phép thao tác này. Hãy kiểm tra lại rồi thử lại.',
-    };
-  }
-
-  if (error.status === 502 || error.status === 503 || error.status === 504) {
-    return {
-      title: 'Dịch vụ tạm thời chưa sẵn sàng',
-      message: 'Vui lòng thử lại sau.',
-    };
-  }
-
-  return {
-    title: 'Đã xảy ra lỗi',
-    message: 'Không thể hoàn tất thao tác. Vui lòng thử lại sau.',
-  };
+  if (error.code && COPY_BY_CODE[error.code]) return COPY_BY_CODE[error.code];
+  if (error.status === 0) return { title: 'Could not connect', message: 'Check your connection and try again.' };
+  if ([400, 413, 415, 422].includes(error.status)) return { title: 'Check your information', message: 'Review what you entered and try again.' };
+  if (error.status === 401) return COPY_BY_CODE.AUTHENTICATION_REQUIRED;
+  if (error.status === 403) return { title: 'Action not allowed', message: 'You do not have access to complete this action.' };
+  if (error.status === 404) return { title: 'Content not found', message: 'It no longer exists or you do not have access.' };
+  if (error.status === 409) return { title: 'Action not available', message: 'The current state does not allow this action. Check again and retry.' };
+  if ([502, 503, 504].includes(error.status)) return { title: 'Service temporarily unavailable', message: 'Try again later.' };
+  return { title: 'Something went wrong', message: 'The action could not be completed. Try again later.' };
 }

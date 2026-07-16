@@ -6,9 +6,19 @@ describe('hash route helpers', () => {
     expect(parseRoute('#/')).toEqual({ name: 'home' });
     expect(parseRoute('#/library')).toEqual({ name: 'library' });
     expect(parseRoute('#/settings')).toEqual({ name: 'settings' });
+    expect(parseRoute('#/login')).toEqual({ name: 'login' });
+    expect(parseRoute('#/register')).toEqual({ name: 'register' });
     expect(routeToHash({ name: 'home' })).toBe('#/');
     expect(routeToHash({ name: 'library' })).toBe('#/library');
     expect(routeToHash({ name: 'settings' })).toBe('#/settings');
+    expect(routeToHash({ name: 'login' })).toBe('#/login');
+    expect(routeToHash({ name: 'register' })).toBe('#/register');
+  });
+
+  it('keeps the Library route compatible while carrying controlled upload state', () => {
+    expect(parseRoute('#/library?upload=1')).toEqual({ name: 'library', upload: true });
+    expect(routeToHash({ name: 'library', upload: true })).toBe('#/library?upload=1');
+    expect(routeToHash({ name: 'library' })).toBe('#/library');
   });
 
   it('keeps the plain Search route backward compatible', () => {

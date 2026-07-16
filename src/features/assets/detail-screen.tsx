@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type {
   AssetIndexResponse,
   AssetStatus,
@@ -8,17 +9,19 @@ import type { AssistantAnswerCitation } from '../assistant/model/types';
 import type { SearchResponse, SearchResult } from '../search/api/search-api';
 import type { TranscriptContextResponse, TranscriptRow } from '../../entities/transcript/model/types';
 import { buildTranscriptDisplayRows, matchesTranscriptReference } from '../../entities/transcript/model/transcript-display';
-import { Button, EmptyState, ErrorBanner, InfoBanner, LoadingBlock, Section, formatDateTime } from '../../lib/ui';
-import { SelectedAssetPanel } from './components/selected-asset-panel';
+import { Button, EmptyState, ErrorBanner, InfoBanner, LoadingBlock, formatDateTime } from '../../lib/ui';
+import { getFriendlyRenameErrorCopy } from './model/error-copy';
+import { AssetIndexingRecoveryAction } from './components/asset-indexing-recovery-action';
 import { SelectedAssetTranscriptPanel } from './components/selected-asset-transcript-panel';
 import { StatusBadge } from './components/status-badge';
 import { AssetAssistantPanel } from '../assistant/components/asset-assistant-panel';
 import { SearchPanel } from '../search/search';
 
+type StudyTab = 'transcript' | 'ask' | 'details';
+
 type AssetDetailScreenProps = {
   workspaceId?: string;
   workspaceName: string;
-  assets: AssetSummary[];
   asset: AssetSummary | null;
   successNotice: { title: string; message: string } | null;
   resolvedAssetStatus: AssetStatus | null;
@@ -31,6 +34,7 @@ type AssetDetailScreenProps = {
   indexResponse?: AssetIndexResponse;
   isIndexing: boolean;
   isRenaming: boolean;
+  isDeleting: boolean;
   renameError: unknown;
   activeQuery: string | null;
   searchResponse?: SearchResponse;
@@ -47,15 +51,13 @@ type AssetDetailScreenProps = {
   studyContextError: unknown;
   isStudyContextLoading: boolean;
   searchResetToken: number;
-  searchableAssetCount: number;
   onIndex: () => void;
   onRename: (title: string) => void;
   onResetRename: () => void;
+  onDelete: (asset: AssetSummary) => void;
   onSearchWithinAsset: (query: string) => void;
   onSelectSearchResult: (result: SearchResult) => void;
   onOpenLibrary: () => void;
-  onOpenSearch: () => void;
-  onOpenAsset: (assetId: string) => void;
   onOpenAssistantCitation?: (citation: AssistantAnswerCitation) => void;
   onReturnToSearch?: () => void;
   onClearStudyContext?: () => void;
@@ -64,7 +66,6 @@ type AssetDetailScreenProps = {
 export function AssetDetailScreen({
   workspaceId,
   workspaceName,
-  assets,
   asset,
   successNotice,
   resolvedAssetStatus,
@@ -77,6 +78,7 @@ export function AssetDetailScreen({
   indexResponse,
   isIndexing,
   isRenaming,
+  isDeleting,
   renameError,
   activeQuery,
   searchResponse,
@@ -93,76 +95,212 @@ export function AssetDetailScreen({
   studyContextError,
   isStudyContextLoading,
   searchResetToken,
-  searchableAssetCount,
   onIndex,
   onRename,
   onResetRename,
+  onDelete,
   onSearchWithinAsset,
   onSelectSearchResult,
   onOpenLibrary,
-  onOpenSearch,
-  onOpenAsset,
   onOpenAssistantCitation,
   onReturnToSearch,
   onClearStudyContext,
 }: AssetDetailScreenProps) {
-  const otherAssets = assets.filter((currentAsset) => currentAsset.assetId !== asset?.assetId).slice(0, 5);
-  const assetSearchableCount = resolvedAssetStatus === 'SEARCHABLE' ? 1 : 0;
+  const [activeTab, setActiveTab] = useState<StudyTab>('transcript');
+  const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [draftTitle, setDraftTitle] = useState('');
+  const actionMenuRef = useRef<HTMLDivElement>(null);
+  const actionButtonRef = useRef<HTMLButtonElement>(null);
+  const isMobileStudyLayout = useMobileStudyLayout();
   const assistantWorkspaceId = workspaceId ?? asset?.workspaceId ?? null;
+  const renameErrorCopy = getFriendlyRenameErrorCopy(renameError);
+  const transcriptRowCount = transcriptRows?.length ?? 0;
+
+  useEffect(() => {
+    setActiveTab('transcript');
+    setIsActionMenuOpen(false);
+    setIsEditingTitle(false);
+    setDraftTitle(asset?.title ?? '');
+  }, [asset?.assetId, asset?.title]);
+
+  useEffect(() => {
+    if (!isActionMenuOpen) return;
+
+    function closeMenuWithKeyboard(event: globalThis.KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setIsActionMenuOpen(false);
+        actionButtonRef.current?.focus();
+      }
+    }
+
+    function closeMenuFromOutside(event: Event) {
+      if (event.target instanceof Node && !actionMenuRef.current?.contains(event.target)) {
+        setIsActionMenuOpen(false);
+      }
+    }
+
+    window.addEventListener('keydown', closeMenuWithKeyboard);
+    window.addEventListener('pointerdown', closeMenuFromOutside);
+    return () => {
+      window.removeEventListener('keydown', closeMenuWithKeyboard);
+      window.removeEventListener('pointerdown', closeMenuFromOutside);
+    };
+  }, [isActionMenuOpen]);
+
+  function selectTab(tab: StudyTab) {
+    setActiveTab(tab);
+    requestAnimationFrame(() => document.getElementById(`study-tab-${tab}`)?.focus());
+  }
+
+  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    const tabs: StudyTab[] = ['transcript', 'ask', 'details'];
+    const currentIndex = tabs.indexOf(activeTab);
+    const direction = event.key === 'ArrowRight' ? 1 : -1;
+    selectTab(tabs[(currentIndex + direction + tabs.length) % tabs.length] ?? 'transcript');
+  }
+
+  if (!asset) {
+    return (
+      <div className="screen-stack">
+        <header className="page-header"><div className="page-header__copy"><h1>Video</h1></div></header>
+        <EmptyState title="Video unavailable" description="Return to the library and choose another video." />
+      </div>
+    );
+  }
 
   return (
-    <div className="screen-grid screen-grid--detail">
-      <div className="screen-main">
-        <SelectedAssetPanel
-          asset={asset}
-          workspaceName={workspaceName}
-          successNotice={successNotice}
-          resolvedAssetStatus={resolvedAssetStatus}
-          statusResponse={statusResponse}
-          statusError={statusError}
-          transcriptRows={transcriptRows}
-          transcriptError={transcriptError}
-          transcriptLoading={transcriptLoading}
-          indexError={indexError}
-          indexResponse={indexResponse}
-          isIndexing={isIndexing}
-          isRenaming={isRenaming}
-          renameError={renameError}
-          onIndex={onIndex}
-          onRename={onRename}
-          onResetRename={onResetRename}
-        />
+    <div className="study-screen">
+      <header className="study-header">
+        <nav className="product-breadcrumb" aria-label="Breadcrumb">
+          <button type="button" onClick={onOpenLibrary}>Library</button>
+          <span aria-hidden="true">/</span>
+          <span aria-current="page">Study</span>
+        </nav>
+        <div className="study-header__main">
+          <div className="study-header__copy">
+            <p className="hero__eyebrow">{workspaceName}</p>
+            <h1>{asset.title}</h1>
+            <StatusBadge status={resolvedAssetStatus} />
+          </div>
+          <div ref={actionMenuRef} className="overflow-menu">
+            <button
+              ref={actionButtonRef}
+              type="button"
+              className="overflow-menu__trigger overflow-menu__trigger--large"
+              aria-label={`Actions for ${asset.title}`}
+              aria-expanded={isActionMenuOpen}
+              onClick={() => setIsActionMenuOpen((current) => !current)}
+            >
+              <span aria-hidden="true">•••</span>
+            </button>
+            {isActionMenuOpen ? (
+              <div className="overflow-menu__popover" aria-label="Video actions">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onResetRename();
+                    setDraftTitle(asset.title);
+                    setIsEditingTitle(true);
+                    setIsActionMenuOpen(false);
+                  }}
+                >
+                  Rename
+                </button>
+                <button
+                  type="button"
+                  className="overflow-menu__danger"
+                  onClick={() => {
+                    setIsActionMenuOpen(false);
+                    onDelete(asset);
+                  }}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
 
-        {asset && assistantWorkspaceId && onOpenAssistantCitation ? (
-          <AssetAssistantPanel
-            workspaceId={assistantWorkspaceId}
-            workspaceName={workspaceName}
-            assetId={asset.assetId}
-            assetTitle={asset.title}
-            isAssetSearchable={resolvedAssetStatus === 'SEARCHABLE'}
-            onOpenCitationContext={onOpenAssistantCitation}
-          />
+        {isEditingTitle ? (
+          <form
+            className="study-title-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const nextTitle = draftTitle.trim();
+              if (nextTitle && nextTitle !== asset.title) onRename(nextTitle);
+            }}
+          >
+            <label className="field field--grow">
+              <span className="field__label">Video title</span>
+              <input
+                className="field__input"
+                value={draftTitle}
+                onChange={(event) => {
+                  if (renameError) onResetRename();
+                  setDraftTitle(event.target.value);
+                }}
+                maxLength={255}
+                autoFocus
+                disabled={isRenaming}
+              />
+            </label>
+            <Button type="submit" disabled={isRenaming || !draftTitle.trim() || draftTitle.trim() === asset.title}>
+              {isRenaming ? 'Saving...' : 'Save'}
+            </Button>
+            <Button
+              type="button"
+              tone="ghost"
+              onClick={() => {
+                onResetRename();
+                setDraftTitle(asset.title);
+                setIsEditingTitle(false);
+              }}
+              disabled={isRenaming}
+            >
+              Cancel
+            </Button>
+          </form>
         ) : null}
 
-        {asset && focusedTranscriptRowId ? (
-          <TranscriptStudyContextPanel
-            assetTitle={asset.title}
-            workspaceName={workspaceName}
-            focusedTranscriptRowId={focusedTranscriptRowId}
-            source={focusedTranscriptSource}
-            sourceSearchQuery={sourceSearchQuery}
-            contextResponse={studyContextResponse}
-            contextError={studyContextError}
-            isContextLoading={isStudyContextLoading}
-            onReturnToSearch={onReturnToSearch}
-            onClearStudyContext={onClearStudyContext}
-          />
-        ) : null}
+        {renameErrorCopy?.tone === 'warning' ? <InfoBanner tone="warning" title={renameErrorCopy.title} message={renameErrorCopy.message} /> : null}
+        {renameErrorCopy?.tone === 'error' ? <ErrorBanner error={renameError} title={renameErrorCopy.title} message={renameErrorCopy.message} /> : null}
+        {successNotice ? <InfoBanner tone="success" title={successNotice.title} message={successNotice.message} /> : null}
+      </header>
 
-        {asset ? (
+      <div className="study-tabs" role="tablist" aria-label="Study views">
+        {(['transcript', 'ask', 'details'] as const).map((tab) => (
+          <button
+            key={tab}
+            id={`study-tab-${tab}`}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab}
+            aria-controls={`study-pane-${tab}`}
+            tabIndex={activeTab === tab ? 0 : -1}
+            onClick={() => setActiveTab(tab)}
+            onKeyDown={handleTabKeyDown}
+          >
+            {tab === 'ask' ? 'Ask' : tab[0].toUpperCase() + tab.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      <div className="study-layout">
+        <section
+          id="study-pane-transcript"
+          className="study-pane study-pane--transcript"
+          role="tabpanel"
+          aria-labelledby="study-tab-transcript"
+          hidden={isMobileStudyLayout && activeTab !== 'transcript'}
+        >
           <SearchPanel
+            embedded
             workspaceName={workspaceName}
-            searchableAssetCount={assetSearchableCount}
+            searchableAssetCount={resolvedAssetStatus === 'SEARCHABLE' ? 1 : 0}
             resetToken={searchResetToken}
             activeQuery={activeQuery}
             searchResponse={searchResponse}
@@ -176,84 +314,91 @@ export function AssetDetailScreen({
             onSearch={onSearchWithinAsset}
             onSelectResult={onSelectSearchResult}
           />
-        ) : null}
 
-        <SelectedAssetTranscriptPanel
-          asset={asset}
-          workspaceName={workspaceName}
-          resolvedAssetStatus={resolvedAssetStatus}
-          statusResponse={statusResponse}
-          transcriptRows={transcriptRows}
-          transcriptError={transcriptError}
-          transcriptLoading={transcriptLoading}
-          focusedTranscriptRowId={focusedTranscriptRowId}
-          focusedTranscriptSource={focusedTranscriptSource}
-        />
-      </div>
-
-      <div className="screen-side">
-        <Section title="Asset navigation" eyebrow={workspaceName}>
-          {!asset ? (
-            <EmptyState
-              title="No asset selected"
-              description="Open the library to choose an asset and follow its automatic path to search."
+          {focusedTranscriptRowId ? (
+            <TranscriptStudyContextPanel
+              focusedTranscriptRowId={focusedTranscriptRowId}
+              source={focusedTranscriptSource}
+              sourceSearchQuery={sourceSearchQuery}
+              contextResponse={studyContextResponse}
+              contextError={studyContextError}
+              isContextLoading={isStudyContextLoading}
+              onReturnToSearch={onReturnToSearch}
+              onClearStudyContext={onClearStudyContext}
             />
-          ) : (
-            <div className="summary-list">
-              <div className="summary-list__item">
-                <span className="summary-list__label">Current asset</span>
-                <strong>{asset.title}</strong>
-              </div>
-              <div className="summary-list__item">
-                <span className="summary-list__label">Current status</span>
-                <div className="summary-list__status">
-                  <StatusBadge status={resolvedAssetStatus} />
-                </div>
-              </div>
-              <div className="guidance-card__actions">
-                <Button type="button" onClick={onOpenLibrary}>
-                  Back to library
-                </Button>
-                <Button type="button" tone="ghost" onClick={onOpenSearch} disabled={searchableAssetCount === 0}>
-                  Open search
-                </Button>
-              </div>
-            </div>
-          )}
-        </Section>
+          ) : null}
 
-        <Section title="Other assets" eyebrow="Workspace library">
-          {otherAssets.length === 0 ? (
-            <EmptyState
-              title="No additional assets yet"
-              description="Upload more lecture videos in the library if you want a broader searchable workspace."
+          <SelectedAssetTranscriptPanel
+            embedded
+            asset={asset}
+            workspaceName={workspaceName}
+            resolvedAssetStatus={resolvedAssetStatus}
+            statusResponse={statusResponse}
+            transcriptRows={transcriptRows}
+            transcriptError={transcriptError}
+            transcriptLoading={transcriptLoading}
+            focusedTranscriptRowId={focusedTranscriptRowId}
+            focusedTranscriptSource={focusedTranscriptSource}
+          />
+        </section>
+
+        <aside
+          id="study-pane-ask"
+          className="study-pane study-pane--assistant"
+          role="tabpanel"
+          aria-labelledby="study-tab-ask"
+          hidden={isMobileStudyLayout && activeTab !== 'ask'}
+        >
+          {assistantWorkspaceId && onOpenAssistantCitation ? (
+            <AssetAssistantPanel
+              workspaceId={assistantWorkspaceId}
+              assetId={asset.assetId}
+              assetTitle={asset.title}
+              isAssetSearchable={resolvedAssetStatus === 'SEARCHABLE'}
+              onOpenCitationContext={onOpenAssistantCitation}
             />
-          ) : (
-            <div className="compact-list">
-              {otherAssets.map((otherAsset) => (
-                <button
-                  key={otherAsset.assetId}
-                  type="button"
-                  className="compact-list__button"
-                  onClick={() => onOpenAsset(otherAsset.assetId)}
-                >
-                  <div className="compact-list__header">
-                    <strong>{otherAsset.title}</strong>
-                    <StatusBadge status={otherAsset.assetStatus} />
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </Section>
+          ) : null}
+        </aside>
+
+        <section
+          id="study-pane-details"
+          className="study-pane study-pane--details"
+          role="tabpanel"
+          aria-labelledby="study-tab-details"
+          hidden={isMobileStudyLayout && activeTab !== 'details'}
+        >
+          <div className="study-pane__header">
+            <p className="panel__eyebrow">Video</p>
+            <h2>Details</h2>
+          </div>
+          <dl className="detail-list">
+            <div><dt>Workspace</dt><dd>{workspaceName}</dd></div>
+            <div><dt>Status</dt><dd><StatusBadge status={resolvedAssetStatus} /></dd></div>
+            <div><dt>Added</dt><dd>{formatDateTime(asset.createdAt)}</dd></div>
+            <div><dt>Transcript</dt><dd>{transcriptRowCount ? `${transcriptRowCount} segments` : 'Not ready yet'}</dd></div>
+          </dl>
+          <details className="processing-details">
+            <summary>Processing details</summary>
+            <p>{getProcessingSummary(resolvedAssetStatus)}</p>
+            {statusError ? <ErrorBanner error={statusError} /> : null}
+            <AssetIndexingRecoveryAction
+              resolvedAssetStatus={resolvedAssetStatus}
+              statusResponse={statusResponse}
+              transcriptRows={transcriptRows}
+              transcriptError={transcriptError}
+              indexError={indexError}
+              indexResponse={indexResponse}
+              isIndexing={isIndexing}
+              onIndex={onIndex}
+            />
+          </details>
+        </section>
       </div>
     </div>
   );
 }
 
 function TranscriptStudyContextPanel({
-  assetTitle,
-  workspaceName,
   focusedTranscriptRowId,
   source,
   sourceSearchQuery,
@@ -263,8 +408,6 @@ function TranscriptStudyContextPanel({
   onReturnToSearch,
   onClearStudyContext,
 }: {
-  assetTitle: string;
-  workspaceName: string;
   focusedTranscriptRowId: string;
   source?: 'search' | 'assistant' | null;
   sourceSearchQuery: string | null;
@@ -276,94 +419,73 @@ function TranscriptStudyContextPanel({
 }) {
   const displayContextRows = contextResponse?.rows.length ? buildTranscriptDisplayRows(contextResponse.rows) : [];
   const resolvedSource = source ?? (sourceSearchQuery ? 'search' : null);
-  const sourceTitle =
-    resolvedSource === 'search'
-      ? 'Opened from workspace search'
-      : resolvedSource === 'assistant'
-        ? 'Opened from assistant citation'
-        : 'Focused transcript reference';
-  const sourceMessage =
-    resolvedSource === 'search'
-      ? sourceSearchQuery
-        ? `This asset detail view is focused on a transcript match for "${sourceSearchQuery}".`
-        : 'This asset detail view is focused on a selected transcript match.'
-      : resolvedSource === 'assistant'
-        ? 'This asset detail view is focused on a cited transcript reference from the assistant answer.'
-        : 'This asset detail view is focused on a transcript reference carried in the route.';
-  const hitLabel =
-    resolvedSource === 'assistant' ? 'Citation source' : resolvedSource === 'search' ? 'Search hit' : 'Focused row';
 
   return (
-    <Section
-      title="Study this moment"
-      eyebrow={assetTitle}
-      actions={
-        <div className="study-context__actions">
-          {onReturnToSearch ? (
-            <Button type="button" tone="secondary" onClick={onReturnToSearch}>
-              Back to search
-            </Button>
-          ) : null}
-          {onClearStudyContext ? (
-            <Button type="button" tone="ghost" onClick={onClearStudyContext}>
-              Clear focus
-            </Button>
-          ) : null}
+    <section className="selected-context" aria-labelledby="selected-context-title">
+      <div className="selected-context__header">
+        <div>
+          <p className="panel__eyebrow">Selected context</p>
+          <h2 id="selected-context-title">
+            {resolvedSource === 'assistant' ? 'Citation in context' : 'Search result in context'}
+          </h2>
         </div>
-      }
-    >
-      <InfoBanner
-        title={sourceTitle}
-        message={sourceMessage}
-        detail={`Workspace: ${workspaceName}. Nearby context uses the existing transcript context API.`}
-      />
-
-      {isContextLoading ? <LoadingBlock label="Loading selected transcript context..." /> : null}
-
+        <div className="selected-context__actions">
+          {onReturnToSearch ? <Button type="button" tone="secondary" onClick={onReturnToSearch}>Back to search</Button> : null}
+          {onClearStudyContext ? <Button type="button" tone="ghost" onClick={onClearStudyContext}>Clear</Button> : null}
+        </div>
+      </div>
+      {sourceSearchQuery ? <p>Showing the moment found for “{sourceSearchQuery}”.</p> : null}
+      {isContextLoading ? <LoadingBlock label="Loading selected context..." compact /> : null}
       {!isContextLoading && contextError ? (
-        <ErrorBanner
-          error={contextError}
-          title="Selected transcript row is unavailable"
-          message="The selected search hit could not be loaded. Return to search or review the full transcript below."
-        />
+        <ErrorBanner error={contextError} title="This moment is unavailable" message="Return to search or continue with the full transcript below." />
       ) : null}
-
       {!isContextLoading && !contextError && !contextResponse ? (
-        <EmptyState
-          title="Context not available yet"
-          description="The selected search hit is still carried in the route, but nearby transcript rows are not loaded."
-        />
+        <EmptyState title="Context unavailable" description="Continue with the full transcript below." />
       ) : null}
-
       {contextResponse ? (
-        <div className="context-window study-context">
-          <div className="context-window__meta">
-            <span>Hit segment: {contextResponse.hitSegmentIndex ?? 'n/a'}</span>
-            <span>Context window: {contextResponse.window}</span>
-          </div>
-
-          <ol className="transcript-list transcript-list--compact">
-            {displayContextRows.map(({ row, displayText, overlapHidden }) => {
-              const isHit = matchesTranscriptReference(row, focusedTranscriptRowId);
-
-              return (
-                <li
-                  key={row.id ?? `segment-${row.segmentIndex ?? 'missing'}`}
-                  className={`transcript-list__item ${isHit ? 'transcript-list__item--active' : ''}`}
-                >
-                  <div className="transcript-list__meta">
-                    <span>Segment {row.segmentIndex ?? 'n/a'}</span>
-                    <span>{formatDateTime(row.createdAt)}</span>
-                    {overlapHidden ? <span className="transcript-overlap-note">Overlap hidden</span> : null}
-                    {isHit ? <span className="hit-pill">{hitLabel}</span> : null}
-                  </div>
-                  <p>{displayText}</p>
-                </li>
-              );
-            })}
-          </ol>
-        </div>
+        <ol className="transcript-list transcript-list--compact">
+          {displayContextRows.map(({ row, displayText }) => {
+            const isHit = matchesTranscriptReference(row, focusedTranscriptRowId);
+            return (
+              <li key={row.id ?? `segment-${row.segmentIndex ?? 'missing'}`} className={`transcript-list__item ${isHit ? 'transcript-list__item--active' : ''}`}>
+                <div className="transcript-list__meta">
+                  <span>Moment {row.segmentIndex ?? '—'}</span>
+                  {isHit ? <span className="hit-pill">Selected</span> : null}
+                </div>
+                <p>{displayText}</p>
+              </li>
+            );
+          })}
+        </ol>
       ) : null}
-    </Section>
+    </section>
   );
+}
+
+function useMobileStudyLayout(): boolean {
+  const query = '(max-width: 760px)';
+  const [matches, setMatches] = useState(
+    () => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(query).matches,
+  );
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return undefined;
+    const media = window.matchMedia(query);
+    const update = () => setMatches(media.matches);
+    update();
+    media.addEventListener?.('change', update);
+    return () => media.removeEventListener?.('change', update);
+  }, []);
+
+  return matches;
+}
+
+function getProcessingSummary(status: AssetStatus | null): string {
+  switch (status) {
+    case 'SEARCHABLE': return 'This video is ready to search and ask questions about.';
+    case 'TRANSCRIPT_READY': return 'The transcript is ready while search preparation finishes.';
+    case 'FAILED': return 'This video could not be processed.';
+    case 'PROCESSING':
+    default: return 'The video is being prepared. This page updates automatically.';
+  }
 }

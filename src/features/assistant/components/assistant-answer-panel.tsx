@@ -14,11 +14,9 @@ export function AssistantAnswerPanel({
     return (
       <div className="assistant-result">
         <div className="assistant-answer assistant-answer--insufficient">
-          <p className="context-window__label">Question</p>
-          <p>{question}</p>
-          <p className="context-window__label">Insufficient context</p>
+          <p className="context-window__label">Answer to “{question}”</p>
           <p className="assistant-answer__body">{response.answer}</p>
-          <p>Refine the question or inspect transcript and search results before relying on this answer.</p>
+          <p>Try a more specific question or search the transcript directly.</p>
         </div>
       </div>
     );
@@ -27,9 +25,7 @@ export function AssistantAnswerPanel({
   return (
     <div className="assistant-result">
       <div className="assistant-answer">
-        <p className="context-window__label">Question</p>
-        <p>{question}</p>
-        <p className="context-window__label">Generated answer</p>
+        <p className="context-window__label">Answer to “{question}”</p>
         <p className="assistant-answer__body">{response.answer}</p>
       </div>
       <AssistantCitationList citations={response.citations} onOpenCitationContext={onOpenCitationContext} />

@@ -177,7 +177,7 @@ describe('asset and search API contracts', () => {
     await expect(listWorkspaces()).rejects.toMatchObject({
       status: 503,
       code: 'SEARCH_SERVICE_UNAVAILABLE',
-      message: 'Yêu cầu không thể hoàn tất.',
+      message: 'The request could not be completed.',
     });
   });
 

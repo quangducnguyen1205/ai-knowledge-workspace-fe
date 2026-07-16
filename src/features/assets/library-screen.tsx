@@ -1,7 +1,18 @@
-import type { AssetSummary } from './model/types';
+import { useMemo, useState } from 'react';
+import type { AssetStatus, AssetSummary } from './model/types';
 import { Button, Section } from '../../lib/ui';
 import { AssetList } from './components/asset-list';
-import { AssetUploadForm } from '../upload/components/asset-upload-form';
+import { AssetUploadDialog } from '../upload/components/asset-upload-dialog';
+
+type LibraryFilter = 'ALL' | AssetStatus;
+
+const STATUS_FILTERS: Array<{ value: LibraryFilter; label: string }> = [
+  { value: 'ALL', label: 'All' },
+  { value: 'SEARCHABLE', label: 'Ready' },
+  { value: 'PROCESSING', label: 'Processing' },
+  { value: 'TRANSCRIPT_READY', label: 'Preparing search' },
+  { value: 'FAILED', label: 'Failed' },
+];
 
 type AssetLibraryScreenProps = {
   workspaceName: string;
@@ -10,17 +21,22 @@ type AssetLibraryScreenProps = {
   successNotice: { title: string; message: string } | null;
   assetsError: unknown;
   deleteError: unknown;
+  renameError: unknown;
   deleteBusy: boolean;
   deletingAssetId: string | null;
+  renameBusy: boolean;
+  renamingAssetId: string | null;
   assetsLoading: boolean;
   uploadError: unknown;
   uploadSuccessId?: string;
   isUploading: boolean;
+  isUploadOpen: boolean;
   onSelectAsset: (assetId: string) => void;
   onDeleteAsset: (asset: AssetSummary) => void;
+  onRenameAsset: (asset: AssetSummary, title: string) => void;
   onUpload: (input: { file: File; title?: string }) => void;
-  onOpenSearch: () => void;
-  onOpenSettings: () => void;
+  onOpenUpload: () => void;
+  onCloseUpload: () => void;
 };
 
 export function AssetLibraryScreen({
@@ -30,91 +46,111 @@ export function AssetLibraryScreen({
   successNotice,
   assetsError,
   deleteError,
+  renameError,
   deleteBusy,
   deletingAssetId,
+  renameBusy,
+  renamingAssetId,
   assetsLoading,
   uploadError,
   uploadSuccessId,
   isUploading,
+  isUploadOpen,
   onSelectAsset,
   onDeleteAsset,
+  onRenameAsset,
   onUpload,
-  onOpenSearch,
-  onOpenSettings,
+  onOpenUpload,
+  onCloseUpload,
 }: AssetLibraryScreenProps) {
-  const processingCount = assets.filter((asset) => asset.assetStatus === 'PROCESSING').length;
-  const transcriptReadyCount = assets.filter((asset) => asset.assetStatus === 'TRANSCRIPT_READY').length;
-  const searchableCount = assets.filter((asset) => asset.assetStatus === 'SEARCHABLE').length;
+  const [titleFilter, setTitleFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState<LibraryFilter>('ALL');
+  const normalizedTitleFilter = titleFilter.trim().toLocaleLowerCase();
+  const visibleAssets = useMemo(
+    () => assets.filter((asset) => {
+      const matchesTitle = !normalizedTitleFilter || asset.title.toLocaleLowerCase().includes(normalizedTitleFilter);
+      const matchesStatus = statusFilter === 'ALL' || asset.assetStatus === statusFilter;
+      return matchesTitle && matchesStatus;
+    }),
+    [assets, normalizedTitleFilter, statusFilter],
+  );
+  const filtersActive = Boolean(normalizedTitleFilter) || statusFilter !== 'ALL';
 
   return (
-    <div className="screen-grid screen-grid--library">
-      <div className="screen-main">
+    <div className="screen-stack library-screen">
+      <header className="page-header">
+        <div className="page-header__copy">
+          <p className="hero__eyebrow">{workspaceName}</p>
+          <h1>Library</h1>
+          <p>Manage the videos in this workspace.</p>
+        </div>
+        <div className="page-header__actions">
+          <Button type="button" onClick={onOpenUpload}>Upload video</Button>
+        </div>
+      </header>
+
       <Section
-        title="Asset Library"
-        eyebrow={workspaceName}
-        actions={<span className="panel-pill">{assets.length} {assets.length === 1 ? 'asset' : 'assets'}</span>}
+        title="Videos"
+        actions={<span className="panel-pill">{assets.length} {assets.length === 1 ? 'video' : 'videos'}</span>}
+        className="library-panel"
       >
-        <AssetUploadForm
+        {assets.length > 0 ? (
+          <div className="library-filters" aria-label="Filter videos">
+            <label className="library-filter-search">
+              <span className="visually-hidden">Filter videos by title</span>
+              <input
+                className="field__input"
+                type="search"
+                value={titleFilter}
+                onChange={(event) => setTitleFilter(event.target.value)}
+                placeholder="Filter videos"
+              />
+            </label>
+            <div className="filter-chips" role="group" aria-label="Filter by status">
+              {STATUS_FILTERS.map((filter) => (
+                <button
+                  key={filter.value}
+                  type="button"
+                  className={`filter-chip ${statusFilter === filter.value ? 'filter-chip--active' : ''}`}
+                  aria-pressed={statusFilter === filter.value}
+                  onClick={() => setStatusFilter(filter.value)}
+                >
+                  {filter.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        <AssetList
+          assets={visibleAssets}
+          selectedAssetId={selectedAssetId}
+          successNotice={successNotice}
+          assetsError={assetsError}
+          deleteError={deleteError}
+          renameError={renameError}
+          deleteBusy={deleteBusy}
+          deletingAssetId={deletingAssetId}
+          renameBusy={renameBusy}
+          renamingAssetId={renamingAssetId}
+          assetsLoading={assetsLoading}
+          emptyDescription={filtersActive ? 'Try a different title or status filter.' : undefined}
+          onSelectAsset={onSelectAsset}
+          onDeleteAsset={onDeleteAsset}
+          onRenameAsset={onRenameAsset}
+        />
+      </Section>
+
+      {isUploadOpen ? (
+        <AssetUploadDialog
           workspaceName={workspaceName}
           uploadError={uploadError}
           uploadSuccessId={uploadSuccessId}
           isUploading={isUploading}
           onUpload={onUpload}
+          onClose={onCloseUpload}
         />
-        <AssetList
-          assets={assets}
-          selectedAssetId={selectedAssetId}
-          successNotice={successNotice}
-          assetsError={assetsError}
-          deleteError={deleteError}
-          deleteBusy={deleteBusy}
-          deletingAssetId={deletingAssetId}
-          assetsLoading={assetsLoading}
-          onSelectAsset={onSelectAsset}
-          onDeleteAsset={onDeleteAsset}
-        />
-      </Section>
-      </div>
-
-      <div className="screen-side">
-        <Section title="Library health" eyebrow={workspaceName}>
-          <div className="summary-list">
-            <div className="summary-list__item">
-              <span className="summary-list__label">Processing</span>
-              <strong>{processingCount}</strong>
-            </div>
-            <div className="summary-list__item">
-              <span className="summary-list__label">Transcript ready</span>
-              <strong>{transcriptReadyCount}</strong>
-            </div>
-            <div className="summary-list__item">
-              <span className="summary-list__label">Searchable</span>
-              <strong>{searchableCount}</strong>
-            </div>
-          </div>
-        </Section>
-
-        <Section title="Next actions" eyebrow="Product flow">
-          <div className="guidance-card">
-            <strong>{searchableCount > 0 ? 'Search is ready' : transcriptReadyCount > 0 ? 'Review transcript readiness' : 'Keep uploads moving'}</strong>
-            <p>
-              {searchableCount > 0
-                ? 'At least one asset is searchable. Open the search screen to validate result quality and transcript context.'
-                : transcriptReadyCount > 0
-                  ? 'One or more assets are waiting for automatic indexing. Open an asset detail view if a fallback is needed.'
-                  : 'Use this library to upload lecture videos, watch processing states, and keep the workspace organized.'}
-            </p>
-            <div className="guidance-card__actions">
-              <Button type="button" onClick={onOpenSearch} disabled={searchableCount === 0}>
-                Open search
-              </Button>
-              <Button type="button" tone="ghost" onClick={onOpenSettings}>
-                Workspace settings
-              </Button>
-            </div>
-          </div>
-        </Section>
-      </div>
+      ) : null}
     </div>
   );
 }

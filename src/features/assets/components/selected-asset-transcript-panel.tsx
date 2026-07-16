@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { buildTranscriptDisplayRows, matchesTranscriptReference } from '../../../entities/transcript/model/transcript-display';
 import type { TranscriptRow } from '../../../entities/transcript/model/types';
-import { EmptyState, ErrorBanner, InfoBanner, LoadingBlock, Section, formatDateTime } from '../../../lib/ui';
+import { EmptyState, ErrorBanner, InfoBanner, LoadingBlock, Section } from '../../../lib/ui';
 import { getTranscriptConflictCopy } from '../model/error-copy';
 import type { AssetStatus, AssetStatusResponse, AssetSummary } from '../model/types';
 
@@ -15,6 +15,7 @@ export function SelectedAssetTranscriptPanel({
   transcriptLoading,
   focusedTranscriptRowId,
   focusedTranscriptSource,
+  embedded = false,
 }: {
   asset: AssetSummary | null;
   workspaceName: string;
@@ -25,6 +26,7 @@ export function SelectedAssetTranscriptPanel({
   transcriptLoading: boolean;
   focusedTranscriptRowId?: string | null;
   focusedTranscriptSource?: 'search' | 'assistant' | null;
+  embedded?: boolean;
 }) {
   const transcriptConflictCopy = getTranscriptConflictCopy(transcriptError, resolvedAssetStatus, statusResponse?.processingJobStatus);
   const displayTranscriptRows = useMemo(
@@ -34,34 +36,35 @@ export function SelectedAssetTranscriptPanel({
   const focusedRowIsVisible = Boolean(
     focusedTranscriptRowId && displayTranscriptRows.some(({ row }) => matchesTranscriptReference(row, focusedTranscriptRowId)),
   );
-  const focusedRowLabel = focusedTranscriptSource === 'assistant' ? 'Citation source' : focusedTranscriptSource === 'search' ? 'Search hit' : 'Focused row';
+  const focusedRowLabel = focusedTranscriptSource === 'assistant' ? 'Citation' : focusedTranscriptSource === 'search' ? 'Search match' : 'Selected';
   const missingFocusedRowCopy = focusedTranscriptSource === 'assistant'
     ? {
-        title: 'Cited transcript source is not visible',
-        message: 'The cited transcript reference could not be matched in the loaded transcript. Review search results or the full transcript directly.',
+        title: 'Cited moment is not visible',
+        message: 'The cited moment could not be matched in this transcript. Search the transcript directly.',
       }
     : {
-        title: 'Selected search row is not visible in this transcript',
-        message: 'The transcript may have changed since the search result was opened. Use the study context above or return to search.',
+        title: 'Selected moment is not visible',
+        message: 'The transcript may have changed. Use the selected context above or return to search.',
       };
 
   if (!asset) return null;
 
-  return (
-    <Section title="Transcript Review" eyebrow={workspaceName}>
-      <div className="panel-block">
+  const content = (
+      <div className="transcript-panel">
         <div className="panel-block__header">
-          <h3>Transcript</h3>
-          <span className="context-panel__hint">Transcript rows appear here as soon as they are ready</span>
+          <div>
+            <p className="panel__eyebrow">{workspaceName}</p>
+            <h2>Transcript</h2>
+          </div>
         </div>
 
-        {transcriptLoading ? <LoadingBlock label="Loading transcript rows..." /> : null}
+        {transcriptLoading ? <LoadingBlock label="Loading transcript..." /> : null}
         {!transcriptLoading && transcriptConflictCopy ? (
           <InfoBanner tone="warning" title={transcriptConflictCopy.title} message={transcriptConflictCopy.message} detail={transcriptConflictCopy.detail} />
         ) : null}
         {!transcriptLoading && transcriptError && !transcriptConflictCopy ? <ErrorBanner error={transcriptError} /> : null}
         {!transcriptLoading && !transcriptError && !transcriptRows?.length ? (
-          <EmptyState title="Transcript not loaded yet" description="Keep this asset selected. Transcript rows will appear here as soon as processing completes successfully." />
+          <EmptyState title="Transcript not ready yet" description="This page updates automatically while the video is being prepared." />
         ) : null}
         {focusedTranscriptRowId && !transcriptLoading && displayTranscriptRows.length > 0 && !focusedRowIsVisible ? (
           <InfoBanner tone="warning" title={missingFocusedRowCopy.title} message={missingFocusedRowCopy.message} />
@@ -69,7 +72,7 @@ export function SelectedAssetTranscriptPanel({
 
         {displayTranscriptRows.length ? (
           <ol className="transcript-list">
-            {displayTranscriptRows.map(({ row, displayText, overlapHidden }) => {
+            {displayTranscriptRows.map(({ row, displayText }) => {
               const isFocusedRow = Boolean(focusedTranscriptRowId && matchesTranscriptReference(row, focusedTranscriptRowId));
               return (
                 <li
@@ -77,9 +80,7 @@ export function SelectedAssetTranscriptPanel({
                   className={`transcript-list__item ${isFocusedRow ? 'transcript-list__item--active' : ''}`}
                 >
                   <div className="transcript-list__meta">
-                    <span>Segment {row.segmentIndex ?? 'n/a'}</span>
-                    <span>{formatDateTime(row.createdAt)}</span>
-                    {overlapHidden ? <span className="transcript-overlap-note">Overlap hidden</span> : null}
+                    <span>Moment {row.segmentIndex ?? '—'}</span>
                     {isFocusedRow ? <span className="hit-pill">{focusedRowLabel}</span> : null}
                   </div>
                   <p>{displayText}</p>
@@ -89,6 +90,8 @@ export function SelectedAssetTranscriptPanel({
           </ol>
         ) : null}
       </div>
-    </Section>
   );
+
+  if (embedded) return content;
+  return <Section title="Transcript" eyebrow={workspaceName}>{content}</Section>;
 }

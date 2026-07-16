@@ -2,39 +2,45 @@
 
 ## Screen model
 
-The frontend now behaves like a small product shell instead of a single demo page:
+Public entry is intentionally concise:
 
-- Auth entry
-- Workspace home
-- Asset library
-- Asset detail / transcript review
-- Asset detail / transcript review / in-video search
-- Workspace search
-- Settings / workspace management
+- Landing
+- Login
+- Register
+
+The authenticated learning workspace contains:
+
+- Home for upload/search actions and recent learning
+- Library for video filtering, upload, rename, open, and delete
+- Study for transcript reading, transcript-local search, grounded questions, citations, and disclosed details
+- Workspace Search for cross-video results and direct Study navigation
+- Settings for workspace management and account actions
 
 ## Routing choice
 
-The app uses lightweight hash routing instead of a router dependency. That keeps the repo aligned with the current Vite setup, works cleanly in the existing Docker/dev flow, and avoids requiring new server-side SPA route handling before the product shell is ready.
+The app keeps its lightweight hash router so deployment behavior and existing deep links remain compatible.
 
 Routes:
 
-- `#/`
+- `#/` — Landing when signed out, Home when authenticated
+- `#/login`
+- `#/register`
 - `#/library`
-- `#/assets/:assetId`
-- `#/search`
+- `#/library?upload=1` — controlled upload dialog
+- `#/assets/:assetId` — Study, including existing compact row/source/query focus state
+- `#/search` — optional safe `q` query state remains supported
 - `#/settings`
 
-## Why this structure is better
+Authenticated access to Login or Register returns to Home. Signed-out protected deep links continue to show authentication without discarding the requested hash route, so the existing post-login hydration behavior remains intact.
 
-- It separates browse, review, search, and settings into focused screens.
-- It lets search stay available in two narrow product-grade entry points: workspace-wide from Search, and current-video-only from Asset Detail.
-- It keeps the real backend-owned workflow intact: auth -> workspace -> upload lecture video -> processing -> transcript review -> explicit index -> search -> transcript context.
-- It introduces a stable app frame with navigation and clearer context without inventing assistant or AI flows.
+## Navigation and responsive composition
 
-## Intentionally deferred
+Desktop primary navigation contains only Home, Library, and Search. Workspace selection and Upload remain global; identity, workspace settings, and sign out live in the account menu.
 
-- Chat or assistant UX
-- Timestamp seek or media playback controls
-- Collaboration features
-- Cross-workspace asset movement
-- Advanced search filters or analytics
+Study uses a transcript-first desktop layout with the assistant on the right when space permits. At mobile widths, Transcript, Ask, and Details become keyboard-operable tabs instead of one long stack. Upload and workspace deletion use contained dialogs with Escape, focus trapping, and focus restoration.
+
+## Preserved behavior
+
+The refinement changes presentation and information hierarchy, not product contracts. Authentication, workspace provisioning and switching, upload validation, lifecycle polling, deep-link hydration, transcript display, both search scopes, assistant request safety, citation navigation, and deletion behavior continue through the existing feature hooks and Spring API modules.
+
+Explicit indexing remains available only as recovery while a transcript is ready and automatic search preparation has not completed.

@@ -1,8 +1,5 @@
-import type { AssetSummary } from '../assets/model/types';
 import type { TranscriptContextResponse } from '../../entities/transcript/model/types';
 import type { SearchResponse, SearchResult } from './api/search-api';
-import { Button, EmptyState, InfoBanner, Section } from '../../lib/ui';
-import { StatusBadge } from '../assets/components/status-badge';
 import { SearchPanel } from './search';
 
 type SearchScreenProps = {
@@ -18,12 +15,9 @@ type SearchScreenProps = {
   contextError: unknown;
   isContextLoading: boolean;
   selectedResult: SearchResult | null;
-  assets: AssetSummary[];
   onSearch: (query: string) => void;
   onSelectResult: (result: SearchResult) => void;
   onOpenResultContext: (result: SearchResult) => void;
-  onOpenAsset: (assetId: string) => void;
-  onOpenLibrary: () => void;
 };
 
 export function WorkspaceSearchScreen({
@@ -39,26 +33,23 @@ export function WorkspaceSearchScreen({
   contextError,
   isContextLoading,
   selectedResult,
-  assets,
   onSearch,
   onSelectResult,
   onOpenResultContext,
-  onOpenAsset,
-  onOpenLibrary,
 }: SearchScreenProps) {
-  const searchableAssets = assets.filter((asset) => asset.assetStatus === 'SEARCHABLE').slice(0, 6);
-
   return (
-    <div className="screen-grid screen-grid--search">
-      <div className="screen-main">
-        {routeQuery ? (
-          <InfoBanner
-            title={`Returned to workspace search for "${routeQuery}"`}
-            message="Results are loaded through the current product search API; result rows are not cached or restored from the URL."
-          />
-        ) : null}
+    <div className="screen-stack workspace-search-screen">
+      <header className="page-header">
+        <div className="page-header__copy">
+          <p className="hero__eyebrow">{workspaceName}</p>
+          <h1>Workspace Search</h1>
+          <p>Find exact moments across every ready video in this workspace.</p>
+        </div>
+      </header>
 
+      <section className="workspace-search-surface" aria-label="Workspace transcript search">
         <SearchPanel
+          embedded
           workspaceName={workspaceName}
           searchableAssetCount={searchableAssetCount}
           resetToken={resetToken}
@@ -75,57 +66,7 @@ export function WorkspaceSearchScreen({
           onSelectResult={onSelectResult}
           onOpenResultContext={onOpenResultContext}
         />
-      </div>
-
-      <div className="screen-side">
-        <Section title="Search readiness" eyebrow={workspaceName}>
-          {searchableAssetCount === 0 ? (
-            <div className="guidance-card">
-              <strong>Search is still locked</strong>
-              <p>Index at least one transcript before search becomes available in this workspace.</p>
-              <Button type="button" onClick={onOpenLibrary}>
-                Open library
-              </Button>
-            </div>
-          ) : (
-            <div className="summary-list">
-              <div className="summary-list__item">
-                <span className="summary-list__label">Searchable assets</span>
-                <strong>{searchableAssetCount}</strong>
-              </div>
-              <div className="summary-list__item">
-                <span className="summary-list__label">Active query</span>
-                <strong>{activeQuery ?? 'No query yet'}</strong>
-              </div>
-            </div>
-          )}
-        </Section>
-
-        <Section title="Searchable assets" eyebrow="Open detail">
-          {searchableAssets.length === 0 ? (
-            <EmptyState
-              title="No searchable assets yet"
-              description="Return to the library or an asset detail view to finish transcript indexing first."
-            />
-          ) : (
-            <div className="compact-list">
-              {searchableAssets.map((asset) => (
-                <button
-                  key={asset.assetId}
-                  type="button"
-                  className="compact-list__button"
-                  onClick={() => onOpenAsset(asset.assetId)}
-                >
-                  <div className="compact-list__header">
-                    <strong>{asset.title}</strong>
-                    <StatusBadge status={asset.assetStatus} />
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </Section>
-      </div>
+      </section>
     </div>
   );
 }

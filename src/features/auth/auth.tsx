@@ -51,21 +51,6 @@ type FriendlyAuthErrorCopy = {
   message: string;
 };
 
-const productHighlights = [
-  {
-    title: 'Upload source material',
-    description: 'Bring lecture videos into one workspace.',
-  },
-  {
-    title: 'Review the transcript',
-    description: 'Read the extracted transcript before publishing it to search.',
-  },
-  {
-    title: 'Search exact context',
-    description: 'Open the surrounding transcript rows around every hit.',
-  },
-];
-
 function getFriendlyAuthErrorCopy(error: unknown, mode: 'register' | 'login' | 'logout'): FriendlyAuthErrorCopy | null {
   if (!(error instanceof ApiClientError)) {
     return null;
@@ -73,66 +58,67 @@ function getFriendlyAuthErrorCopy(error: unknown, mode: 'register' | 'login' | '
 
   if (error.status === 0) {
     return {
-      title: mode === 'logout' ? 'Chưa thể đăng xuất' : 'Đăng nhập tạm thời chưa sẵn sàng',
+      title: mode === 'logout' ? 'Could not sign out' : 'Sign in is temporarily unavailable',
       message:
         mode === 'logout'
-          ? 'Kiểm tra kết nối mạng rồi thử lại. Phiên hiện tại vẫn đang hoạt động.'
-          : 'Kiểm tra kết nối mạng rồi thử lại. Trạng thái đăng nhập chưa thay đổi.',
+          ? 'Check your connection and try again. Your current session is still active.'
+          : 'Check your connection and try again. Your sign-in state has not changed.',
     };
   }
 
   if (mode === 'register' && error.status === 409 && error.code === 'EMAIL_ALREADY_REGISTERED') {
     return {
-      title: 'Email đã được đăng ký',
-      message: 'Hãy đăng nhập bằng email này hoặc sử dụng một địa chỉ email khác.',
+      title: 'Email already registered',
+      message: 'Sign in with this email or use a different address.',
     };
   }
 
   if (mode === 'login' && error.status === 401 && error.code === 'INVALID_CREDENTIALS') {
     return {
-      title: 'Email hoặc mật khẩu chưa đúng',
-      message: 'Kiểm tra lại thông tin đăng nhập rồi thử lại.',
+      title: 'Email or password is incorrect',
+      message: 'Check your details and try again.',
     };
   }
 
   if (error.status === 400 && error.code === 'INVALID_EMAIL') {
     return {
-      title: 'Email chưa hợp lệ',
-      message: 'Nhập đầy đủ một địa chỉ email hợp lệ rồi thử lại.',
+      title: 'Enter a valid email',
+      message: 'Use a complete email address and try again.',
     };
   }
 
   if (error.status === 400 && error.code === 'INVALID_PASSWORD') {
     return {
-      title: 'Mật khẩu chưa hợp lệ',
-      message: 'Kiểm tra yêu cầu về mật khẩu rồi thử lại.',
+      title: 'Password is not valid',
+      message: 'Check the password requirements and try again.',
     };
   }
 
   if (error.status === 400 && error.code === 'INVALID_AUTH_REQUEST') {
     return {
-      title: 'Thông tin chưa đầy đủ',
-      message: 'Kiểm tra các trường trong biểu mẫu rồi gửi lại.',
+      title: 'Complete the form',
+      message: 'Check the fields and submit again.',
     };
   }
 
   if (mode === 'logout') {
     return {
-      title: 'Không thể đăng xuất',
-      message: 'Phiên hiện tại vẫn đang hoạt động. Vui lòng thử lại sau.',
+      title: 'Could not sign out',
+      message: 'Your current session is still active. Try again later.',
     };
   }
 
   return {
-    title: mode === 'register' ? 'Không thể tạo tài khoản' : 'Không thể đăng nhập',
+    title: mode === 'register' ? 'Could not create account' : 'Could not sign in',
     message:
       mode === 'register'
-        ? 'Tài khoản chưa được tạo. Vui lòng thử lại sau.'
-        : 'Đăng nhập chưa thành công. Vui lòng thử lại sau.',
+        ? 'Your account was not created. Try again later.'
+        : 'Sign in was not completed. Try again later.',
   };
 }
 
 export function AuthEntrySurface({
+  mode,
   registerError,
   loginError,
   isRegistering,
@@ -140,7 +126,10 @@ export function AuthEntrySurface({
   onRegister,
   onLogin,
   onResetErrors,
+  onNavigateMode,
+  onBackHome,
 }: {
+  mode: 'register' | 'login';
   registerError: unknown;
   loginError: unknown;
   isRegistering: boolean;
@@ -148,8 +137,9 @@ export function AuthEntrySurface({
   onRegister: (input: AuthCredentialsInput) => void;
   onLogin: (input: AuthCredentialsInput) => void;
   onResetErrors: () => void;
+  onNavigateMode: (mode: 'register' | 'login') => void;
+  onBackHome: () => void;
 }) {
-  const [mode, setMode] = useState<'register' | 'login'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const activeError = mode === 'register' ? registerError : loginError;
@@ -176,85 +166,35 @@ export function AuthEntrySurface({
   }
 
   return (
-    <div className="auth-shell">
-      <div className="auth-layout">
-        <section className="auth-hero">
-          <div className="auth-hero__copy">
-            <p className="hero__eyebrow">AI Knowledge Workspace</p>
-            <h1>Search-first workspaces for long-form knowledge.</h1>
-            <p>
-              Upload a lecture video, review the transcript, explicitly index it, and search the exact passage you
-              need inside the right workspace.
-            </p>
-          </div>
+    <div className="auth-page">
+      <header className="auth-page__header">
+        <button type="button" className="public-brand public-brand--button" onClick={onBackHome}>
+          <span className="public-brand__mark" aria-hidden="true">AK</span>
+          <strong>AI Knowledge Workspace</strong>
+        </button>
+        <button
+          type="button"
+          className="auth-page__switch"
+          onClick={() => {
+            onResetErrors();
+            onNavigateMode(mode === 'login' ? 'register' : 'login');
+          }}
+        >
+          {mode === 'login' ? 'Create account' : 'Sign in'}
+        </button>
+      </header>
 
-          <div className="auth-highlights">
-            {productHighlights.map((highlight, index) => (
-              <div key={highlight.title} className="auth-highlight">
-                <span className="auth-highlight__index">0{index + 1}</span>
-                <div>
-                  <strong>{highlight.title}</strong>
-                  <p>{highlight.description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="auth-preview">
-            <div className="auth-preview__card">
-              <span className="auth-preview__label">Workspace</span>
-              <strong>Distributed Systems Lab</strong>
-              <p>12 assets ready for transcript review and search preparation.</p>
-            </div>
-            <div className="auth-preview__card auth-preview__card--accent">
-              <span className="auth-preview__label">Transcript state</span>
-              <strong>Indexing automatically</strong>
-              <p>Transcript ready. Search preparation continues without a required manual step.</p>
-            </div>
-            <div className="auth-preview__snippet">
-              <span className="auth-preview__label">Search context</span>
-              <p>
-                "Vector clocks capture causal ordering without forcing a single global time."
-              </p>
-            </div>
-          </div>
-        </section>
-
+      <main className="auth-page__main">
         <div className="auth-card">
           <div className="auth-card__top">
             <div className="auth-card__intro">
-              <p className="hero__eyebrow">Welcome back</p>
-              <h2>{mode === 'register' ? 'Create your account' : 'Sign in to your workspace'}</h2>
+              <p className="hero__eyebrow">{mode === 'register' ? 'Get started' : 'Welcome back'}</p>
+              <h1>{mode === 'register' ? 'Create your account' : 'Sign in to your workspace'}</h1>
               <p>
                 {mode === 'register'
-                  ? 'Start with a clean workspace shell for transcript review, indexing, and search.'
-                  : 'Pick up where you left off inside your authenticated knowledge workspace.'}
+                  ? 'Create a workspace for your videos, transcripts, and cited answers.'
+                  : 'Continue learning where you left off.'}
               </p>
-            </div>
-
-            <div className="auth-card__tabs" role="tablist" aria-label="Authentication mode">
-              <button
-                type="button"
-                className={`auth-tab ${mode === 'login' ? 'auth-tab--active' : ''}`}
-                onClick={() => {
-                  onResetErrors();
-                  setMode('login');
-                }}
-                aria-pressed={mode === 'login'}
-              >
-                Sign in
-              </button>
-              <button
-                type="button"
-                className={`auth-tab ${mode === 'register' ? 'auth-tab--active' : ''}`}
-                onClick={() => {
-                  onResetErrors();
-                  setMode('register');
-                }}
-                aria-pressed={mode === 'register'}
-              >
-                Create account
-              </button>
             </div>
           </div>
 
@@ -297,8 +237,8 @@ export function AuthEntrySurface({
               </Button>
               <span className="auth-form__hint">
                 {mode === 'register'
-                  ? 'New accounts are signed in immediately after they are created.'
-                  : 'Signing in opens your workspace shell directly.'}
+                  ? 'You will be signed in when your account is ready.'
+                  : 'Your videos remain private to your account.'}
               </span>
             </div>
           </form>
@@ -311,12 +251,8 @@ export function AuthEntrySurface({
             />
           ) : null}
 
-          <div className="auth-card__footer">
-            <strong>What happens next</strong>
-            <p>Choose or create a workspace, upload a source asset, review the transcript, then explicitly index it for search.</p>
-          </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
@@ -327,74 +263,42 @@ export function KeycloakAuthEntrySurface({
   authErrorMessage,
   isStartingLogin,
   onContinue,
+  onBackHome,
 }: {
   configIssue: AuthConfigurationIssue | null;
   authModeUnavailable: boolean;
   authErrorMessage: string | null;
   isStartingLogin: boolean;
   onContinue: () => void;
+  onBackHome: () => void;
 }) {
   const isActionDisabled = Boolean(configIssue) || authModeUnavailable || isStartingLogin;
 
   return (
-    <div className="auth-shell">
-      <div className="auth-layout">
-        <section className="auth-hero">
-          <div className="auth-hero__copy">
-            <p className="hero__eyebrow">AI Knowledge Workspace</p>
-            <h1>Search-first workspaces for long-form knowledge.</h1>
-            <p>
-              Upload a lecture video, review the transcript, explicitly index it, and search the exact passage you
-              need inside the right workspace.
-            </p>
-          </div>
-
-          <div className="auth-highlights">
-            {productHighlights.map((highlight, index) => (
-              <div key={highlight.title} className="auth-highlight">
-                <span className="auth-highlight__index">0{index + 1}</span>
-                <div>
-                  <strong>{highlight.title}</strong>
-                  <p>{highlight.description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="auth-preview">
-            <div className="auth-preview__card">
-              <span className="auth-preview__label">Workspace</span>
-              <strong>Distributed Systems Lab</strong>
-              <p>12 assets ready for transcript review and search preparation.</p>
-            </div>
-            <div className="auth-preview__card auth-preview__card--accent">
-              <span className="auth-preview__label">Transcript state</span>
-              <strong>Indexing automatically</strong>
-              <p>Transcript ready. Search preparation continues without a required manual step.</p>
-            </div>
-            <div className="auth-preview__snippet">
-              <span className="auth-preview__label">Search context</span>
-              <p>"Vector clocks capture causal ordering without forcing a single global time."</p>
-            </div>
-          </div>
-        </section>
-
+    <div className="auth-page">
+      <header className="auth-page__header">
+        <button type="button" className="public-brand public-brand--button" onClick={onBackHome}>
+          <span className="public-brand__mark" aria-hidden="true">AK</span>
+          <strong>AI Knowledge Workspace</strong>
+        </button>
+      </header>
+      <main className="auth-page__main">
         <div className="auth-card">
           <div className="auth-card__top">
             <div className="auth-card__intro">
-              <p className="hero__eyebrow">Keycloak sign-in</p>
-              <h2>Continue to your workspace</h2>
-              <p>Use the configured workspace identity provider, then the app will load your Spring product account.</p>
+              <p className="hero__eyebrow">Welcome back</p>
+              <h1>Continue to your workspace</h1>
+              <p>Use your organization account to continue learning.</p>
             </div>
           </div>
 
           <div className="auth-form">
             <div className="auth-form__actions">
               <Button type="button" onClick={onContinue} disabled={isActionDisabled}>
-                {isStartingLogin ? 'Opening Keycloak...' : 'Continue with Keycloak'}
+                {isStartingLogin ? 'Opening sign in...' : 'Continue to sign in'}
               </Button>
               <span className="auth-form__hint">
-                Workspace and asset access stays enforced by the product API after sign-in.
+                Your videos remain private to your account.
               </span>
             </div>
           </div>
@@ -402,33 +306,29 @@ export function KeycloakAuthEntrySurface({
           {configIssue ? (
             <ErrorBanner
               error={new Error(configIssue.message)}
-              title="Cấu hình đăng nhập chưa sẵn sàng"
-              message="Ứng dụng chưa thể khởi tạo phương thức đăng nhập. Vui lòng liên hệ quản trị viên."
+              title="Sign in is not configured"
+              message="The app cannot start sign in yet. Contact your administrator."
             />
           ) : null}
 
           {authModeUnavailable ? (
             <ErrorBanner
               error={new Error(authErrorMessage ?? 'Authentication mode is unavailable.')}
-              title="Phương thức đăng nhập chưa sẵn sàng"
-              message="Phương thức đăng nhập hiện tại chưa được hệ thống chấp nhận. Vui lòng thử lại sau."
+              title="Sign in is temporarily unavailable"
+              message="The current sign-in method is not available. Try again later."
             />
           ) : null}
 
           {!configIssue && !authModeUnavailable && authErrorMessage ? (
             <ErrorBanner
               error={new Error(authErrorMessage)}
-              title="Đăng nhập chưa hoàn tất"
-              message="Không thể hoàn tất đăng nhập. Vui lòng thử lại."
+              title="Sign in was not completed"
+              message="Try signing in again."
             />
           ) : null}
 
-          <div className="auth-card__footer">
-            <strong>What happens next</strong>
-            <p>After Keycloak returns, the app asks Spring for `/api/me` and uses that product user in the workspace shell.</p>
-          </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

@@ -2,15 +2,15 @@
 
 ## 1. Purpose
 
-This repo now implements a small product-grade frontend for AI Knowledge Workspace before any future AI expansion. The frontend stays grounded in the real Spring-owned backend contract and focuses on the current authenticated product flow:
+This repo implements the focused learning-workspace frontend for AI Knowledge Workspace. The frontend stays grounded in the real Spring-owned backend contract and covers both concise public entry and the authenticated learning flow:
 
 - auth
 - workspace selection and management
 - lecture video upload
 - processing and transcript review
-- explicit indexing
+- automatic search preparation with explicit indexing retained only as recovery
 - workspace-scoped search
-- asset-scoped search from Asset Detail
+- transcript-local search from Study
 - search-to-asset study context
 - transcript context around selected hits
 
@@ -26,21 +26,20 @@ asset-scoped grounded assistant answer and citation-navigation experience.
 - Plain CSS with a custom product shell and screen layouts
 - Lightweight hash-based routing implemented locally in the app
 - Docker-first local development with `/api` requests proxied to the Spring backend
-- Responsive authenticated app shell with desktop top navigation and keyboard-operable compact mobile navigation
+- Responsive authenticated shell with three-item primary navigation, compact account menu, and keyboard-operable mobile navigation
 
 ## 3. Current Product IA
 
-The frontend now behaves like a routed web app with a persistent product shell instead of a single giant shell:
+The frontend behaves like a routed learning product:
 
-- Auth entry
-- Workspace home
-- Asset library
-- Asset detail / transcript review
-- Asset detail / transcript review / in-video search
-- Workspace search
-- Settings / workspace management
+- Public Landing, Login, and Register
+- Home for immediate actions and recent learning
+- Library with controlled upload, filtering, and video actions
+- Study with transcript, selected context, assistant, and disclosed details
+- Workspace Search
+- Settings for workspace management and account
 
-Authenticated routes are surfaced through top navigation on desktop: `Home`, `Library`, `Search`, and `Settings`. Upload is a single shell-level action into the existing Library upload flow rather than a fake standalone route. Asset Detail remains a deep Library route with a breadcrumb back to Library.
+Authenticated primary navigation contains only `Home`, `Library`, and `Search`. The shell also owns the workspace selector, Upload action, and account menu; Settings and sign out live in that menu. Upload opens a controlled Library dialog through `#/library?upload=1`. Study keeps the compatible `#/assets/:assetId` deep route and compact focus query parameters.
 
 ## 4. Frontend Modular Boundaries
 
@@ -62,12 +61,13 @@ This refactor preserves existing routes, API request shapes, auth defaults, toke
 - Load the visible owned workspace scope
 - Switch workspaces from the persistent app shell
 - Create, rename, and conservatively delete workspaces through Settings
-- Land in a workspace home screen with readiness summaries and next actions
+- Land on Home with upload/search actions and recent learning
 - Open a dedicated asset library screen
-- Upload lecture videos into the active workspace
-- Review library-wide asset status in a full browse/manage screen
-- Open a dedicated asset detail screen for transcript review
-- Search within the currently viewed video from Asset Detail once that asset is searchable
+- Upload learning videos through a focus-managed dialog
+- Filter the video library and use stable overflow actions for open, rename, and delete
+- Open Study with transcript and assistant side by side on desktop
+- Use Transcript, Ask, and Details views on mobile
+- Find within the current transcript once the video is ready
 - Rename and delete assets
 - Poll processing state until terminal
 - Load transcript rows only when the backend says they are ready
@@ -75,14 +75,14 @@ This refactor preserves existing routes, API request shapes, auth defaults, toke
 - Open a dedicated workspace search screen
 - Search only within the active workspace
 - Review ranked search results with a distinct asset title, transcript excerpt, and transcript moment metadata
-- Open a result into the real Asset Detail route with the asset id, selected transcript-row reference, and optional source query preserved in the hash route
-- Read nearby transcript rows from the existing transcript context API on Asset Detail
+- Open a result into the existing Study route with the asset id, selected transcript-row reference, and optional source query preserved in the hash route
+- Read nearby transcript rows from the existing transcript context API in Study
 - Return to Search from a detail page that originated from a workspace result, preserving the safe query as `#/search?q=<query>` when available
-- Optionally restrict search to the current asset from Asset Detail
+- Keep Workspace Search and Find in transcript as explicitly distinct tasks
 - Open transcript context around a selected result
 - Ask a grounded question about the selected asset through Spring and render validated
   citations with transcript navigation
-- Keep orientation through the top navigation active state, page heading, workspace status, visible account summary, and asset-detail breadcrumb
+- Keep orientation through active navigation, concise page headings, workspace selector, Study breadcrumb, and progressively disclosed account/details menus
 
 ## 6. Backend API Surface Used
 
@@ -133,9 +133,9 @@ This refactor preserves existing routes, API request shapes, auth defaults, toke
 - Auth boundary, workspace queries, asset queries, transcript flow, explicit indexing, and search remain backend-aligned
 - The new routed shell compiles cleanly without adding external router dependencies
 - P3-C4 local browser smoke passed for the opt-in Keycloak JWT flow. Evidence covered the legacy password auth entry, JWT Keycloak-only entry, empty Keycloak login form, authenticated product shell from Spring `/api/me`, local frontend logout return, and focused primary Keycloak action.
-- P3-FE1 frontend tests cover the authenticated top navigation landmarks, `aria-current` active state, shell Upload action availability, and Escape-to-close behavior for the compact mobile menu.
+- Component tests cover signed-out routing, authenticated Home, the simplified navigation, account/mobile menu Escape behavior, upload dialog focus handling, Library overflow actions, mobile Study tabs, and workspace deletion focus trapping.
 - P3-FE1 browser checks are Vite-only by design. They do not claim authenticated backend/browser integration when Spring/auth services are not running.
-- P3-FE2 component tests cover the Search page labelled query control, result readability, route/state produced by opening a result, loading/empty/error states, selected transcript context on Asset Detail, canonical transcript display without a selected row, missing-row feedback, Search return behavior, and keyboard activation for the context-opening action.
+- Search/Study component tests cover labelled Workspace Search versus Find in transcript, grouped result readability, route/state produced by opening a result, loading/empty/error states, selected context, transcript display, missing-moment feedback, Search return behavior, and keyboard activation.
 - P3-FE2 browser checks are public/auth-surface only when no real authenticated backend session is available; search and asset study behavior are validated through frontend component tests without fake backend sessions.
 - P3-FE2.2 modularized app routing/bootstrap, Search route hydration, study route interpretation, and transcript display ownership without changing routes, API calls, auth defaults, or visible UX.
 - P3-S5.B4.R1 passed the bounded browser flow from upload through automatic indexing,
@@ -144,13 +144,13 @@ This refactor preserves existing routes, API request shapes, auth defaults, toke
 
 ## 10. Design / Product Notes
 
-- The UI now uses a persistent app shell with horizontal desktop navigation instead of a demo hero plus three fixed panels
+- The UI uses a concise public landing experience and a persistent authenticated learning shell
 - Routing is hash-based to stay compatible with the current frontend setup and avoid new backend/server route assumptions
 - Upload copy and accepted file input remain lecture-video-first to match the current real product path
-- Search stays disabled until explicit indexing produces searchable assets
-- Workspace Search opens relevant results into Asset Detail so the learner can continue reading nearby transcript context without losing the source Search orientation
+- Search stays disabled until automatic search preparation produces ready videos
+- Workspace Search opens relevant results into Study so the learner can continue reading nearby transcript context without losing the source Search orientation
 - Search return links carry only compact route state and reuse the existing product search path; result rows are not cached, fabricated, or serialized into the URL
-- Asset Detail can reuse the same transcript-hit/context search pattern, but scoped to the current asset
+- Study exposes the same transcript-hit/context behavior as Find in transcript, scoped to the current video
 - No general-purpose chat history, provider controls or fake AI affordances were added.
   The supported asset-scoped grounded answer and citation UI calls Spring only.
 - Unsupported media seek behavior, provider inference in the browser and persisted chat state

@@ -4,10 +4,12 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { TranscriptRow } from '../../entities/transcript/model/types';
 import type { AssetSummary } from './model/types';
-import { SelectedAssetPanel } from './components/selected-asset-panel';
+import { AssetIndexingRecoveryAction } from './components/asset-indexing-recovery-action';
 import { deriveAssetStatus, shouldPollAssetStatus } from './model/lifecycle';
 import { AssetUploadForm } from '../upload/components/asset-upload-form';
+import { AssetUploadDialog } from '../upload/components/asset-upload-dialog';
 import { ApiClientError } from '../../shared/api/api-error';
+import { AssetList } from './components/asset-list';
 
 const asset: AssetSummary = {
   assetId: 'asset-1',
@@ -27,13 +29,10 @@ const transcriptRows: TranscriptRow[] = [
   },
 ];
 
-function renderSelectedAssetPanel(
-  overrides: Partial<ComponentProps<typeof SelectedAssetPanel>> = {},
+function renderIndexingRecovery(
+  overrides: Partial<ComponentProps<typeof AssetIndexingRecoveryAction>> = {},
 ) {
-  const props: ComponentProps<typeof SelectedAssetPanel> = {
-    asset,
-    workspaceName: 'Distributed Systems',
-    successNotice: null,
+  const props: ComponentProps<typeof AssetIndexingRecoveryAction> = {
     resolvedAssetStatus: 'TRANSCRIPT_READY',
     statusResponse: {
       assetId: 'asset-1',
@@ -41,22 +40,16 @@ function renderSelectedAssetPanel(
       assetStatus: 'TRANSCRIPT_READY',
       processingJobStatus: 'SUCCEEDED',
     },
-    statusError: null,
     transcriptRows,
     transcriptError: null,
-    transcriptLoading: false,
     indexError: null,
     indexResponse: undefined,
     isIndexing: false,
-    isRenaming: false,
-    renameError: null,
     onIndex: vi.fn(),
-    onRename: vi.fn(),
-    onResetRename: vi.fn(),
     ...overrides,
   };
 
-  render(<SelectedAssetPanel {...props} />);
+  render(<AssetIndexingRecoveryAction {...props} />);
   return props;
 }
 
@@ -94,23 +87,21 @@ describe('asset lifecycle characterization', () => {
     ).toBe('SEARCHABLE');
   });
 
-  it('presents explicit indexing as a secondary recovery action', async () => {
+  it('presents manual search preparation only as a secondary recovery action', async () => {
     const user = userEvent.setup();
-    const props = renderSelectedAssetPanel();
+    const props = renderIndexingRecovery();
 
-    expect(screen.getByText('Explicit indexing')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Indexing fallback' })).toBeInTheDocument();
-    expect(screen.getByText(/automatic indexing has not completed/i)).toBeInTheDocument();
+    expect(screen.getByText('Recovery')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Search preparation needs attention' })).toBeInTheDocument();
 
-    const action = screen.getByRole('button', { name: 'Index transcript' });
+    const action = screen.getByRole('button', { name: 'Retry search preparation' });
     expect(action).toHaveClass('button--secondary');
     await user.click(action);
     expect(props.onIndex).toHaveBeenCalledTimes(1);
   });
 
   it('removes recovery indexing after the automatic searchable transition', () => {
-    renderSelectedAssetPanel({
-      asset: { ...asset, assetStatus: 'SEARCHABLE' },
+    renderIndexingRecovery({
       resolvedAssetStatus: 'SEARCHABLE',
       statusResponse: {
         assetId: 'asset-1',
@@ -120,12 +111,38 @@ describe('asset lifecycle characterization', () => {
       },
     });
 
-    expect(screen.queryByRole('button', { name: 'Index transcript' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Indexing fallback' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry search preparation' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Search preparation needs attention' })).not.toBeInTheDocument();
   });
 });
 
 describe('asset upload characterization', () => {
+  it('contains upload in a labelled dialog with Escape close and focus restoration', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const trigger = document.createElement('button');
+    document.body.appendChild(trigger);
+    trigger.focus();
+
+    const { unmount } = render(
+      <AssetUploadDialog
+        workspaceName="Distributed Systems"
+        uploadError={null}
+        isUploading={false}
+        onUpload={vi.fn()}
+        onClose={onClose}
+      />,
+    );
+
+    expect(screen.getByRole('dialog', { name: 'Upload video' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Close upload dialog' })).toHaveFocus();
+    await user.keyboard('{Escape}');
+    expect(onClose).toHaveBeenCalledTimes(1);
+    unmount();
+    expect(trigger).toHaveFocus();
+    trigger.remove();
+  });
+
   it('submits the trimmed optional title and resets file controls after success', async () => {
     const user = userEvent.setup();
     const onUpload = vi.fn();
@@ -138,13 +155,13 @@ describe('asset upload characterization', () => {
     };
     const { rerender } = render(<AssetUploadForm {...props} />);
     const file = new File(['video'], 'lecture.mp4', { type: 'video/mp4' });
-    const titleInput = screen.getByLabelText(/asset title/i);
-    const fileInput = screen.getByLabelText(/source file/i) as HTMLInputElement;
+    const titleInput = screen.getByLabelText(/video title/i);
+    const fileInput = screen.getByLabelText(/video file/i) as HTMLInputElement;
 
     await user.type(titleInput, '  Lifecycle lecture  ');
     await user.upload(fileInput, file);
     expect(screen.getByText('lecture.mp4')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Upload to workspace' }));
+    await user.click(screen.getByRole('button', { name: 'Upload video' }));
 
     expect(onUpload).toHaveBeenCalledWith({ file, title: 'Lifecycle lecture' });
 
@@ -163,11 +180,11 @@ describe('asset upload characterization', () => {
     };
 
     const { rerender } = render(<AssetUploadForm {...baseProps} />);
-    expect(screen.getByRole('button', { name: 'Upload to workspace' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Upload video' })).toBeDisabled();
 
     rerender(<AssetUploadForm {...baseProps} isUploading />);
-    expect(screen.getByRole('button', { name: /uploading to distributed systems/i })).toBeDisabled();
-    expect(screen.getByText('Upload in progress')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Uploading video...' })).toBeDisabled();
+    expect(screen.getByText('Uploading video')).toBeInTheDocument();
   });
 
   it('rejects an unsupported selected file before it can submit an upload request', async () => {
@@ -181,7 +198,7 @@ describe('asset upload characterization', () => {
         onUpload={onUpload}
       />,
     );
-    const fileInput = screen.getByLabelText(/source file/i) as HTMLInputElement;
+    const fileInput = screen.getByLabelText(/video file/i) as HTMLInputElement;
     const invalidFile = new File(['notes'], 'notes.txt', { type: 'video/mp4' });
 
     expect(fileInput).toHaveAttribute(
@@ -190,9 +207,9 @@ describe('asset upload characterization', () => {
     );
     await user.upload(fileInput, invalidFile);
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Chọn tệp video MP4, MOV, M4V, WebM hoặc AVI hợp lệ.');
+    expect(screen.getByRole('alert')).toHaveTextContent('Choose an MP4, MOV, M4V, WebM, or AVI video.');
     expect(screen.getByText('notes.txt')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Upload to workspace' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Upload video' })).toBeDisabled();
     expect(onUpload).not.toHaveBeenCalled();
   });
 
@@ -207,7 +224,7 @@ describe('asset upload characterization', () => {
         onUpload={onUpload}
       />,
     );
-    const fileInput = screen.getByLabelText(/source file/i) as HTMLInputElement;
+    const fileInput = screen.getByLabelText(/video file/i) as HTMLInputElement;
 
     await user.upload(fileInput, new File(['notes'], 'notes.txt', { type: 'text/plain' }));
     expect(screen.getByRole('alert')).toBeInTheDocument();
@@ -216,8 +233,8 @@ describe('asset upload characterization', () => {
     await user.upload(fileInput, validFile);
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Upload to workspace' })).toBeEnabled();
-    await user.click(screen.getByRole('button', { name: 'Upload to workspace' }));
+    expect(screen.getByRole('button', { name: 'Upload video' })).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: 'Upload video' }));
     expect(onUpload).toHaveBeenCalledWith({ file: validFile, title: undefined });
   });
 
@@ -231,8 +248,58 @@ describe('asset upload characterization', () => {
       />,
     );
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Tệp tải lên không được hỗ trợ');
-    expect(screen.getByRole('alert')).toHaveTextContent('Chọn tệp video MP4, MOV, M4V, WebM hoặc AVI hợp lệ.');
+    expect(screen.getByRole('alert')).toHaveTextContent('Video format is not supported');
+    expect(screen.getByRole('alert')).toHaveTextContent('Choose an MP4, MOV, M4V, WebM, or AVI video.');
     expect(screen.getByRole('alert')).not.toHaveTextContent('Only MP4, MOV, M4V, WebM, and AVI');
+  });
+});
+
+describe('video library actions', () => {
+  it('keeps Open, Rename, and Delete in a labelled overflow menu without showing the asset id', async () => {
+    const user = userEvent.setup();
+    const onSelectAsset = vi.fn();
+    const onRenameAsset = vi.fn();
+    const onDeleteAsset = vi.fn();
+
+    render(
+      <AssetList
+        assets={[asset]}
+        selectedAssetId={null}
+        successNotice={null}
+        assetsError={null}
+        deleteError={null}
+        renameError={null}
+        deleteBusy={false}
+        deletingAssetId={null}
+        renameBusy={false}
+        renamingAssetId={null}
+        assetsLoading={false}
+        onSelectAsset={onSelectAsset}
+        onDeleteAsset={onDeleteAsset}
+        onRenameAsset={onRenameAsset}
+      />,
+    );
+
+    expect(screen.queryByText(asset.assetId)).not.toBeInTheDocument();
+    const actions = screen.getByRole('button', { name: `Actions for ${asset.title}` });
+    await user.click(actions);
+    expect(screen.getByRole('button', { name: 'Open' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Rename' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    expect(onSelectAsset).toHaveBeenCalledWith(asset.assetId);
+
+    await user.click(actions);
+    await user.click(screen.getByRole('button', { name: 'Rename' }));
+    const titleInput = screen.getByLabelText(`New title for ${asset.title}`);
+    await user.clear(titleInput);
+    await user.type(titleInput, 'Distributed Systems Lecture');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(onRenameAsset).toHaveBeenCalledWith(asset, 'Distributed Systems Lecture');
+
+    await user.click(actions);
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    expect(onDeleteAsset).toHaveBeenCalledWith(asset);
   });
 });

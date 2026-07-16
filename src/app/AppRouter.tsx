@@ -16,6 +16,7 @@ import {
   useLogoutMutation,
   useRegisterMutation,
 } from '../features/auth/auth';
+import { PublicLanding } from '../features/auth/public-landing';
 import { useAuth } from '../features/auth/auth-provider';
 import { assetKeys, useAssetRouteQuery } from '../features/assets/hooks/asset-queries';
 import { useAssetSelection } from '../features/assets/hooks/use-asset-selection';
@@ -65,6 +66,7 @@ export function AppRouter() {
       (currentUserQuery.error instanceof ApiClientError &&
         currentUserQuery.error.status === 409 &&
         currentUserQuery.error.code === 'AUTH_MODE_UNAVAILABLE'));
+  const isPublicAuthRoute = route.name === 'login' || route.name === 'register';
 
   const workspacesQuery = useWorkspacesQuery(isAuthenticated);
   const {
@@ -114,15 +116,6 @@ export function AppRouter() {
     () => displayAssets.filter((asset) => asset.assetStatus === 'SEARCHABLE').length,
     [displayAssets],
   );
-  const processingAssetCount = useMemo(
-    () => displayAssets.filter((asset) => asset.assetStatus === 'PROCESSING').length,
-    [displayAssets],
-  );
-  const transcriptReadyAssetCount = useMemo(
-    () => displayAssets.filter((asset) => asset.assetStatus === 'TRANSCRIPT_READY').length,
-    [displayAssets],
-  );
-
   const workspaceSearch = useSearchController({ workspaceId: selectedWorkspaceId });
   const assetSearch = useSearchController({ workspaceId: selectedWorkspaceId, assetId: selectedAssetId });
   const openAssistantCitationInAsset = useAssistantCitationNavigation({
@@ -259,6 +252,12 @@ export function AppRouter() {
     navigate,
   });
 
+  useEffect(() => {
+    if (isAuthenticated && isPublicAuthRoute) {
+      navigate({ name: 'home' });
+    }
+  }, [isAuthenticated, isPublicAuthRoute, navigate]);
+
   function handleSelectWorkspace(workspaceId: string) {
     workspaceManagement.clearSuccessNotice();
     setPreferredWorkspaceId(workspaceId);
@@ -326,6 +325,7 @@ export function AppRouter() {
         loginMutation.reset();
         logoutMutation.reset();
         await reconcileAuthBoundary();
+        if (isPublicAuthRoute) navigate({ name: 'home' });
       },
     });
   }
@@ -336,6 +336,7 @@ export function AppRouter() {
         registerMutation.reset();
         logoutMutation.reset();
         await reconcileAuthBoundary();
+        if (isPublicAuthRoute) navigate({ name: 'home' });
       },
     });
   }
@@ -430,9 +431,26 @@ export function AppRouter() {
   if (auth.isResolvingAuth) {
     return (
       <div className="app-shell app-shell--centered">
-        <LoadingBlock label="Completing Keycloak sign-in..." />
+        <LoadingBlock label="Completing sign in..." />
       </div>
     );
+  }
+
+  if (currentUserQuery.isLoading) {
+    return (
+      <div className="app-shell app-shell--centered">
+        <LoadingBlock label="Checking your session..." />
+      </div>
+    );
+  }
+
+  if (
+    route.name === 'home' &&
+    (isLegacyAuthRequired ||
+      (auth.mode === 'keycloak_jwt' &&
+        (auth.configIssue || (!auth.hasBearerToken && !isJwtAuthModeUnavailable && !auth.authErrorMessage))))
+  ) {
+    return <PublicLanding navigate={navigate} />;
   }
 
   if (auth.mode === 'keycloak_jwt' && (auth.configIssue || isJwtAuthModeUnavailable || !auth.hasBearerToken)) {
@@ -443,21 +461,15 @@ export function AppRouter() {
         authErrorMessage={auth.authErrorMessage}
         isStartingLogin={auth.isStartingLogin}
         onContinue={() => void auth.startKeycloakLogin()}
+        onBackHome={() => navigate({ name: 'home' })}
       />
-    );
-  }
-
-  if (currentUserQuery.isLoading) {
-    return (
-      <div className="app-shell app-shell--centered">
-        <LoadingBlock label="Checking authenticated session..." />
-      </div>
     );
   }
 
   if (isLegacyAuthRequired) {
     return (
       <AuthEntrySurface
+        mode={route.name === 'register' ? 'register' : 'login'}
         registerError={registerMutation.error}
         loginError={loginMutation.error}
         isRegistering={registerMutation.isPending}
@@ -465,6 +477,8 @@ export function AppRouter() {
         onRegister={handleRegister}
         onLogin={handleLogin}
         onResetErrors={resetAuthMutations}
+        onNavigateMode={(mode) => navigate({ name: mode })}
+        onBackHome={() => navigate({ name: 'home' })}
       />
     );
   }
@@ -509,15 +523,45 @@ export function AppRouter() {
     );
   }
 
+  const settingsScreen = (
+    <SettingsScreen
+      currentUserEmail={currentUser?.email ?? 'Unknown account'}
+      logoutError={auth.mode === 'legacy_session' ? logoutMutation.error : null}
+      isLoggingOut={isLogoutPending}
+      onLogout={() => void handleLogout()}
+      workspaceManagement={
+        <WorkspaceBar
+          workspaces={workspacesQuery.data ?? []}
+          selectedWorkspace={selectedWorkspace}
+          selectedWorkspaceId={selectedWorkspaceId}
+          isLoading={workspacesQuery.isLoading || workspacesQuery.isFetching || isTransitionPending}
+          successNotice={workspaceManagement.successNotice}
+          createError={workspaceManagement.createError}
+          renameError={workspaceManagement.renameError}
+          deleteError={workspaceManagement.deleteError}
+          createSuccessId={workspaceManagement.createSuccessId}
+          onSelectWorkspace={handleSelectWorkspace}
+          onCreateWorkspace={workspaceManagement.createWorkspace}
+          onRenameWorkspace={workspaceManagement.renameWorkspace}
+          onDeleteWorkspace={workspaceManagement.deleteWorkspace}
+          onResetDelete={workspaceManagement.resetDelete}
+          isCreating={workspaceManagement.isCreating}
+          isRenaming={workspaceManagement.isRenaming}
+          isDeleting={workspaceManagement.isDeleting}
+        />
+      }
+    />
+  );
+
   let screenContent;
 
   if (!selectedWorkspace) {
-    screenContent = (
+    screenContent = route.name === 'settings' ? settingsScreen : (
       <div className="screen-stack">
         <div className="workspace-setup-card">
           <EmptyState
             title="No workspace yet"
-            description="Create a workspace in Settings to start uploading lecture videos and preparing them for transcript search."
+            description="Create a workspace to upload your first learning video."
           />
           <div className="workspace-setup-card__actions">
             <Button type="button" onClick={() => navigate({ name: 'settings' })}>
@@ -538,17 +582,22 @@ export function AppRouter() {
             successNotice={assetManagement.librarySuccessNotice}
             assetsError={assetsQuery.error}
             deleteError={assetManagement.visibleDeleteError}
+            renameError={assetManagement.visibleRenameError}
             deleteBusy={assetManagement.isDeleting}
             deletingAssetId={assetManagement.deletingAssetId}
+            renameBusy={Boolean(assetManagement.renamingAssetId)}
+            renamingAssetId={assetManagement.renamingAssetId}
             assetsLoading={assetsQuery.isLoading}
             uploadError={upload.error}
             uploadSuccessId={upload.uploadedAssetId}
             isUploading={upload.isUploading}
+            isUploadOpen={Boolean(route.upload)}
             onSelectAsset={openAsset}
             onDeleteAsset={assetManagement.handleDeleteAsset}
+            onRenameAsset={(asset, title) => assetManagement.handleRenameAsset(title, asset)}
             onUpload={upload.submit}
-            onOpenSearch={() => navigate({ name: 'search' })}
-            onOpenSettings={() => navigate({ name: 'settings' })}
+            onOpenUpload={() => navigate({ name: 'library', upload: true })}
+            onCloseUpload={() => navigate({ name: 'library' })}
           />
         );
         break;
@@ -557,7 +606,6 @@ export function AppRouter() {
           <AssetDetailScreen
             workspaceId={selectedWorkspace.id}
             workspaceName={selectedWorkspace.name}
-            assets={displayAssets}
             asset={selectedAsset}
             successNotice={assetManagement.detailSuccessNotice}
             resolvedAssetStatus={lifecycle.resolvedAssetStatus}
@@ -570,6 +618,7 @@ export function AppRouter() {
             indexResponse={lifecycle.indexResponse}
             isIndexing={lifecycle.isIndexing}
             isRenaming={Boolean(assetManagement.isRenamingSelectedAsset)}
+            isDeleting={assetManagement.deletingAssetId === selectedAsset?.assetId}
             renameError={assetManagement.visibleRenameError}
             activeQuery={assetSearch.submittedSearch}
             searchResponse={assetSearch.searchResponse}
@@ -586,15 +635,13 @@ export function AppRouter() {
             studyContextError={routedStudyContextQuery.error}
             isStudyContextLoading={routedStudyContextQuery.isLoading || routedStudyContextQuery.isFetching}
             searchResetToken={assetSearch.resetToken}
-            searchableAssetCount={searchableAssetCount}
             onIndex={lifecycle.runRecoveryIndexing}
             onRename={assetManagement.handleRenameAsset}
             onResetRename={assetManagement.resetRename}
+            onDelete={assetManagement.handleDeleteAsset}
             onSearchWithinAsset={assetSearch.submit}
             onSelectSearchResult={assetSearch.setSelectedResult}
             onOpenLibrary={() => navigate({ name: 'library' })}
-            onOpenSearch={() => navigate({ name: 'search' })}
-            onOpenAsset={openAsset}
             onOpenAssistantCitation={openAssistantCitationInAsset}
             onReturnToSearch={route.name === 'asset' && route.source === 'search' ? returnToSearchFromAsset : undefined}
             onClearStudyContext={studyRouteState.focusedTranscriptRowId ? clearRoutedStudyContext : undefined}
@@ -616,7 +663,6 @@ export function AppRouter() {
             contextError={workspaceSearch.contextError}
             isContextLoading={workspaceSearch.isContextLoading}
             selectedResult={workspaceSearch.selectedResult}
-            assets={displayAssets}
             onSearch={(query) => {
               const trimmedQuery = query.trim();
               workspaceSearch.submit(trimmedQuery);
@@ -624,57 +670,23 @@ export function AppRouter() {
             }}
             onSelectResult={workspaceSearch.setSelectedResult}
             onOpenResultContext={openSearchResultInAsset}
-            onOpenAsset={openAsset}
-            onOpenLibrary={() => navigate({ name: 'library' })}
           />
         );
         break;
       case 'settings':
-        screenContent = (
-          <SettingsScreen
-            currentUserEmail={currentUser?.email ?? 'Unknown account'}
-            selectedWorkspaceName={selectedWorkspace.name}
-            workspaceManagement={
-              <WorkspaceBar
-                workspaces={workspacesQuery.data ?? []}
-                selectedWorkspace={selectedWorkspace}
-                selectedWorkspaceId={selectedWorkspaceId}
-                isLoading={workspacesQuery.isLoading || workspacesQuery.isFetching || isTransitionPending}
-                successNotice={workspaceManagement.successNotice}
-                createError={workspaceManagement.createError}
-                renameError={workspaceManagement.renameError}
-                deleteError={workspaceManagement.deleteError}
-                logoutError={auth.mode === 'legacy_session' ? logoutMutation.error : null}
-                createSuccessId={workspaceManagement.createSuccessId}
-                onSelectWorkspace={handleSelectWorkspace}
-                onCreateWorkspace={workspaceManagement.createWorkspace}
-                onRenameWorkspace={workspaceManagement.renameWorkspace}
-                onDeleteWorkspace={workspaceManagement.deleteWorkspace}
-                onResetDelete={workspaceManagement.resetDelete}
-                isCreating={workspaceManagement.isCreating}
-                isRenaming={workspaceManagement.isRenaming}
-                isDeleting={workspaceManagement.isDeleting}
-                onLogout={handleLogout}
-                isLoggingOut={isLogoutPending}
-              />
-            }
-          />
-        );
+        screenContent = settingsScreen;
         break;
       case 'home':
       default:
         screenContent = (
           <WorkspaceHomeScreen
             workspaceName={selectedWorkspace.name}
-            currentUserEmail={currentUser?.email ?? 'Unknown account'}
             assets={displayAssets}
             selectedAsset={selectedAsset}
             searchableAssetCount={searchableAssetCount}
-            activeQuery={workspaceSearch.submittedSearch}
-            onOpenLibrary={() => navigate({ name: 'library' })}
+            onUploadVideo={() => navigate({ name: 'library', upload: true })}
             onOpenSearch={() => navigate({ name: 'search' })}
             onOpenAsset={openAsset}
-            onOpenSettings={() => navigate({ name: 'settings' })}
           />
         );
         break;
@@ -688,12 +700,8 @@ export function AppRouter() {
       workspaces={workspacesQuery.data ?? []}
       selectedWorkspace={selectedWorkspace}
       selectedWorkspaceId={selectedWorkspaceId}
-      selectedAssetTitle={selectedAsset?.title}
       currentUserEmail={currentUser?.email ?? 'Unknown account'}
       isWorkspaceFetching={workspacesQuery.isFetching}
-      processingAssetCount={processingAssetCount}
-      transcriptReadyAssetCount={transcriptReadyAssetCount}
-      searchableAssetCount={searchableAssetCount}
       isLogoutPending={isLogoutPending}
       onSelectWorkspace={handleSelectWorkspace}
       onLogout={handleLogout}

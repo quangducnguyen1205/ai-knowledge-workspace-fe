@@ -34,21 +34,21 @@ export function AssetIndexingRecoveryAction({
       {action ? (
         <div className={`action-card ${!action.canIndex ? 'action-card--muted' : ''}`}>
           <div className="action-card__copy">
-            <p className="panel__eyebrow">Explicit indexing</p>
+            <p className="panel__eyebrow">Recovery</p>
             <h3>{action.title}</h3>
             <p>{action.description}</p>
           </div>
           <Button type="button" tone={action.buttonTone} onClick={onIndex} disabled={!action.canIndex || isIndexing}>
-            {isIndexing ? 'Indexing...' : action.buttonLabel}
+            {isIndexing ? 'Preparing...' : action.buttonLabel}
           </Button>
         </div>
       ) : null}
 
       {isIndexing ? (
-        <InfoBanner title="Indexing transcript" message="Publishing transcript rows to workspace search so this asset becomes discoverable." />
+        <InfoBanner title="Preparing search" message="Retrying search preparation for this video." />
       ) : null}
       {indexResponse ? (
-        <InfoBanner tone="success" title="Indexing complete" message={`Indexed ${indexResponse.indexedDocumentCount} transcript rows for this asset.`} />
+        <InfoBanner tone="success" title="Video is ready" message="This video can now be found in workspace search." />
       ) : null}
       {indexError ? <ErrorBanner error={indexError} /> : null}
     </>

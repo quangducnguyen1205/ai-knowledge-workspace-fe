@@ -37,6 +37,8 @@ const transcriptRows = [
   },
 ];
 
+const routeFlowTimeout = { timeout: 3_000 };
+
 function jsonResponse(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), {
     status,
@@ -178,7 +180,11 @@ describe('Search route query flow', () => {
     });
     expect(await screen.findByDisplayValue('vector clocks')).toBeInTheDocument();
     expect(
-      await screen.findByRole('button', { name: 'Study result 1 in Vector Clocks Lecture' }),
+      await screen.findByRole(
+        'button',
+        { name: 'Open result 1 in Vector Clocks Lecture' },
+        routeFlowTimeout,
+      ),
     ).toBeInTheDocument();
     expect(searchCalls(fetchMock)).toHaveLength(1);
   });
@@ -192,7 +198,7 @@ describe('Search route query flow', () => {
     await waitFor(() => {
       expect(window.location.hash).toBe('#/search');
     });
-    expect(await screen.findByLabelText(/search transcript text/i)).toHaveValue('');
+    expect(await screen.findByLabelText(/search workspace/i)).toHaveValue('');
     expect(searchCalls(fetchMock)).toHaveLength(0);
   });
 
@@ -201,7 +207,11 @@ describe('Search route query flow', () => {
 
     expect(await screen.findByDisplayValue('vector clocks')).toBeInTheDocument();
     expect(
-      await screen.findByRole('button', { name: 'Study result 1 in Vector Clocks Lecture' }),
+      await screen.findByRole(
+        'button',
+        { name: 'Open result 1 in Vector Clocks Lecture' },
+        routeFlowTimeout,
+      ),
     ).toBeInTheDocument();
     expect(searchCalls(fetchMock)).toHaveLength(1);
   });
@@ -209,8 +219,8 @@ describe('Search route query flow', () => {
   it('does not auto-submit Search when the route has no q', async () => {
     const fetchMock = renderAppAt('#/search');
 
-    expect(await screen.findByLabelText(/search transcript text/i)).toHaveValue('');
-    expect(screen.getByText(/search this workspace/i)).toBeInTheDocument();
+    expect(await screen.findByLabelText(/search workspace/i)).toHaveValue('');
+    expect(screen.getByText(/search your learning workspace/i)).toBeInTheDocument();
     expect(searchCalls(fetchMock)).toHaveLength(0);
   });
 });

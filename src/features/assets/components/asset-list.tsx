@@ -1,5 +1,6 @@
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Button, EmptyState, ErrorBanner, InfoBanner, LoadingBlock, formatDateTime } from '../../../lib/ui';
-import { getAssetStatusDescription, getFriendlyDeleteErrorCopy } from '../model/error-copy';
+import { getFriendlyDeleteErrorCopy, getFriendlyRenameErrorCopy } from '../model/error-copy';
 import type { AssetSummary } from '../model/types';
 import { StatusBadge } from './status-badge';
 
@@ -9,41 +10,90 @@ export function AssetList({
   successNotice,
   assetsError,
   deleteError,
+  renameError,
   deleteBusy,
   deletingAssetId,
+  renameBusy,
+  renamingAssetId,
   assetsLoading,
+  emptyDescription,
   onSelectAsset,
   onDeleteAsset,
+  onRenameAsset,
 }: {
   assets: AssetSummary[];
   selectedAssetId: string | null;
   successNotice: { title: string; message: string } | null;
   assetsError: unknown;
   deleteError: unknown;
+  renameError: unknown;
   deleteBusy: boolean;
   deletingAssetId: string | null;
+  renameBusy: boolean;
+  renamingAssetId: string | null;
   assetsLoading: boolean;
+  emptyDescription?: string;
   onSelectAsset: (assetId: string) => void;
   onDeleteAsset: (asset: AssetSummary) => void;
+  onRenameAsset: (asset: AssetSummary, title: string) => void;
 }) {
+  const [openMenuAssetId, setOpenMenuAssetId] = useState<string | null>(null);
+  const [editingAsset, setEditingAsset] = useState<AssetSummary | null>(null);
+  const [draftTitle, setDraftTitle] = useState('');
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const deleteErrorCopy = getFriendlyDeleteErrorCopy(deleteError);
+  const renameErrorCopy = getFriendlyRenameErrorCopy(renameError);
+
+  useEffect(() => {
+    if (!openMenuAssetId) return;
+
+    function closeMenuWithKeyboard(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setOpenMenuAssetId(null);
+        menuButtonRef.current?.focus();
+      }
+    }
+
+    function closeMenuFromOutside(event: Event) {
+      if (event.target instanceof Node && !menuRef.current?.contains(event.target)) {
+        setOpenMenuAssetId(null);
+      }
+    }
+
+    window.addEventListener('keydown', closeMenuWithKeyboard);
+    window.addEventListener('pointerdown', closeMenuFromOutside);
+    return () => {
+      window.removeEventListener('keydown', closeMenuWithKeyboard);
+      window.removeEventListener('pointerdown', closeMenuFromOutside);
+    };
+  }, [openMenuAssetId]);
+
+  useEffect(() => {
+    if (editingAsset && !assets.some((asset) => asset.assetId === editingAsset.assetId)) {
+      setEditingAsset(null);
+      setDraftTitle('');
+    }
+  }, [assets, editingAsset]);
+
+  useEffect(() => {
+    if (editingAsset && successNotice?.title === 'Video renamed') {
+      setEditingAsset(null);
+      setDraftTitle('');
+    }
+  }, [editingAsset, successNotice]);
+
+  function submitRename(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editingAsset || renameBusy) return;
+    const nextTitle = draftTitle.trim();
+    if (!nextTitle || nextTitle === editingAsset.title) return;
+    onRenameAsset(editingAsset, nextTitle);
+  }
 
   return (
     <div className="asset-list">
-      <div className="asset-list__meta">
-        <strong>{assets.length}</strong>
-        <span>{assets.length === 1 ? 'asset in this workspace' : 'assets in this workspace'}</span>
-      </div>
-
-      <div className="status-legend">
-        <span className="status-legend__label">Status legend</span>
-        <StatusBadge status="PROCESSING" />
-        <StatusBadge status="TRANSCRIPT_READY" />
-        <StatusBadge status="SEARCHABLE" />
-        <StatusBadge status="FAILED" />
-      </div>
-
-      {assetsLoading ? <LoadingBlock label="Loading workspace assets..." compact /> : null}
+      {assetsLoading ? <LoadingBlock label="Loading videos..." compact /> : null}
       {!assetsLoading && assetsError ? <ErrorBanner error={assetsError} /> : null}
       {!assetsLoading && !assetsError && deleteErrorCopy?.tone === 'warning' ? (
         <InfoBanner tone="warning" title={deleteErrorCopy.title} message={deleteErrorCopy.message} detail={deleteErrorCopy.detail} />
@@ -56,40 +106,111 @@ export function AssetList({
       ) : null}
 
       {!assetsLoading && !assetsError && assets.length === 0 ? (
-        <EmptyState title="No assets yet" description="Upload a lecture video to start transcript review and prepare this workspace for search." />
+        <EmptyState title="No videos found" description={emptyDescription ?? 'Upload a video to begin learning in this workspace.'} />
       ) : null}
 
       {!assetsLoading && !assetsError && assets.length > 0 ? (
-        <ul className="asset-list__items">
+        <ul className="video-list">
           {assets.map((asset) => {
             const isSelected = asset.assetId === selectedAssetId;
             const isDeleting = deletingAssetId === asset.assetId;
+            const isRenaming = renamingAssetId === asset.assetId;
+            const isEditing = editingAsset?.assetId === asset.assetId;
+
             return (
-              <li key={asset.assetId} className="asset-row">
-                <button
-                  type="button"
-                  className={`asset-card ${isSelected ? 'asset-card--selected' : ''}`}
-                  onClick={() => onSelectAsset(asset.assetId)}
-                >
-                  <div className="asset-card__header">
+              <li key={asset.assetId} className={`video-row ${isSelected ? 'video-row--selected' : ''}`}>
+                <button type="button" className="video-row__open" onClick={() => onSelectAsset(asset.assetId)}>
+                  <span className="video-row__thumb" aria-hidden="true">▶</span>
+                  <span className="video-row__copy">
                     <strong>{asset.title}</strong>
-                    <StatusBadge status={asset.assetStatus} />
-                  </div>
-                  <div className="asset-card__meta">
-                    <span>{formatDateTime(asset.createdAt)}</span>
-                    <span className="asset-card__id">{asset.assetId}</span>
-                  </div>
-                  <p className="asset-card__summary">{getAssetStatusDescription(asset.assetStatus)}</p>
+                    <small>{formatDateTime(asset.createdAt)}</small>
+                  </span>
+                  <StatusBadge status={asset.assetStatus} />
                 </button>
-                <Button
-                  type="button"
-                  tone="ghost"
-                  className="asset-row__delete"
-                  onClick={() => onDeleteAsset(asset)}
-                  disabled={deleteBusy}
-                >
-                  {isDeleting ? 'Deleting...' : 'Delete'}
-                </Button>
+
+                <div ref={openMenuAssetId === asset.assetId ? menuRef : undefined} className="overflow-menu">
+                  <button
+                    ref={openMenuAssetId === asset.assetId ? menuButtonRef : undefined}
+                    type="button"
+                    className="overflow-menu__trigger"
+                    aria-label={`Actions for ${asset.title}`}
+                    aria-expanded={openMenuAssetId === asset.assetId}
+                    onClick={() => setOpenMenuAssetId((current) => current === asset.assetId ? null : asset.assetId)}
+                  >
+                    <span aria-hidden="true">•••</span>
+                  </button>
+                  {openMenuAssetId === asset.assetId ? (
+                    <div className="overflow-menu__popover" aria-label={`Video actions for ${asset.title}`}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpenMenuAssetId(null);
+                          onSelectAsset(asset.assetId);
+                        }}
+                      >
+                        Open
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingAsset(asset);
+                          setDraftTitle(asset.title);
+                          setOpenMenuAssetId(null);
+                        }}
+                      >
+                        Rename
+                      </button>
+                      <button
+                        type="button"
+                        className="overflow-menu__danger"
+                        onClick={() => {
+                          setOpenMenuAssetId(null);
+                          onDeleteAsset(asset);
+                        }}
+                        disabled={deleteBusy}
+                      >
+                        {isDeleting ? 'Deleting...' : 'Delete'}
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+
+                {isEditing ? (
+                  <form className="video-row__rename" onSubmit={submitRename}>
+                    <label className="field field--grow">
+                      <span className="visually-hidden">New title for {asset.title}</span>
+                      <input
+                        className="field__input"
+                        value={draftTitle}
+                        onChange={(event) => setDraftTitle(event.target.value)}
+                        maxLength={255}
+                        autoFocus
+                        disabled={renameBusy}
+                      />
+                    </label>
+                    <Button type="submit" className="button--inline" disabled={renameBusy || !draftTitle.trim() || draftTitle.trim() === asset.title}>
+                      {isRenaming ? 'Saving...' : 'Save'}
+                    </Button>
+                    <Button
+                      type="button"
+                      tone="ghost"
+                      className="button--inline"
+                      onClick={() => {
+                        setEditingAsset(null);
+                        setDraftTitle('');
+                      }}
+                      disabled={renameBusy}
+                    >
+                      Cancel
+                    </Button>
+                    {renameErrorCopy?.tone === 'warning' ? (
+                      <InfoBanner tone="warning" title={renameErrorCopy.title} message={renameErrorCopy.message} />
+                    ) : null}
+                    {renameErrorCopy?.tone === 'error' ? (
+                      <ErrorBanner error={renameError} title={renameErrorCopy.title} message={renameErrorCopy.message} />
+                    ) : null}
+                  </form>
+                ) : null}
               </li>
             );
           })}

@@ -1,37 +1,42 @@
-# AI Knowledge Workspace Frontend Demo
+# AI Knowledge Workspace Frontend
 
 This repo is the separate frontend for the AI Knowledge Workspace product. It is intentionally
 narrow, depends only on the Spring product API, and does not call the internal FastAPI service
 directly. See the [Project3 v1 final baseline](https://github.com/quangducnguyen1205/ai-knowledge-workspace/blob/project3-submission-v1/docs/submission/project3-final-baseline.md)
 for cross-repository ownership and evidence.
 
-## Current Demo Scope
+## Current Product Scope
 
+- concise public landing page plus dedicated Login and Register routes
 - workspace selection and creation
-- workspace-scoped asset upload and listing
+- workspace-scoped video upload in a controlled dialog and focused library management
 - processing status polling
 - transcript retrieval
 - automatic indexing as the normal lifecycle, with explicit indexing retained as a fallback
-- workspace search with result-to-asset study context
-- transcript-context follow-up around selected hits
-- search within the currently viewed video from Asset Detail
-- selected asset lifecycle guidance with a clearer current step and next action
-- search disabled until the active workspace has at least one searchable asset
+- Workspace Search with result-to-video study context
+- Find in transcript on the current Study screen
+- desktop transcript/assistant study layout with deliberate Transcript, Ask, and Details mobile views
 - search/context state kept in sync across workspace switch, upload completion, indexing completion, and refreshed results
-- responsive product app shell with persistent desktop top navigation and compact mobile navigation
-- grounded Ask-this-asset answers with insufficient-context handling, actionable citations, and transcript-row navigation
+- responsive product shell with Home, Library, and Search primary navigation
+- workspace selector, Upload action, and compact account menu with Settings and sign out
+- grounded Ask-this-video answers with insufficient-context handling, actionable citations, and transcript navigation
 - incremental frontend module boundaries documented in `FRONTEND_STATUS.md`
 
 ## Navigation Model
 
-Authenticated product screens use a horizontal top navigation model:
+Signed-out routes use the existing hash deployment model:
 
-- `Home` for workspace readiness and next action orientation
-- `Library` for upload, asset inventory, and asset management
-- `Search` for workspace-scoped transcript search and opening relevant asset moments
-- `Settings` for workspace management and account context
+- `#/` for the landing page
+- `#/login` for Login
+- `#/register` for Register
 
-Asset detail remains a deep route under Library and exposes a breadcrumb back to the library. The shell includes a skip-to-content link, active navigation state with `aria-current`, a keyboard-operable compact mobile menu, and a single shell-level Upload action that routes to the existing Library upload flow. The Ask-this-asset panel calls Spring only, renders grounded-answer states and citations, and opens compact transcript context routes. It never calls FastAPI or a provider directly.
+Authenticated product screens use a compact top navigation model:
+
+- `Home` for immediate actions and recent learning
+- `Library` for upload, filtering, and video management
+- `Search` for workspace-wide transcript search and opening relevant moments
+
+Settings remains available from the account menu at `#/settings`. Study remains a compatible deep route at `#/assets/:assetId`, with existing compact query state for search and citation focus. The shell includes a skip-to-content link, active state with `aria-current`, keyboard-operable mobile and account menus, and a shell-level Upload action that opens `#/library?upload=1`. The upload dialog, workspace deletion dialog, and mobile Study views preserve focus, Escape, and duplicate-submit protections.
 
 ## Asset Processing And Indexing Lifecycle
 
@@ -47,15 +52,15 @@ production-scale capacity, security certification or unrestricted chatbot behavi
 Workspace Search now supports the real learner flow:
 
 ```text
-Search transcript text
+Search workspace
 -> review ranked results with asset title, excerpt, and transcript moment metadata
--> Study this moment
--> Asset Detail opens with the selected transcript row carried in the hash route
+-> Open in video
+-> Study opens with the selected transcript row carried in the hash route
 -> nearby transcript context loads from the existing transcript context API
--> the canonical transcript remains available below, with the selected row marked when visible
+-> the transcript remains available with the selected moment marked when visible
 ```
 
-The route carries only compact state: asset id, transcript-row reference, and optional source query. It does not serialize transcript text, credentials, raw API payloads, user email, tokens, or private data into the URL. Asset Detail keeps a return action back to Search when the route originated there, including the safe original query as `#/search?q=<query>` when present. Returning to Search reloads results through the existing product search API; result rows are not cached, fabricated, or serialized into the URL. Library remains the canonical place for upload and asset management.
+The route carries only compact state: asset id, transcript-row reference, and optional source query. It does not serialize transcript text, credentials, raw API payloads, user email, tokens, or private data into the URL. Study keeps a return action back to Search when the route originated there, including the safe original query as `#/search?q=<query>` when present. Returning to Search reloads results through the existing product search API; result rows are not cached, fabricated, or serialized into the URL. Library remains the canonical place for upload and video management.
 
 ## Local Setup
 
@@ -83,7 +88,7 @@ Recently verified in the browser:
 - automatic Project3 lifecycle through SEARCHABLE, search, grounded assistant answer and
   citation navigation without a direct browser request to FastAPI
 - P3-C4 local Keycloak browser smoke: legacy auth entry remained visually available, and opt-in `keycloak_jwt` completed browser Authorization Code + PKCE through Keycloak, returned to the frontend, called Spring `/api/me`, rendered the authenticated product shell, and returned to the local Keycloak entry surface after frontend logout
-- P3-FE1 product shell foundation: route-aware top navigation, mobile menu Escape handling, skip link, active destination state, and visible account/workspace context are covered by frontend tests. Browser verification for this phase is Vite-only and does not claim authenticated backend integration when Spring/auth runtime is not running.
+- Product shell behavior: three-item route-aware navigation, mobile and account-menu Escape handling, skip link, active destination state, and the compact workspace selector are covered by frontend tests.
 
 Dockerized frontend build has also passed successfully, and the Docker local-dev path has recently been rechecked with the app serving on `http://localhost:5173`.
 

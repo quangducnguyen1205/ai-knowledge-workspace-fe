@@ -24,7 +24,6 @@ describe('WorkspaceDeleteDialog', () => {
         createError={null}
         renameError={null}
         deleteError={null}
-        logoutError={null}
         onSelectWorkspace={vi.fn()}
         onCreateWorkspace={vi.fn()}
         onRenameWorkspace={vi.fn()}
@@ -33,8 +32,6 @@ describe('WorkspaceDeleteDialog', () => {
         isCreating={false}
         isRenaming={false}
         isDeleting={false}
-        onLogout={vi.fn()}
-        isLoggingOut={false}
       />,
     );
 
@@ -54,6 +51,11 @@ describe('WorkspaceDeleteDialog', () => {
     render(<WorkspaceDeleteDialog workspace={workspace} isDeleting={false} error={null} onConfirm={onConfirm} onCancel={onCancel} />);
 
     expect(screen.getByRole('dialog', { name: 'Delete “Algorithms”?' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
+
+    await user.keyboard('{Shift>}{Tab}{/Shift}');
+    expect(screen.getByRole('button', { name: 'Delete workspace' })).toHaveFocus();
+    await user.keyboard('{Tab}');
     expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -99,7 +101,7 @@ describe('WorkspaceDeleteDialog', () => {
       />,
     );
 
-    expect(screen.getByText('Workspace vẫn còn tài liệu')).toBeInTheDocument();
+    expect(screen.getByText('Workspace still contains videos')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Delete workspace' }));
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
@@ -115,7 +117,7 @@ describe('WorkspaceDeleteDialog', () => {
       />,
     );
 
-    expect(screen.getByText('Không thể xóa workspace mặc định')).toBeInTheDocument();
+    expect(screen.getByText('Default workspace cannot be deleted')).toBeInTheDocument();
     expect(screen.queryByText('raw backend detail')).not.toBeInTheDocument();
   });
 
@@ -132,7 +134,7 @@ describe('WorkspaceDeleteDialog', () => {
       />,
     );
 
-    expect(screen.getByText('Không thể xóa workspace')).toBeInTheDocument();
+    expect(screen.getByText('Could not delete workspace')).toBeInTheDocument();
     expect(screen.queryByText('internal stack detail')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Delete workspace' }));
     expect(onConfirm).toHaveBeenCalledTimes(1);
