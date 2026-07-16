@@ -9,7 +9,8 @@ import {
   type Workspace,
 } from './api/workspaces-api';
 import { isApiClientError } from '../../shared/api/api-error';
-import { Button, ErrorBanner, InfoBanner } from '../../lib/ui';
+import { Button, ErrorBanner, InfoBanner, SuccessNotification } from '../../lib/ui';
+import type { EphemeralNotice } from '../../shared/ui/use-ephemeral-notice';
 import { WorkspaceDeleteDialog } from './components/workspace-delete-dialog';
 
 export const workspaceKeys = {
@@ -124,7 +125,7 @@ export function WorkspaceBar({
   selectedWorkspace: Workspace | null;
   selectedWorkspaceId: string | null;
   isLoading: boolean;
-  successNotice: { title: string; message: string } | null;
+  successNotice: EphemeralNotice | null;
   createError: unknown;
   renameError: unknown;
   deleteError: unknown;
@@ -302,11 +303,11 @@ export function WorkspaceBar({
       </div>
 
       {successNotice ? (
-        <InfoBanner
+        <SuccessNotification
           className="workspace-bar__error"
-          tone="success"
           title={successNotice.title}
           message={successNotice.message}
+          onDismiss={successNotice.dismiss}
         />
       ) : null}
       {createError ? <ErrorBanner error={createError} className="workspace-bar__error" /> : null}

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Button, EmptyState, ErrorBanner, InfoBanner, LoadingBlock, formatDateTime } from '../../../lib/ui';
+import { Button, EmptyState, ErrorBanner, InfoBanner, LoadingBlock, SuccessNotification, formatDateTime } from '../../../lib/ui';
+import type { EphemeralNotice } from '../../../shared/ui/use-ephemeral-notice';
 import { getFriendlyDeleteErrorCopy, getFriendlyRenameErrorCopy } from '../model/error-copy';
 import type { AssetSummary } from '../model/types';
 import { StatusBadge } from './status-badge';
@@ -23,7 +24,7 @@ export function AssetList({
 }: {
   assets: AssetSummary[];
   selectedAssetId: string | null;
-  successNotice: { title: string; message: string } | null;
+  successNotice: EphemeralNotice | null;
   assetsError: unknown;
   deleteError: unknown;
   renameError: unknown;
@@ -102,7 +103,11 @@ export function AssetList({
         <ErrorBanner error={deleteError} title={deleteErrorCopy.title} message={deleteErrorCopy.message} detail={deleteErrorCopy.detail} />
       ) : null}
       {!assetsLoading && !assetsError && successNotice ? (
-        <InfoBanner tone="success" title={successNotice.title} message={successNotice.message} />
+        <SuccessNotification
+          title={successNotice.title}
+          message={successNotice.message}
+          onDismiss={successNotice.dismiss}
+        />
       ) : null}
 
       {!assetsLoading && !assetsError && assets.length === 0 ? (

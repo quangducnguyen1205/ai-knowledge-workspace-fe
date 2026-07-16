@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ApiClientError } from '../../../shared/api/api-error';
 import type { Workspace } from '../api/workspaces-api';
@@ -8,18 +7,17 @@ import {
   useRenameWorkspaceMutation,
   workspaceKeys,
 } from '../workspaces';
-
-type SuccessNotice = { title: string; message: string };
+import { useEphemeralNotice } from '../../../shared/ui/use-ephemeral-notice';
 
 export function useWorkspaceManagement({
-  currentUserId,
+  noticeContextKey,
   selectedWorkspaceId,
   setPreferredWorkspaceId,
   setWorkspaceScopeRefreshAfter,
   onClearWorkspaceScope,
   onDeletedWorkspaceRoute,
 }: {
-  currentUserId?: string;
+  noticeContextKey: string;
   selectedWorkspaceId: string | null;
   setPreferredWorkspaceId: (workspaceId: string | null) => void;
   setWorkspaceScopeRefreshAfter: (refreshedAfter: number | null) => void;
@@ -30,16 +28,14 @@ export function useWorkspaceManagement({
   const createMutation = useCreateWorkspaceMutation();
   const renameMutation = useRenameWorkspaceMutation();
   const deleteMutation = useDeleteWorkspaceMutation();
-  const [successNotice, setSuccessNotice] = useState<SuccessNotice | null>(null);
-
-  useEffect(() => setSuccessNotice(null), [currentUserId]);
+  const feedback = useEphemeralNotice(noticeContextKey);
 
   function createWorkspace(name: string) {
-    setSuccessNotice(null);
+    feedback.clearNotice();
     createMutation.mutate(name, {
       onSuccess: (workspace) => {
         setPreferredWorkspaceId(workspace.id);
-        setSuccessNotice({
+        feedback.showNotice({
           title: 'Workspace created',
           message: `Created "${workspace.name}" and refreshed the visible workspace scope.`,
         });
@@ -48,10 +44,10 @@ export function useWorkspaceManagement({
   }
 
   function renameWorkspace(input: { workspaceId: string; name: string }) {
-    setSuccessNotice(null);
+    feedback.clearNotice();
     renameMutation.mutate(input, {
       onSuccess: (workspace) => {
-        setSuccessNotice({
+        feedback.showNotice({
           title: 'Workspace renamed',
           message: `Active workspace is now "${workspace.name}".`,
         });
@@ -71,7 +67,7 @@ export function useWorkspaceManagement({
 
     const deletingWorkspaceName = workspace.name;
     const isDeletingSelectedWorkspace = workspace.id === selectedWorkspaceId;
-    setSuccessNotice(null);
+    feedback.clearNotice();
     deleteMutation.mutate(
       { workspaceId: workspace.id },
       {
@@ -81,7 +77,7 @@ export function useWorkspaceManagement({
             onClearWorkspaceScope(variables.workspaceId);
             onDeletedWorkspaceRoute();
           }
-          setSuccessNotice({
+          feedback.showNotice({
             title: 'Workspace deleted',
             message: isDeletingSelectedWorkspace
               ? `Removed "${deletingWorkspaceName}" and refreshed the visible workspace scope.`
@@ -102,8 +98,8 @@ export function useWorkspaceManagement({
   }
 
   return {
-    successNotice,
-    clearSuccessNotice: () => setSuccessNotice(null),
+    successNotice: feedback.notice,
+    clearSuccessNotice: feedback.clearNotice,
     createWorkspace,
     renameWorkspace,
     deleteWorkspace,

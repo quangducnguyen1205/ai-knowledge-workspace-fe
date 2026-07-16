@@ -3,6 +3,7 @@ import type { AssetStatus, AssetSummary } from './model/types';
 import { Button, Section } from '../../lib/ui';
 import { AssetList } from './components/asset-list';
 import { AssetUploadDialog } from '../upload/components/asset-upload-dialog';
+import type { EphemeralNotice } from '../../shared/ui/use-ephemeral-notice';
 
 type LibraryFilter = 'ALL' | AssetStatus;
 
@@ -18,7 +19,7 @@ type AssetLibraryScreenProps = {
   workspaceName: string;
   assets: AssetSummary[];
   selectedAssetId: string | null;
-  successNotice: { title: string; message: string } | null;
+  successNotice: EphemeralNotice | null;
   assetsError: unknown;
   deleteError: unknown;
   renameError: unknown;

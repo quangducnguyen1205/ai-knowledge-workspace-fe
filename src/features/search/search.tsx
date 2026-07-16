@@ -84,30 +84,30 @@ export function SearchPanel({
       selectedResult?.assetId === result.assetId &&
       selectedResult?.transcriptRowId === result.transcriptRowId &&
       selectedResult?.segmentIndex === result.segmentIndex;
+    const actionLabel = onOpenResultContext
+      ? `Open moment ${index + 1} in ${result.assetTitle}`
+      : `Show transcript context for moment ${index + 1} in ${result.assetTitle}`;
 
     return (
       <article
         className={`search-result ${isSelected ? 'search-result--selected' : ''} ${!hasContextAction ? 'search-result--disabled' : ''}`}
         aria-current={isSelected ? 'true' : undefined}
       >
-        <div className="search-result__header">
-          <span className="search-result__rank">Moment {result.segmentIndex ?? index + 1}</span>
-        </div>
-        <p>{result.text}</p>
-        <div className="search-result__footer">
-          <Button
-            type="button"
-            tone={onOpenResultContext ? 'primary' : 'secondary'}
-            className="search-result__action-button"
-            onClick={() => onOpenResultContext ? onOpenResultContext(result) : onSelectResult(result)}
-            disabled={!hasContextAction}
-            aria-label={onOpenResultContext
-              ? `Open result ${index + 1} in ${result.assetTitle}`
-              : `Show transcript context for result ${index + 1} in ${result.assetTitle}`}
-          >
-            {!hasContextAction ? 'Unavailable' : onOpenResultContext ? 'Open in video' : isSelected ? 'Context shown' : 'Show context'}
-          </Button>
-        </div>
+        <button
+          type="button"
+          className="search-result__moment"
+          onClick={() => onOpenResultContext ? onOpenResultContext(result) : onSelectResult(result)}
+          disabled={!hasContextAction}
+          aria-label={actionLabel}
+        >
+          <span className="search-result__header">
+            <span className="search-result__rank">Transcript moment</span>
+          </span>
+          <span className="search-result__excerpt">{result.text}</span>
+          <span className="search-result__open-label">
+            {!hasContextAction ? 'Unavailable' : onOpenResultContext ? 'Open moment' : isSelected ? 'Context shown' : 'Show context'}
+          </span>
+        </button>
       </article>
     );
   }
@@ -168,8 +168,12 @@ export function SearchPanel({
 
       {activeQuery && hasSearchResults ? (
         <p className="search-summary" role="status">
-          <strong>{searchResponse?.resultCount ?? searchResponse?.results.length ?? 0}</strong>{' '}
-          {(searchResponse?.resultCount ?? 0) === 1 ? 'match' : 'matches'} for “{activeQuery}”
+          {isAssetScoped ? (
+            <><strong>{searchResponse?.resultCount ?? searchResponse?.results.length ?? 0}</strong>{' '}
+              {(searchResponse?.resultCount ?? 0) === 1 ? 'match' : 'matches'} for “{activeQuery}”</>
+          ) : (
+            <>Top relevant moments for “{activeQuery}” · <strong>{searchResponse?.results.length ?? 0} shown</strong></>
+          )}
         </p>
       ) : null}
 
@@ -189,7 +193,7 @@ export function SearchPanel({
             <section key={group.assetId} className="search-result-group" aria-labelledby={`search-group-${groupIndex}`}>
               <header>
                 <h2 id={`search-group-${groupIndex}`}>{group.assetTitle}</h2>
-                <span>{group.results.length} {group.results.length === 1 ? 'match' : 'matches'}</span>
+                <span>{group.results.length} {group.results.length === 1 ? 'moment' : 'moments'}</span>
               </header>
               <ol className="search-results">
                 {group.results.map((result, index) => (

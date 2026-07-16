@@ -1,5 +1,7 @@
+import { useEffect } from 'react';
 import type { TranscriptRow } from '../../../entities/transcript/model/types';
-import { Button, ErrorBanner, InfoBanner } from '../../../lib/ui';
+import { Button, ErrorBanner, InfoBanner, SuccessNotification } from '../../../lib/ui';
+import { useEphemeralNotice } from '../../../shared/ui/use-ephemeral-notice';
 import { getIndexActionState } from '../model/lifecycle';
 import type { AssetIndexResponse, AssetStatus, AssetStatusResponse } from '../model/types';
 
@@ -22,12 +24,26 @@ export function AssetIndexingRecoveryAction({
   isIndexing: boolean;
   onIndex: () => void;
 }) {
+  const { notice, showNotice, clearNotice } = useEphemeralNotice(
+    statusResponse?.assetId ?? indexResponse?.assetId ?? 'no-asset',
+  );
   const action = getIndexActionState({
     resolvedAssetStatus,
     processingJobStatus: statusResponse?.processingJobStatus,
     transcriptRows,
     transcriptError,
   });
+
+  useEffect(() => {
+    if (indexResponse) {
+      showNotice({
+        title: 'Video is ready',
+        message: 'This video can now be found in workspace search.',
+      });
+    } else {
+      clearNotice();
+    }
+  }, [clearNotice, indexResponse, showNotice]);
 
   return (
     <>
@@ -47,8 +63,8 @@ export function AssetIndexingRecoveryAction({
       {isIndexing ? (
         <InfoBanner title="Preparing search" message="Retrying search preparation for this video." />
       ) : null}
-      {indexResponse ? (
-        <InfoBanner tone="success" title="Video is ready" message="This video can now be found in workspace search." />
+      {notice ? (
+        <SuccessNotification title={notice.title} message={notice.message} onDismiss={notice.dismiss} />
       ) : null}
       {indexError ? <ErrorBanner error={indexError} /> : null}
     </>

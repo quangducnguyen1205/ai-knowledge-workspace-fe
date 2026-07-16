@@ -118,6 +118,39 @@ export function InfoBanner({
   );
 }
 
+export function SuccessNotification({
+  title,
+  message,
+  onDismiss,
+  className,
+}: {
+  title: string;
+  message: string;
+  onDismiss: () => void;
+  className?: string;
+}) {
+  return (
+    <div
+      className={joinClassNames('message', 'message--success', 'message--dismissible', className)}
+      role="status"
+      aria-live="polite"
+    >
+      <div>
+        <strong>{title}</strong>
+        <p>{message}</p>
+      </div>
+      <button
+        type="button"
+        className="message__dismiss"
+        aria-label={`Dismiss ${title}`}
+        onClick={onDismiss}
+      >
+        Dismiss
+      </button>
+    </div>
+  );
+}
+
 export function LoadingBlock({
   label,
   compact = false,

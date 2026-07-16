@@ -1,5 +1,5 @@
 import type { ComponentProps } from 'react';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseRoute, routeToHash } from '../../app/router';
@@ -141,18 +141,21 @@ function renderAssetDetail(overrides: Partial<ComponentProps<typeof AssetDetailS
     onOpenAssistantCitation: vi.fn(),
     onSearchWithinAsset: vi.fn(),
     onSelectSearchResult: vi.fn(),
+    onOpenTranscriptMoment: vi.fn(),
     onOpenLibrary: vi.fn(),
     ...overrides,
   };
 
-  render(<AssetDetailScreen {...props} />);
+  const view = render(<AssetDetailScreen {...props} />);
 
-  return props;
+  return { ...view, props };
 }
 
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+  Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
   window.history.pushState({}, '', '/');
 });
 
@@ -171,7 +174,7 @@ describe('search-to-study workflow', () => {
     expect(screen.getByText(/search your learning workspace/i)).toBeInTheDocument();
   });
 
-  it('shows result asset identity and a context-opening action', () => {
+  it('shows result asset identity and makes the excerpt the moment-opening action', () => {
     renderSearchPanel({
       activeQuery: 'vector clocks',
       searchResponse,
@@ -180,8 +183,8 @@ describe('search-to-study workflow', () => {
 
     expect(screen.getByText('Vector Clocks Lecture')).toBeInTheDocument();
     expect(screen.getByText(/vector clocks preserve causal relationships/i)).toBeInTheDocument();
-    expect(screen.getByText(/moment 2/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /open result 1 in vector clocks lecture/i })).toBeEnabled();
+    expect(screen.getByText(/transcript moment/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /open moment 1 in vector clocks lecture/i })).toBeEnabled();
   });
 
   it('opens an existing Asset Detail route with asset and transcript-row identity', async () => {
@@ -206,7 +209,7 @@ describe('search-to-study workflow', () => {
       },
     });
 
-    await user.click(screen.getByRole('button', { name: /open result 1 in vector clocks lecture/i }));
+    await user.click(screen.getByText(/vector clocks preserve causal relationships/i));
 
     expect(parseRoute(window.location.hash)).toEqual({
       name: 'asset',
@@ -294,6 +297,31 @@ describe('search-to-study workflow', () => {
     expect(screen.getAllByText(/vector clocks preserve causal relationships/i)).not.toHaveLength(0);
   });
 
+  it('focuses and scrolls the exact rendered transcript row when the target changes on the same asset', async () => {
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    });
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      callback(0);
+      return 1;
+    });
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
+
+    const view = renderAssetDetail({ focusedTranscriptRowId: 'row-2' });
+
+    await waitFor(() => expect(screen.getByLabelText('Selected transcript moment')).toHaveFocus());
+    expect(screen.getByLabelText('Selected transcript moment')).toHaveTextContent(/vector clocks preserve/i);
+    expect(scrollIntoView).toHaveBeenLastCalledWith({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+
+    view.rerender(<AssetDetailScreen {...view.props} focusedTranscriptRowId="row-1" />);
+
+    await waitFor(() => expect(screen.getByLabelText('Selected transcript moment')).toHaveFocus());
+    expect(screen.getByLabelText('Selected transcript moment')).toHaveTextContent(/first we define/i);
+    expect(scrollIntoView).toHaveBeenCalledTimes(2);
+  });
+
   it('keeps manual search preparation as a disclosed fallback only while the transcript is ready', async () => {
     const user = userEvent.setup();
     const transcriptReadyAsset = { ...asset, assetStatus: 'TRANSCRIPT_READY' as const };
@@ -345,13 +373,17 @@ describe('search-to-study workflow', () => {
       dispatchEvent: vi.fn(),
     })));
 
-    renderAssetDetail();
+    const view = renderAssetDetail();
 
     expect(document.getElementById('study-pane-ask')).toHaveAttribute('hidden');
     await user.click(screen.getByRole('tab', { name: 'Ask' }));
     expect(screen.getByRole('tab', { name: 'Ask' })).toHaveAttribute('aria-selected', 'true');
     expect(document.getElementById('study-pane-transcript')).toHaveAttribute('hidden');
     expect(screen.getByRole('heading', { name: 'Ask this video' })).toBeInTheDocument();
+
+    view.rerender(<AssetDetailScreen {...view.props} focusedTranscriptRowId="row-2" />);
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'Transcript' })).toHaveAttribute('aria-selected', 'true'));
+    expect(document.getElementById('study-pane-transcript')).not.toHaveAttribute('hidden');
   });
 
   it('shows safe feedback when the selected row is missing from the visible transcript', () => {
@@ -381,7 +413,7 @@ describe('search-to-study workflow', () => {
     expect(onReturnToSearch).toHaveBeenCalledTimes(1);
   });
 
-  it('supports keyboard activation for the context-opening action', async () => {
+  it('supports Enter and Space keyboard activation for the moment excerpt', async () => {
     const user = userEvent.setup();
     const onOpenResultContext = vi.fn();
 
@@ -391,10 +423,12 @@ describe('search-to-study workflow', () => {
       onOpenResultContext,
     });
 
-    const action = screen.getByRole('button', { name: /open result 1 in vector clocks lecture/i });
+    const action = screen.getByRole('button', { name: /open moment 1 in vector clocks lecture/i });
     action.focus();
     await user.keyboard('{Enter}');
+    await user.keyboard(' ');
 
-    expect(onOpenResultContext).toHaveBeenCalledWith(baseResult);
+    expect(onOpenResultContext).toHaveBeenCalledTimes(2);
+    expect(onOpenResultContext).toHaveBeenLastCalledWith(baseResult);
   });
 });

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { buildTranscriptDisplayRows, matchesTranscriptReference } from '../../../entities/transcript/model/transcript-display';
 import type { TranscriptRow } from '../../../entities/transcript/model/types';
 import { EmptyState, ErrorBanner, InfoBanner, LoadingBlock, Section } from '../../../lib/ui';
@@ -29,6 +29,7 @@ export function SelectedAssetTranscriptPanel({
   embedded?: boolean;
 }) {
   const transcriptConflictCopy = getTranscriptConflictCopy(transcriptError, resolvedAssetStatus, statusResponse?.processingJobStatus);
+  const focusedRowRef = useRef<HTMLLIElement>(null);
   const displayTranscriptRows = useMemo(
     () => (transcriptRows?.length ? buildTranscriptDisplayRows(transcriptRows) : []),
     [transcriptRows],
@@ -46,6 +47,27 @@ export function SelectedAssetTranscriptPanel({
         title: 'Selected moment is not visible',
         message: 'The transcript may have changed. Use the selected context above or return to search.',
       };
+
+  useEffect(() => {
+    if (!focusedTranscriptRowId || transcriptLoading || !focusedRowIsVisible) return undefined;
+
+    const frameId = window.requestAnimationFrame(() => {
+      const focusedRow = focusedRowRef.current;
+      if (!focusedRow) return;
+      const reduceMotion = typeof window.matchMedia === 'function'
+        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (typeof focusedRow.scrollIntoView === 'function') {
+        focusedRow.scrollIntoView({
+          behavior: reduceMotion ? 'auto' : 'smooth',
+          block: 'center',
+          inline: 'nearest',
+        });
+      }
+      focusedRow.focus({ preventScroll: true });
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [focusedRowIsVisible, focusedTranscriptRowId, transcriptLoading]);
 
   if (!asset) return null;
 
@@ -77,7 +99,11 @@ export function SelectedAssetTranscriptPanel({
               return (
                 <li
                   key={row.id ?? `segment-${row.segmentIndex ?? 'missing'}`}
+                  ref={isFocusedRow ? focusedRowRef : undefined}
                   className={`transcript-list__item ${isFocusedRow ? 'transcript-list__item--active' : ''}`}
+                  tabIndex={isFocusedRow ? -1 : undefined}
+                  aria-current={isFocusedRow ? 'true' : undefined}
+                  aria-label={isFocusedRow ? 'Selected transcript moment' : undefined}
                 >
                   <div className="transcript-list__meta">
                     <span>Moment {row.segmentIndex ?? '—'}</span>

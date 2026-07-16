@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ApiClientError } from '../shared/api/api-error';
 import type { SearchResponse, SearchResult } from '../features/search/api/search-api';
 import { Button, EmptyState, ErrorBanner, LoadingBlock } from '../lib/ui';
-import { useHashRoute, type AppRoute } from './router';
+import { routeToHash, useHashRoute, type AppRoute } from './router';
 import { AppShell } from './AppShell';
 import { useProtectedRouteFallback } from './bootstrap/use-protected-route-fallback';
 import { useWorkspaceBootstrap } from './bootstrap/use-workspace-bootstrap';
@@ -133,11 +133,13 @@ export function AppRouter() {
   });
   const studyRouteState = getStudyRouteState(route, selectedWorkspaceId, workspaceSearch.submittedSearch);
   const routedStudyContextQuery = useTranscriptContextQuery(studyRouteState.contextParams);
+  const noticeContextKey = `${currentUser?.id ?? 'anonymous'}:${selectedWorkspaceId ?? 'no-workspace'}:${routeToHash(route)}`;
 
   const assetManagement = useAssetManagement({
     currentUserId: currentUser?.id,
     workspaceId: selectedWorkspaceId,
     workspaceName: selectedWorkspace?.name,
+    noticeContextKey,
     selectedAsset,
     selectedAssetId,
     selectedAssetIdRef,
@@ -171,7 +173,7 @@ export function AppRouter() {
   });
 
   const workspaceManagement = useWorkspaceManagement({
-    currentUserId: currentUser?.id,
+    noticeContextKey,
     selectedWorkspaceId,
     setPreferredWorkspaceId,
     setWorkspaceScopeRefreshAfter,
@@ -374,24 +376,31 @@ export function AppRouter() {
     navigate({ name: 'asset', assetId });
   }
 
-  function openSearchResultInAsset(result: SearchResult) {
+  function openTranscriptMoment(result: SearchResult, origin: 'workspace-search' | 'transcript-search') {
     const transcriptRowId = resolveTranscriptLookupId(result);
+    const searchController = origin === 'workspace-search' ? workspaceSearch : assetSearch;
 
     if (!transcriptRowId) {
-      workspaceSearch.setSelectedResult(null);
+      searchController.setSelectedResult(null);
       openAsset(result.assetId);
       return;
     }
 
-    workspaceSearch.setSelectedResult(result);
+    searchController.setSelectedResult(result);
     selectAsset(result.assetId);
-    navigate({
-      name: 'asset',
-      assetId: result.assetId,
-      transcriptRowId,
-      source: 'search',
-      searchQuery: workspaceSearch.submittedSearch ?? undefined,
-    });
+    navigate(origin === 'workspace-search'
+      ? {
+          name: 'asset',
+          assetId: result.assetId,
+          transcriptRowId,
+          source: 'search',
+          searchQuery: workspaceSearch.submittedSearch ?? undefined,
+        }
+      : {
+          name: 'asset',
+          assetId: result.assetId,
+          transcriptRowId,
+        });
   }
 
   function clearRoutedStudyContext() {
@@ -641,6 +650,7 @@ export function AppRouter() {
             onDelete={assetManagement.handleDeleteAsset}
             onSearchWithinAsset={assetSearch.submit}
             onSelectSearchResult={assetSearch.setSelectedResult}
+            onOpenTranscriptMoment={(result) => openTranscriptMoment(result, 'transcript-search')}
             onOpenLibrary={() => navigate({ name: 'library' })}
             onOpenAssistantCitation={openAssistantCitationInAsset}
             onReturnToSearch={route.name === 'asset' && route.source === 'search' ? returnToSearchFromAsset : undefined}
@@ -669,7 +679,7 @@ export function AppRouter() {
               navigate({ name: 'search', searchQuery: trimmedQuery });
             }}
             onSelectResult={workspaceSearch.setSelectedResult}
-            onOpenResultContext={openSearchResultInAsset}
+            onOpenResultContext={(result) => openTranscriptMoment(result, 'workspace-search')}
           />
         );
         break;

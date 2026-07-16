@@ -25,7 +25,7 @@ function renderManagement(selectedWorkspaceId = activeWorkspace.id) {
 
   const hook = renderHook(
     () => useWorkspaceManagement({
-      currentUserId: 'user-1',
+      noticeContextKey: `user-1:${selectedWorkspaceId}:settings`,
       selectedWorkspaceId,
       setPreferredWorkspaceId,
       setWorkspaceScopeRefreshAfter,

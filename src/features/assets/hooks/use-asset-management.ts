@@ -1,15 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ApiClientError } from '../../../shared/api/api-error';
 import { assetKeys, useDeleteAssetMutation, useRenameAssetMutation } from './asset-queries';
 import type { AssetSummary } from '../model/types';
-
-type SuccessNotice = { title: string; message: string };
+import { useEphemeralNotice } from '../../../shared/ui/use-ephemeral-notice';
+import type { SearchResponse } from '../../search/api/search-api';
 
 export function useAssetManagement({
   currentUserId,
   workspaceId,
   workspaceName,
+  noticeContextKey,
   selectedAsset,
   selectedAssetId,
   selectedAssetIdRef,
@@ -23,6 +24,7 @@ export function useAssetManagement({
   currentUserId?: string;
   workspaceId: string | null;
   workspaceName?: string;
+  noticeContextKey: string;
   selectedAsset: AssetSummary | null;
   selectedAssetId: string | null;
   selectedAssetIdRef: { current: string | null };
@@ -36,28 +38,25 @@ export function useAssetManagement({
   const queryClient = useQueryClient();
   const deleteMutation = useDeleteAssetMutation();
   const renameMutation = useRenameAssetMutation();
-  const [librarySuccessNotice, setLibrarySuccessNotice] = useState<SuccessNotice | null>(null);
-  const [detailSuccessNotice, setDetailSuccessNotice] = useState<SuccessNotice | null>(null);
-
-  useEffect(() => {
-    setLibrarySuccessNotice(null);
-    setDetailSuccessNotice(null);
-  }, [workspaceId]);
-
-  useEffect(() => {
-    setLibrarySuccessNotice(null);
-    setDetailSuccessNotice(null);
-  }, [currentUserId]);
-
-  useEffect(() => setDetailSuccessNotice(null), [selectedAssetId]);
+  const libraryFeedback = useEphemeralNotice(noticeContextKey);
+  const detailFeedback = useEphemeralNotice(noticeContextKey);
 
   useEffect(() => renameMutation.reset(), [currentUserId, renameMutation.reset, selectedAssetId, workspaceId]);
 
-  function clearAssetDependentState(assetId: string) {
+  function clearAssetDependentState(assetId: string, assetWorkspaceId: string) {
+    queryClient.setQueryData<AssetSummary[] | undefined>(assetKeys.list(assetWorkspaceId), (current) =>
+      current?.filter((asset) => asset.assetId !== assetId),
+    );
+    queryClient.setQueriesData<SearchResponse>({ queryKey: ['search', 'results'] }, (current) => {
+      if (!current?.results.some((result) => result.assetId === assetId)) return current;
+      const results = current.results.filter((result) => result.assetId !== assetId);
+      return { ...current, results, resultCount: results.length };
+    });
+    queryClient.removeQueries({ queryKey: assetKeys.detail(assetId) });
+    queryClient.removeQueries({ queryKey: assetKeys.status(assetId) });
+    queryClient.removeQueries({ queryKey: assetKeys.transcript(assetId) });
     if (selectedAssetIdRef.current === assetId) {
       setSelectedAssetId(null);
-      queryClient.removeQueries({ queryKey: assetKeys.status(assetId) });
-      queryClient.removeQueries({ queryKey: assetKeys.transcript(assetId) });
     }
     if (preferredAssetIdRef.current === assetId) setPreferredAssetId(null);
     onClearAssetReferences(assetId);
@@ -71,15 +70,15 @@ export function useAssetManagement({
     );
     if (!confirmed) return;
 
-    setLibrarySuccessNotice(null);
-    setDetailSuccessNotice(null);
+    libraryFeedback.clearNotice();
+    detailFeedback.clearNotice();
     deleteMutation.mutate(
       { assetId: asset.assetId, workspaceId: asset.workspaceId },
       {
         onSuccess: async (_response, variables) => {
-          clearAssetDependentState(variables.assetId);
+          clearAssetDependentState(variables.assetId, variables.workspaceId);
           onDeletedSelectedRoute(variables.assetId);
-          setLibrarySuccessNotice({
+          libraryFeedback.showNotice({
             title: 'Video deleted',
             message: `Removed "${asset.title}" from ${workspaceName ?? 'the active workspace'}.`,
           });
@@ -90,7 +89,7 @@ export function useAssetManagement({
         },
         onError: async (error, variables) => {
           if (error instanceof ApiClientError && error.status === 404) {
-            clearAssetDependentState(variables.assetId);
+            clearAssetDependentState(variables.assetId, variables.workspaceId);
             await Promise.all([
               queryClient.invalidateQueries({ queryKey: assetKeys.list(variables.workspaceId) }),
               queryClient.invalidateQueries({ queryKey: ['search', 'results', variables.workspaceId] }),
@@ -103,8 +102,8 @@ export function useAssetManagement({
 
   function handleRenameAsset(title: string, targetAsset: AssetSummary | null = selectedAsset) {
     if (!targetAsset) return;
-    setLibrarySuccessNotice(null);
-    setDetailSuccessNotice(null);
+    libraryFeedback.clearNotice();
+    detailFeedback.clearNotice();
     renameMutation.mutate(
       { assetId: targetAsset.assetId, workspaceId: targetAsset.workspaceId, title },
       {
@@ -121,14 +120,16 @@ export function useAssetManagement({
               : asset),
           );
           onAssetTitleChanged(variables.assetId, response.title);
-          setLibrarySuccessNotice({ title: 'Video renamed', message: `Title updated to "${response.title}".` });
+          libraryFeedback.showNotice({ title: 'Video renamed', message: `Title updated to "${response.title}".` });
           if (selectedAssetIdRef.current === variables.assetId) {
-            setDetailSuccessNotice({ title: 'Video renamed', message: `Title updated to "${response.title}".` });
+            detailFeedback.showNotice({ title: 'Video renamed', message: `Title updated to "${response.title}".` });
           }
         },
         onError: async (error, variables) => {
           if (error instanceof ApiClientError && error.status === 404) {
-            if (selectedAssetIdRef.current === variables.assetId) clearAssetDependentState(variables.assetId);
+            if (selectedAssetIdRef.current === variables.assetId) {
+              clearAssetDependentState(variables.assetId, variables.workspaceId);
+            }
             await Promise.all([
               queryClient.invalidateQueries({ queryKey: assetKeys.list(variables.workspaceId) }),
               queryClient.invalidateQueries({ queryKey: ['search', 'results', variables.workspaceId] }),
@@ -140,15 +141,15 @@ export function useAssetManagement({
   }
 
   return {
-    librarySuccessNotice,
-    detailSuccessNotice,
-    recordUploadSuccess: (title: string) => setLibrarySuccessNotice({
+    librarySuccessNotice: libraryFeedback.notice,
+    detailSuccessNotice: detailFeedback.notice,
+    recordUploadSuccess: (title: string) => libraryFeedback.showNotice({
       title: 'Video uploaded',
       message: `Added "${title}" to ${workspaceName ?? 'the active workspace'}.`,
     }),
     clearNotices: () => {
-      setLibrarySuccessNotice(null);
-      setDetailSuccessNotice(null);
+      libraryFeedback.clearNotice();
+      detailFeedback.clearNotice();
     },
     handleDeleteAsset,
     handleRenameAsset,

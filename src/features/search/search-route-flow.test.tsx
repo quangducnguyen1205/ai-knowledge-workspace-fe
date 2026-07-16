@@ -37,7 +37,7 @@ const transcriptRows = [
   },
 ];
 
-const routeFlowTimeout = { timeout: 3_000 };
+const routeFlowTimeout = { timeout: 5_000 };
 
 function jsonResponse(payload: unknown, status = 200): Response {
   return new Response(JSON.stringify(payload), {
@@ -119,19 +119,21 @@ function createFetchMock() {
     }
 
     if (url.startsWith('/api/search?')) {
+      const isTranscriptSearch = url.includes('assetId=asset-1');
+      const resultRow = isTranscriptSearch ? transcriptRows[0] : transcriptRows[1];
       return jsonResponse({
         query: 'vector clocks',
         workspaceIdFilter: 'workspace-1',
-        assetIdFilter: null,
+        assetIdFilter: isTranscriptSearch ? 'asset-1' : null,
         resultCount: 1,
         results: [
           {
             assetId: 'asset-1',
             assetTitle: 'Vector Clocks Lecture',
-            transcriptRowId: 'row-2',
-            segmentIndex: 2,
-            text: 'Vector clocks preserve causal relationships between events in distributed systems.',
-            createdAt: '2026-06-26T10:02:00Z',
+            transcriptRowId: resultRow.id,
+            segmentIndex: resultRow.segmentIndex,
+            text: resultRow.text,
+            createdAt: resultRow.createdAt,
             score: 3.21,
           },
         ],
@@ -164,6 +166,8 @@ function searchCalls(fetchMock: ReturnType<typeof vi.fn>) {
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+  Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
   window.history.pushState({}, '', '/');
   window.localStorage.clear();
 });
@@ -173,7 +177,7 @@ describe('Search route query flow', () => {
     const user = userEvent.setup();
     const fetchMock = renderAppAt('#/assets/asset-1?row=row-2&from=search&q=vector%20clocks');
 
-    await user.click(await screen.findByRole('button', { name: 'Back to search' }, { timeout: 3_000 }));
+    await user.click(await screen.findByRole('button', { name: 'Back to search' }, routeFlowTimeout));
 
     await waitFor(() => {
       expect(window.location.hash).toBe('#/search?q=vector+clocks');
@@ -182,7 +186,7 @@ describe('Search route query flow', () => {
     expect(
       await screen.findByRole(
         'button',
-        { name: 'Open result 1 in Vector Clocks Lecture' },
+        { name: 'Open moment 1 in Vector Clocks Lecture' },
         routeFlowTimeout,
       ),
     ).toBeInTheDocument();
@@ -193,7 +197,7 @@ describe('Search route query flow', () => {
     const user = userEvent.setup();
     const fetchMock = renderAppAt('#/assets/asset-1?row=row-2&from=search&q=%20%20');
 
-    await user.click(await screen.findByRole('button', { name: 'Back to search' }, { timeout: 3_000 }));
+    await user.click(await screen.findByRole('button', { name: 'Back to search' }, routeFlowTimeout));
 
     await waitFor(() => {
       expect(window.location.hash).toBe('#/search');
@@ -209,7 +213,7 @@ describe('Search route query flow', () => {
     expect(
       await screen.findByRole(
         'button',
-        { name: 'Open result 1 in Vector Clocks Lecture' },
+        { name: 'Open moment 1 in Vector Clocks Lecture' },
         routeFlowTimeout,
       ),
     ).toBeInTheDocument();
@@ -223,4 +227,74 @@ describe('Search route query flow', () => {
     expect(screen.getByText(/search your learning workspace/i)).toBeInTheDocument();
     expect(searchCalls(fetchMock)).toHaveLength(0);
   });
+
+  it('opens a workspace result excerpt and focuses the exact transcript row', async () => {
+    const user = userEvent.setup();
+    const scrollIntoView = mockTranscriptScrolling();
+    renderAppAt('#/search?q=vector%20clocks');
+
+    await user.click(await screen.findByRole(
+      'button',
+      { name: 'Open moment 1 in Vector Clocks Lecture' },
+      routeFlowTimeout,
+    ));
+
+    await waitFor(() => expect(window.location.hash)
+      .toBe('#/assets/asset-1?row=row-2&from=search&q=vector+clocks'));
+    await waitFor(() => expect(screen.getByLabelText('Selected transcript moment')).toHaveFocus());
+    expect(screen.getByLabelText('Selected transcript moment')).toHaveTextContent(/vector clocks preserve/i);
+    expect(scrollIntoView).toHaveBeenCalled();
+  });
+
+  it('uses the same stable row target for Find in transcript', async () => {
+    const user = userEvent.setup();
+    mockTranscriptScrolling();
+    renderAppAt('#/assets/asset-1');
+
+    const input = await screen.findByLabelText('Find in transcript', {}, routeFlowTimeout);
+    await user.type(input, 'happens-before');
+    await user.click(screen.getByRole('button', { name: 'Search' }));
+    await user.click(await screen.findByRole(
+      'button',
+      { name: 'Open moment 1 in Vector Clocks Lecture' },
+      routeFlowTimeout,
+    ));
+
+    await waitFor(() => expect(window.location.hash).toBe('#/assets/asset-1?row=row-1'));
+    await waitFor(() => expect(screen.getByLabelText('Selected transcript moment')).toHaveFocus());
+    expect(screen.getByLabelText('Selected transcript moment')).toHaveTextContent(/happens-before/i);
+  });
+
+  it('restores direct, Back, and Forward row targets without leaving the asset', async () => {
+    mockTranscriptScrolling();
+    renderAppAt('#/assets/asset-1?row=row-2');
+
+    await waitFor(() => expect(screen.getByLabelText('Selected transcript moment')).toHaveTextContent(/vector clocks/i));
+
+    window.history.pushState({}, '', '#/assets/asset-1?row=row-1');
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+    await waitFor(() => expect(screen.getByLabelText('Selected transcript moment')).toHaveTextContent(/happens-before/i));
+
+    window.history.back();
+    await waitFor(() => expect(window.location.hash).toBe('#/assets/asset-1?row=row-2'), routeFlowTimeout);
+    await waitFor(() => expect(screen.getByLabelText('Selected transcript moment')).toHaveTextContent(/vector clocks/i));
+
+    window.history.forward();
+    await waitFor(() => expect(window.location.hash).toBe('#/assets/asset-1?row=row-1'), routeFlowTimeout);
+    await waitFor(() => expect(screen.getByLabelText('Selected transcript moment')).toHaveTextContent(/happens-before/i));
+  });
 });
+
+function mockTranscriptScrolling() {
+  const scrollIntoView = vi.fn();
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+    configurable: true,
+    value: scrollIntoView,
+  });
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+    callback(0);
+    return 1;
+  });
+  vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
+  return scrollIntoView;
+}

@@ -9,7 +9,8 @@ import type { AssistantAnswerCitation } from '../assistant/model/types';
 import type { SearchResponse, SearchResult } from '../search/api/search-api';
 import type { TranscriptContextResponse, TranscriptRow } from '../../entities/transcript/model/types';
 import { buildTranscriptDisplayRows, matchesTranscriptReference } from '../../entities/transcript/model/transcript-display';
-import { Button, EmptyState, ErrorBanner, InfoBanner, LoadingBlock, formatDateTime } from '../../lib/ui';
+import { Button, EmptyState, ErrorBanner, InfoBanner, LoadingBlock, SuccessNotification, formatDateTime } from '../../lib/ui';
+import type { EphemeralNotice } from '../../shared/ui/use-ephemeral-notice';
 import { getFriendlyRenameErrorCopy } from './model/error-copy';
 import { AssetIndexingRecoveryAction } from './components/asset-indexing-recovery-action';
 import { SelectedAssetTranscriptPanel } from './components/selected-asset-transcript-panel';
@@ -23,7 +24,7 @@ type AssetDetailScreenProps = {
   workspaceId?: string;
   workspaceName: string;
   asset: AssetSummary | null;
-  successNotice: { title: string; message: string } | null;
+  successNotice: EphemeralNotice | null;
   resolvedAssetStatus: AssetStatus | null;
   statusResponse?: AssetStatusResponse;
   statusError: unknown;
@@ -57,6 +58,7 @@ type AssetDetailScreenProps = {
   onDelete: (asset: AssetSummary) => void;
   onSearchWithinAsset: (query: string) => void;
   onSelectSearchResult: (result: SearchResult) => void;
+  onOpenTranscriptMoment: (result: SearchResult) => void;
   onOpenLibrary: () => void;
   onOpenAssistantCitation?: (citation: AssistantAnswerCitation) => void;
   onReturnToSearch?: () => void;
@@ -101,6 +103,7 @@ export function AssetDetailScreen({
   onDelete,
   onSearchWithinAsset,
   onSelectSearchResult,
+  onOpenTranscriptMoment,
   onOpenLibrary,
   onOpenAssistantCitation,
   onReturnToSearch,
@@ -123,6 +126,10 @@ export function AssetDetailScreen({
     setIsEditingTitle(false);
     setDraftTitle(asset?.title ?? '');
   }, [asset?.assetId, asset?.title]);
+
+  useEffect(() => {
+    if (focusedTranscriptRowId) setActiveTab('transcript');
+  }, [focusedTranscriptRowId]);
 
   useEffect(() => {
     if (!isActionMenuOpen) return;
@@ -268,7 +275,13 @@ export function AssetDetailScreen({
 
         {renameErrorCopy?.tone === 'warning' ? <InfoBanner tone="warning" title={renameErrorCopy.title} message={renameErrorCopy.message} /> : null}
         {renameErrorCopy?.tone === 'error' ? <ErrorBanner error={renameError} title={renameErrorCopy.title} message={renameErrorCopy.message} /> : null}
-        {successNotice ? <InfoBanner tone="success" title={successNotice.title} message={successNotice.message} /> : null}
+        {successNotice ? (
+          <SuccessNotification
+            title={successNotice.title}
+            message={successNotice.message}
+            onDismiss={successNotice.dismiss}
+          />
+        ) : null}
       </header>
 
       <div className="study-tabs" role="tablist" aria-label="Study views">
@@ -313,6 +326,7 @@ export function AssetDetailScreen({
             scope={{ mode: 'asset', assetTitle: asset.title }}
             onSearch={onSearchWithinAsset}
             onSelectResult={onSelectSearchResult}
+            onOpenResultContext={onOpenTranscriptMoment}
           />
 
           {focusedTranscriptRowId ? (
