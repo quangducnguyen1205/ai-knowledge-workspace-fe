@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppRouter } from '../../app/AppRouter';
@@ -244,6 +244,17 @@ describe('Search route query flow', () => {
     await waitFor(() => expect(screen.getByLabelText('Selected transcript moment')).toHaveFocus());
     expect(screen.getByLabelText('Selected transcript moment')).toHaveTextContent(/vector clocks preserve/i);
     expect(scrollIntoView).toHaveBeenCalled();
+
+    const contextRegions = await screen.findAllByRole('region', { name: 'Selected context' }, routeFlowTimeout);
+    expect(contextRegions).toHaveLength(1);
+    expect(screen.queryByRole('heading', { name: /search result in context/i })).not.toBeInTheDocument();
+    expect(within(contextRegions[0]).getByText(/vector clocks preserve/i).closest('li'))
+      .toHaveClass('transcript-list__item--active');
+
+    await user.click(within(contextRegions[0]).getByRole('button', { name: 'Clear' }));
+    await waitFor(() => expect(window.location.hash).toBe('#/assets/asset-1'));
+    expect(screen.queryByRole('region', { name: 'Selected context' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Selected transcript moment')).not.toBeInTheDocument();
   });
 
   it('uses the same stable row target for Find in transcript', async () => {
@@ -263,6 +274,7 @@ describe('Search route query flow', () => {
     await waitFor(() => expect(window.location.hash).toBe('#/assets/asset-1?row=row-1'));
     await waitFor(() => expect(screen.getByLabelText('Selected transcript moment')).toHaveFocus());
     expect(screen.getByLabelText('Selected transcript moment')).toHaveTextContent(/happens-before/i);
+    expect(await screen.findAllByRole('region', { name: 'Selected context' }, routeFlowTimeout)).toHaveLength(1);
   });
 
   it('restores direct, Back, and Forward row targets without leaving the asset', async () => {

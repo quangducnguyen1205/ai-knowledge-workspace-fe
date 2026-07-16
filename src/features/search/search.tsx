@@ -22,12 +22,15 @@ export function SearchPanel({
   contextError,
   isContextLoading,
   selectedResult,
+  selectedContextRowId,
   routeQuery,
   scope,
   embedded = false,
   onSearch,
   onSelectResult,
   onOpenResultContext,
+  onReturnToSearch,
+  onClearContext,
 }: {
   workspaceName: string;
   searchableAssetCount: number;
@@ -40,16 +43,21 @@ export function SearchPanel({
   contextError: unknown;
   isContextLoading: boolean;
   selectedResult: SearchResult | null;
+  selectedContextRowId?: string | null;
   routeQuery?: string | null;
   scope?: SearchPanelScope;
   embedded?: boolean;
   onSearch: (query: string) => void;
   onSelectResult: (result: SearchResult) => void;
   onOpenResultContext?: (result: SearchResult) => void;
+  onReturnToSearch?: () => void;
+  onClearContext?: () => void;
 }) {
   const [searchInput, setSearchInput] = useState('');
   const routeQueryDraft = routeQuery?.trim() || null;
   const isAssetScoped = scope?.mode === 'asset';
+  const selectedResultRowId = selectedResult ? resolveTranscriptLookupId(selectedResult) : null;
+  const contextRowId = selectedContextRowId === undefined ? selectedResultRowId : selectedContextRowId;
   const searchEnabled = searchableAssetCount > 0;
   const hasSearchResults = Boolean(searchResponse?.results.length);
   const displayContextRows = useMemo(
@@ -207,21 +215,27 @@ export function SearchPanel({
         </div>
       ) : null}
 
-      {isAssetScoped && selectedResult ? (
+      {isAssetScoped && contextRowId ? (
         <section className="context-panel" aria-labelledby="local-context-title">
           <div className="panel-block__header">
-            <h2 id="local-context-title">Selected context</h2>
-            <span className="context-panel__hint">Around the matching moment</span>
+            <div>
+              <h2 id="local-context-title">Selected context</h2>
+              <span className="context-panel__hint">Around the matching moment</span>
+            </div>
+            <div className="selected-context__actions">
+              {onReturnToSearch ? <Button type="button" tone="secondary" onClick={onReturnToSearch}>Back to search</Button> : null}
+              {onClearContext ? <Button type="button" tone="ghost" onClick={onClearContext}>Clear</Button> : null}
+            </div>
           </div>
           {isContextLoading ? <LoadingBlock label="Loading context..." compact /> : null}
           {!isContextLoading && contextError ? <ErrorBanner error={contextError} /> : null}
           {!isContextLoading && !contextError && !contextResponse ? (
-            <EmptyState title="Choose a result" description="Select a match above to read the surrounding transcript." />
+            <EmptyState title="Context unavailable" description="Continue with the full transcript below." />
           ) : null}
           {contextResponse ? (
             <ol className="transcript-list transcript-list--compact">
               {displayContextRows.map(({ row, displayText }) => {
-                const isHit = matchesTranscriptReference(row, contextResponse.transcriptRowId);
+                const isHit = matchesTranscriptReference(row, contextRowId);
                 return (
                   <li key={row.id ?? `segment-${row.segmentIndex ?? 'missing'}`} className={`transcript-list__item ${isHit ? 'transcript-list__item--active' : ''}`}>
                     <div className="transcript-list__meta">

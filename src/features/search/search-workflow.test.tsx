@@ -1,5 +1,5 @@
 import type { ComponentProps } from 'react';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseRoute, routeToHash } from '../../app/router';
@@ -129,7 +129,6 @@ function renderAssetDetail(overrides: Partial<ComponentProps<typeof AssetDetailS
     isContextLoading: false,
     selectedSearchResult: null,
     focusedTranscriptRowId: null,
-    sourceSearchQuery: null,
     studyContextResponse: undefined,
     studyContextError: null,
     isStudyContextLoading: false,
@@ -284,17 +283,24 @@ describe('search-to-study workflow', () => {
     expect(screen.queryByText(/search service unavailable/i)).not.toBeInTheDocument();
   });
 
-  it('renders selected transcript context on Asset Detail', () => {
+  it('renders one canonical selected-context region with the matched row highlighted', async () => {
+    const user = userEvent.setup();
+    const onClearStudyContext = vi.fn();
     renderAssetDetail({
       focusedTranscriptRowId: 'row-2',
-      sourceSearchQuery: 'vector clocks',
       studyContextResponse: contextResponse,
+      onClearStudyContext,
     });
 
-    expect(screen.getByRole('heading', { name: /search result in context/i })).toBeInTheDocument();
-    expect(screen.getByText(/showing the moment found for/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/selected/i)).not.toHaveLength(0);
-    expect(screen.getAllByText(/vector clocks preserve causal relationships/i)).not.toHaveLength(0);
+    const contextRegions = screen.getAllByRole('region', { name: 'Selected context' });
+    expect(contextRegions).toHaveLength(1);
+    expect(screen.queryByRole('heading', { name: /search result in context/i })).not.toBeInTheDocument();
+    const matchedRow = within(contextRegions[0]).getByText(/vector clocks preserve causal relationships/i).closest('li');
+    expect(matchedRow).toHaveClass('transcript-list__item--active');
+    expect(within(contextRegions[0]).getAllByRole('listitem')).toHaveLength(3);
+
+    await user.click(within(contextRegions[0]).getByRole('button', { name: 'Clear' }));
+    expect(onClearStudyContext).toHaveBeenCalledTimes(1);
   });
 
   it('focuses and scrolls the exact rendered transcript row when the target changes on the same asset', async () => {
@@ -389,7 +395,6 @@ describe('search-to-study workflow', () => {
   it('shows safe feedback when the selected row is missing from the visible transcript', () => {
     renderAssetDetail({
       focusedTranscriptRowId: 'row-missing',
-      sourceSearchQuery: 'vector clocks',
       studyContextResponse: undefined,
     });
 
@@ -403,7 +408,6 @@ describe('search-to-study workflow', () => {
 
     renderAssetDetail({
       focusedTranscriptRowId: 'row-2',
-      sourceSearchQuery: 'vector clocks',
       studyContextResponse: contextResponse,
       onReturnToSearch,
     });

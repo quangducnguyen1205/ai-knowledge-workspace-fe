@@ -407,6 +407,7 @@ export function AppRouter() {
     const clearedRoute = getClearedStudyRoute(route);
 
     if (clearedRoute) {
+      assetSearch.clearSelectedResult();
       navigate(clearedRoute);
     }
   }
@@ -639,7 +640,6 @@ export function AppRouter() {
             selectedSearchResult={assetSearch.selectedResult}
             focusedTranscriptRowId={studyRouteState.focusedTranscriptRowId}
             focusedTranscriptSource={studyRouteState.source}
-            sourceSearchQuery={studyRouteState.sourceSearchQuery}
             studyContextResponse={routedStudyContextQuery.data}
             studyContextError={routedStudyContextQuery.error}
             isStudyContextLoading={routedStudyContextQuery.isLoading || routedStudyContextQuery.isFetching}

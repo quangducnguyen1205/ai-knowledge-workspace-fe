@@ -8,8 +8,7 @@ import type {
 import type { AssistantAnswerCitation } from '../assistant/model/types';
 import type { SearchResponse, SearchResult } from '../search/api/search-api';
 import type { TranscriptContextResponse, TranscriptRow } from '../../entities/transcript/model/types';
-import { buildTranscriptDisplayRows, matchesTranscriptReference } from '../../entities/transcript/model/transcript-display';
-import { Button, EmptyState, ErrorBanner, InfoBanner, LoadingBlock, SuccessNotification, formatDateTime } from '../../lib/ui';
+import { Button, EmptyState, ErrorBanner, InfoBanner, SuccessNotification, formatDateTime } from '../../lib/ui';
 import type { EphemeralNotice } from '../../shared/ui/use-ephemeral-notice';
 import { getFriendlyRenameErrorCopy } from './model/error-copy';
 import { AssetIndexingRecoveryAction } from './components/asset-indexing-recovery-action';
@@ -47,7 +46,6 @@ type AssetDetailScreenProps = {
   selectedSearchResult: SearchResult | null;
   focusedTranscriptRowId: string | null;
   focusedTranscriptSource?: 'search' | 'assistant' | null;
-  sourceSearchQuery: string | null;
   studyContextResponse?: TranscriptContextResponse;
   studyContextError: unknown;
   isStudyContextLoading: boolean;
@@ -92,7 +90,6 @@ export function AssetDetailScreen({
   selectedSearchResult,
   focusedTranscriptRowId,
   focusedTranscriptSource,
-  sourceSearchQuery,
   studyContextResponse,
   studyContextError,
   isStudyContextLoading,
@@ -319,28 +316,18 @@ export function AssetDetailScreen({
             searchResponse={searchResponse}
             searchError={searchError}
             isSearching={isSearching}
-            contextResponse={contextResponse}
-            contextError={contextError}
-            isContextLoading={isContextLoading}
+            contextResponse={focusedTranscriptRowId ? studyContextResponse : contextResponse}
+            contextError={focusedTranscriptRowId ? studyContextError : contextError}
+            isContextLoading={focusedTranscriptRowId ? isStudyContextLoading : isContextLoading}
             selectedResult={selectedSearchResult}
+            selectedContextRowId={focusedTranscriptRowId}
             scope={{ mode: 'asset', assetTitle: asset.title }}
             onSearch={onSearchWithinAsset}
             onSelectResult={onSelectSearchResult}
             onOpenResultContext={onOpenTranscriptMoment}
+            onReturnToSearch={onReturnToSearch}
+            onClearContext={onClearStudyContext}
           />
-
-          {focusedTranscriptRowId ? (
-            <TranscriptStudyContextPanel
-              focusedTranscriptRowId={focusedTranscriptRowId}
-              source={focusedTranscriptSource}
-              sourceSearchQuery={sourceSearchQuery}
-              contextResponse={studyContextResponse}
-              contextError={studyContextError}
-              isContextLoading={isStudyContextLoading}
-              onReturnToSearch={onReturnToSearch}
-              onClearStudyContext={onClearStudyContext}
-            />
-          ) : null}
 
           <SelectedAssetTranscriptPanel
             embedded
@@ -409,70 +396,6 @@ export function AssetDetailScreen({
         </section>
       </div>
     </div>
-  );
-}
-
-function TranscriptStudyContextPanel({
-  focusedTranscriptRowId,
-  source,
-  sourceSearchQuery,
-  contextResponse,
-  contextError,
-  isContextLoading,
-  onReturnToSearch,
-  onClearStudyContext,
-}: {
-  focusedTranscriptRowId: string;
-  source?: 'search' | 'assistant' | null;
-  sourceSearchQuery: string | null;
-  contextResponse?: TranscriptContextResponse;
-  contextError: unknown;
-  isContextLoading: boolean;
-  onReturnToSearch?: () => void;
-  onClearStudyContext?: () => void;
-}) {
-  const displayContextRows = contextResponse?.rows.length ? buildTranscriptDisplayRows(contextResponse.rows) : [];
-  const resolvedSource = source ?? (sourceSearchQuery ? 'search' : null);
-
-  return (
-    <section className="selected-context" aria-labelledby="selected-context-title">
-      <div className="selected-context__header">
-        <div>
-          <p className="panel__eyebrow">Selected context</p>
-          <h2 id="selected-context-title">
-            {resolvedSource === 'assistant' ? 'Citation in context' : 'Search result in context'}
-          </h2>
-        </div>
-        <div className="selected-context__actions">
-          {onReturnToSearch ? <Button type="button" tone="secondary" onClick={onReturnToSearch}>Back to search</Button> : null}
-          {onClearStudyContext ? <Button type="button" tone="ghost" onClick={onClearStudyContext}>Clear</Button> : null}
-        </div>
-      </div>
-      {sourceSearchQuery ? <p>Showing the moment found for “{sourceSearchQuery}”.</p> : null}
-      {isContextLoading ? <LoadingBlock label="Loading selected context..." compact /> : null}
-      {!isContextLoading && contextError ? (
-        <ErrorBanner error={contextError} title="This moment is unavailable" message="Return to search or continue with the full transcript below." />
-      ) : null}
-      {!isContextLoading && !contextError && !contextResponse ? (
-        <EmptyState title="Context unavailable" description="Continue with the full transcript below." />
-      ) : null}
-      {contextResponse ? (
-        <ol className="transcript-list transcript-list--compact">
-          {displayContextRows.map(({ row, displayText }) => {
-            const isHit = matchesTranscriptReference(row, focusedTranscriptRowId);
-            return (
-              <li key={row.id ?? `segment-${row.segmentIndex ?? 'missing'}`} className={`transcript-list__item ${isHit ? 'transcript-list__item--active' : ''}`}>
-                <div className="transcript-list__meta">
-                  <span>Moment {row.segmentIndex ?? '—'}</span>
-                  {isHit ? <span className="hit-pill">Selected</span> : null}
-                </div>
-                <p>{displayText}</p>
-              </li>
-            );
-          })}
-        </ol>
-      ) : null}
-    </section>
   );
 }
 
