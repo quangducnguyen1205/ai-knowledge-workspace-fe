@@ -190,7 +190,7 @@ describe('asset upload characterization', () => {
     );
     await user.upload(fileInput, invalidFile);
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Choose an MP4, MOV, M4V, WebM, or AVI video file.');
+    expect(screen.getByRole('alert')).toHaveTextContent('Chọn tệp video MP4, MOV, M4V, WebM hoặc AVI hợp lệ.');
     expect(screen.getByText('notes.txt')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Upload to workspace' })).toBeDisabled();
     expect(onUpload).not.toHaveBeenCalled();
@@ -231,7 +231,8 @@ describe('asset upload characterization', () => {
       />,
     );
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Upload was rejected');
-    expect(screen.getByRole('alert')).toHaveTextContent('Choose an MP4, MOV, M4V, WebM, or AVI video file.');
+    expect(screen.getByRole('alert')).toHaveTextContent('Tệp tải lên không được hỗ trợ');
+    expect(screen.getByRole('alert')).toHaveTextContent('Chọn tệp video MP4, MOV, M4V, WebM hoặc AVI hợp lệ.');
+    expect(screen.getByRole('alert')).not.toHaveTextContent('Only MP4, MOV, M4V, WebM, and AVI');
   });
 });

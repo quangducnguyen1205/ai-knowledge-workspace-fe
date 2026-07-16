@@ -62,20 +62,7 @@ export function useDeleteWorkspaceMutation() {
 type FriendlyMessageCopy = {
   title: string;
   message: string;
-  detail?: string;
 };
-
-function getTechnicalDetail(error: { code?: string; message: string }): string | undefined {
-  const normalizedMessage = error.message.trim();
-
-  if (!normalizedMessage) {
-    return error.code ? `Backend detail: ${error.code}` : undefined;
-  }
-
-  return error.code
-    ? `Backend detail: ${error.code} - ${normalizedMessage}`
-    : `Backend detail: ${normalizedMessage}`;
-}
 
 function getFriendlyWorkspaceRenameErrorCopy(
   error: unknown,
@@ -87,34 +74,31 @@ function getFriendlyWorkspaceRenameErrorCopy(
   if (error.status === 400 && error.code === 'INVALID_WORKSPACE_NAME') {
     return {
       tone: 'warning',
-      title: 'Workspace name was rejected',
-      message: 'Use a clear non-empty workspace name within the current length limit, then save again.',
-      detail: getTechnicalDetail(error),
+      title: 'Tên workspace chưa hợp lệ',
+      message: 'Nhập tên workspace không để trống và nằm trong giới hạn cho phép.',
     };
   }
 
   if (error.status === 404) {
     return {
       tone: 'warning',
-      title: 'Workspace is no longer available',
-      message: 'This workspace could not be found anymore. The shell will refresh the visible workspace scope.',
-      detail: getTechnicalDetail(error),
+      title: 'Không tìm thấy workspace',
+      message: 'Workspace không còn tồn tại hoặc bạn không có quyền truy cập.',
     };
   }
 
   if (error.status === 0) {
     return {
       tone: 'error',
-      title: 'Rename is temporarily unavailable',
-      message: 'We could not reach the service, so the workspace name was not updated.',
+      title: 'Chưa thể đổi tên workspace',
+      message: 'Kiểm tra kết nối mạng rồi thử lại. Tên cũ vẫn được giữ nguyên.',
     };
   }
 
   return {
     tone: 'error',
-    title: 'Workspace rename failed',
-    message: 'The workspace name change was not confirmed, so the previous name stays in place.',
-    detail: getTechnicalDetail(error),
+    title: 'Không thể đổi tên workspace',
+    message: 'Tên cũ vẫn được giữ nguyên. Vui lòng thử lại sau.',
   };
 }
 
@@ -367,7 +351,6 @@ export function WorkspaceBar({
           className="workspace-bar__error"
           title={logoutErrorCopy?.title}
           message={logoutErrorCopy?.message}
-          detail={logoutErrorCopy?.detail}
         />
       ) : null}
       {createError ? <ErrorBanner error={createError} className="workspace-bar__error" /> : null}
@@ -377,7 +360,6 @@ export function WorkspaceBar({
           tone="warning"
           title={renameErrorCopy.title}
           message={renameErrorCopy.message}
-          detail={renameErrorCopy.detail}
         />
       ) : null}
       {renameErrorCopy?.tone === 'error' ? (
@@ -386,7 +368,6 @@ export function WorkspaceBar({
           className="workspace-bar__error"
           title={renameErrorCopy.title}
           message={renameErrorCopy.message}
-          detail={renameErrorCopy.detail}
         />
       ) : null}
       {deleteDialogWorkspace ? (

@@ -276,7 +276,9 @@ describe('search-to-study workflow', () => {
       />,
     );
 
-    expect(screen.getByText(/search service unavailable/i)).toBeInTheDocument();
+    expect(screen.getByText('Đã xảy ra lỗi')).toBeInTheDocument();
+    expect(screen.getByText('Không thể hoàn tất thao tác. Vui lòng thử lại sau.')).toBeInTheDocument();
+    expect(screen.queryByText(/search service unavailable/i)).not.toBeInTheDocument();
   });
 
   it('renders selected transcript context on Asset Detail', () => {

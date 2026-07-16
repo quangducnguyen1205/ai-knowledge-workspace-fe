@@ -1,4 +1,4 @@
-import { ApiClientError, isApiClientError } from '../../../shared/api/api-error';
+import { isApiClientError } from '../../../shared/api/api-error';
 import type { AssetStatus, ProcessingJobStatus } from './types';
 
 export type FriendlyMessageCopy = {
@@ -7,40 +7,29 @@ export type FriendlyMessageCopy = {
   detail?: string;
 };
 
-function getTechnicalDetail(error: ApiClientError): string | undefined {
-  const normalizedMessage = error.message.trim();
-  if (!normalizedMessage) return undefined;
-  if (['bad request', 'conflict', 'unsupported media type', 'unprocessable entity'].includes(normalizedMessage.toLowerCase())) {
-    return error.code ? `Backend detail: ${error.code}` : undefined;
-  }
-  return error.code ? `Backend detail: ${error.code} - ${normalizedMessage}` : `Backend detail: ${normalizedMessage}`;
-}
-
 export function getFriendlyUploadErrorCopy(error: unknown): FriendlyMessageCopy | null {
   if (!isApiClientError(error)) return null;
   if (error.status === 400 && error.code === 'INVALID_UPLOAD_FILE') {
     return {
-      title: 'Upload was rejected',
-      message: 'Choose an MP4, MOV, M4V, WebM, or AVI video file.',
-      detail: getTechnicalDetail(error),
+      title: 'Tệp tải lên không được hỗ trợ',
+      message: 'Chọn tệp video MP4, MOV, M4V, WebM hoặc AVI hợp lệ.',
     };
   }
   if (error.status === 0) {
-    return { title: 'Upload is temporarily unavailable', message: 'We could not reach the service, so the upload did not start.' };
+    return { title: 'Chưa thể tải tệp lên', message: 'Kiểm tra kết nối mạng rồi thử lại. Tệp chưa được gửi đi xử lý.' };
   }
   if ([400, 409, 413, 415, 422].includes(error.status)) {
     return {
-      title: 'Upload was rejected',
-      message: 'This file could not be accepted for processing. Try a supported lecture video file and confirm the active workspace is still valid.',
-      detail: getTechnicalDetail(error),
+      title: 'Tệp tải lên chưa hợp lệ',
+      message: 'Kiểm tra định dạng video và workspace đang chọn rồi thử lại.',
     };
   }
-  if ((error.status === 502 && error.code === 'FASTAPI_INTEGRATION_ERROR') ||
-      (error.status === 504 && error.code === 'FASTAPI_CONNECTIVITY_ERROR')) {
+  if (error.code === 'PROCESSING_SERVICE_UNAVAILABLE' ||
+      error.code === 'FASTAPI_INTEGRATION_ERROR' ||
+      error.code === 'FASTAPI_CONNECTIVITY_ERROR') {
     return {
-      title: 'Upload could not start processing',
-      message: 'The current processing path could not accept this file right now. Use a supported lecture video file and try again.',
-      detail: getTechnicalDetail(error),
+      title: 'Xử lý video tạm thời chưa sẵn sàng',
+      message: 'Tệp chưa được gửi đi xử lý. Vui lòng thử lại sau.',
     };
   }
   return null;
@@ -51,28 +40,26 @@ export function getFriendlyDeleteErrorCopy(error: unknown): (FriendlyMessageCopy
   if (error.status === 404) {
     return {
       tone: 'warning',
-      title: 'Asset already removed',
-      message: 'This asset no longer exists. The workspace list will refresh and clear any stale selection.',
-      detail: getTechnicalDetail(error),
+      title: 'Tài liệu đã được xóa',
+      message: 'Danh sách workspace sẽ được làm mới để loại bỏ lựa chọn cũ.',
     };
   }
-  if ((error.status === 503 && error.code === 'ELASTICSEARCH_UNAVAILABLE') ||
-      (error.status === 502 && error.code === 'ELASTICSEARCH_INTEGRATION_ERROR')) {
+  if (error.code === 'SEARCH_SERVICE_UNAVAILABLE' ||
+      error.code === 'ELASTICSEARCH_UNAVAILABLE' ||
+      error.code === 'ELASTICSEARCH_INTEGRATION_ERROR') {
     return {
       tone: 'error',
-      title: 'Delete could not finish',
-      message: 'The asset could not be removed because search infrastructure is unavailable right now. It will stay visible until deletion is confirmed.',
-      detail: getTechnicalDetail(error),
+      title: 'Chưa thể xóa tài liệu',
+      message: 'Dịch vụ tìm kiếm tạm thời chưa sẵn sàng. Tài liệu vẫn được giữ nguyên.',
     };
   }
   if (error.status === 0) {
-    return { tone: 'error', title: 'Delete is temporarily unavailable', message: 'We could not reach the service, so this asset was not removed.' };
+    return { tone: 'error', title: 'Chưa thể xóa tài liệu', message: 'Kiểm tra kết nối mạng rồi thử lại. Tài liệu chưa bị xóa.' };
   }
   return {
     tone: 'error',
-    title: 'Delete failed',
-    message: 'The asset was not removed. The current list stays in place until deletion is confirmed.',
-    detail: getTechnicalDetail(error),
+    title: 'Không thể xóa tài liệu',
+    message: 'Tài liệu chưa bị xóa. Vui lòng thử lại sau.',
   };
 }
 
@@ -81,36 +68,33 @@ export function getFriendlyRenameErrorCopy(error: unknown): (FriendlyMessageCopy
   if (error.status === 400 && error.code === 'INVALID_ASSET_TITLE') {
     return {
       tone: 'warning',
-      title: 'Title was rejected',
-      message: 'Use a clear non-empty title within the current length limit, then save again.',
-      detail: getTechnicalDetail(error),
+      title: 'Tiêu đề chưa hợp lệ',
+      message: 'Nhập tiêu đề không để trống và nằm trong giới hạn cho phép.',
     };
   }
   if (error.status === 404) {
     return {
       tone: 'warning',
-      title: 'Asset no longer exists',
-      message: 'This asset could not be found anymore. The workspace list will refresh and clear stale selection if needed.',
-      detail: getTechnicalDetail(error),
+      title: 'Không tìm thấy tài liệu',
+      message: 'Tài liệu không còn tồn tại hoặc bạn không có quyền truy cập.',
     };
   }
-  if ((error.status === 503 && error.code === 'ELASTICSEARCH_UNAVAILABLE') ||
-      (error.status === 502 && error.code === 'ELASTICSEARCH_INTEGRATION_ERROR')) {
+  if (error.code === 'SEARCH_SERVICE_UNAVAILABLE' ||
+      error.code === 'ELASTICSEARCH_UNAVAILABLE' ||
+      error.code === 'ELASTICSEARCH_INTEGRATION_ERROR') {
     return {
       tone: 'error',
-      title: 'Rename could not finish',
-      message: 'The title could not be updated right now, so the previous title stays in place until the change is confirmed.',
-      detail: getTechnicalDetail(error),
+      title: 'Chưa thể đổi tiêu đề',
+      message: 'Dịch vụ tìm kiếm tạm thời chưa sẵn sàng nên tiêu đề cũ vẫn được giữ nguyên.',
     };
   }
   if (error.status === 0) {
-    return { tone: 'error', title: 'Rename is temporarily unavailable', message: 'We could not reach the service, so this title was not updated.' };
+    return { tone: 'error', title: 'Chưa thể đổi tiêu đề', message: 'Kiểm tra kết nối mạng rồi thử lại. Tiêu đề cũ vẫn được giữ nguyên.' };
   }
   return {
     tone: 'error',
-    title: 'Rename failed',
-    message: 'The title update was not confirmed, so the previous title is still shown.',
-    detail: getTechnicalDetail(error),
+    title: 'Không thể đổi tiêu đề',
+    message: 'Tiêu đề cũ vẫn được giữ nguyên. Vui lòng thử lại sau.',
   };
 }
 
@@ -122,22 +106,19 @@ export function getTranscriptConflictCopy(
   if (!(isApiClientError(error) && error.status === 409)) return null;
   if (resolvedAssetStatus === 'FAILED' || processingJobStatus === 'FAILED') {
     return {
-      title: 'Transcript is unavailable for this asset',
-      message: 'Processing failed, so there are no transcript rows available to review or index.',
-      detail: getTechnicalDetail(error),
+      title: 'Transcript chưa khả dụng',
+      message: 'Quá trình xử lý đã thất bại nên chưa có transcript để xem hoặc lập chỉ mục.',
     };
   }
   if (processingJobStatus === 'SUCCEEDED' || resolvedAssetStatus === 'TRANSCRIPT_READY') {
     return {
-      title: 'Transcript is still being prepared',
-      message: 'Processing finished, but transcript rows are not available yet. Indexing stays disabled until the transcript is ready.',
-      detail: getTechnicalDetail(error),
+      title: 'Transcript đang được chuẩn bị',
+      message: 'Quá trình xử lý đã hoàn tất nhưng transcript chưa sẵn sàng. Hãy chờ trước khi lập chỉ mục.',
     };
   }
   return {
-    title: 'Transcript is still being prepared',
-    message: 'Transcript rows are not available yet. Wait for processing to finish before indexing.',
-    detail: getTechnicalDetail(error),
+    title: 'Transcript đang được chuẩn bị',
+    message: 'Hãy chờ quá trình xử lý hoàn tất trước khi lập chỉ mục.',
   };
 }
 

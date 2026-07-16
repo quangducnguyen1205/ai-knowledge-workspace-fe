@@ -49,7 +49,6 @@ export function useLogoutMutation() {
 type FriendlyAuthErrorCopy = {
   title: string;
   message: string;
-  detail?: string;
 };
 
 const productHighlights = [
@@ -74,69 +73,62 @@ function getFriendlyAuthErrorCopy(error: unknown, mode: 'register' | 'login' | '
 
   if (error.status === 0) {
     return {
-      title: mode === 'logout' ? 'Sign out is unavailable' : 'Authentication is temporarily unavailable',
+      title: mode === 'logout' ? 'Chưa thể đăng xuất' : 'Đăng nhập tạm thời chưa sẵn sàng',
       message:
         mode === 'logout'
-          ? 'We could not reach the service to sign you out, so your current session is still active.'
-          : 'We could not reach the service, so your session has not changed yet.',
+          ? 'Kiểm tra kết nối mạng rồi thử lại. Phiên hiện tại vẫn đang hoạt động.'
+          : 'Kiểm tra kết nối mạng rồi thử lại. Trạng thái đăng nhập chưa thay đổi.',
     };
   }
 
   if (mode === 'register' && error.status === 409 && error.code === 'EMAIL_ALREADY_REGISTERED') {
     return {
-      title: 'Email already registered',
-      message: 'Use a different email address or switch to Sign in if this account already exists.',
-      detail: `Backend detail: ${error.code}`,
+      title: 'Email đã được đăng ký',
+      message: 'Hãy đăng nhập bằng email này hoặc sử dụng một địa chỉ email khác.',
     };
   }
 
   if (mode === 'login' && error.status === 401 && error.code === 'INVALID_CREDENTIALS') {
     return {
-      title: 'Incorrect email or password',
-      message: 'Double-check your credentials and try again.',
-      detail: `Backend detail: ${error.code}`,
+      title: 'Email hoặc mật khẩu chưa đúng',
+      message: 'Kiểm tra lại thông tin đăng nhập rồi thử lại.',
     };
   }
 
   if (error.status === 400 && error.code === 'INVALID_EMAIL') {
     return {
-      title: 'Enter a valid email address',
-      message: 'Use a complete email address and try again.',
-      detail: `Backend detail: ${error.code} - ${error.message}`,
+      title: 'Email chưa hợp lệ',
+      message: 'Nhập đầy đủ một địa chỉ email hợp lệ rồi thử lại.',
     };
   }
 
   if (error.status === 400 && error.code === 'INVALID_PASSWORD') {
     return {
-      title: 'Password was rejected',
-      message: 'Use a password that meets the current requirements, then try again.',
-      detail: `Backend detail: ${error.code} - ${error.message}`,
+      title: 'Mật khẩu chưa hợp lệ',
+      message: 'Kiểm tra yêu cầu về mật khẩu rồi thử lại.',
     };
   }
 
   if (error.status === 400 && error.code === 'INVALID_AUTH_REQUEST') {
     return {
-      title: 'Check the form and try again',
-      message: 'The request was not accepted. Review both fields and submit again.',
-      detail: `Backend detail: ${error.code} - ${error.message}`,
+      title: 'Thông tin chưa đầy đủ',
+      message: 'Kiểm tra các trường trong biểu mẫu rồi gửi lại.',
     };
   }
 
   if (mode === 'logout') {
     return {
-      title: 'Sign out failed',
-      message: 'We could not confirm sign out, so this session is still active.',
-      detail: error.code ? `Backend detail: ${error.code} - ${error.message}` : `Backend detail: ${error.message}`,
+      title: 'Không thể đăng xuất',
+      message: 'Phiên hiện tại vẫn đang hoạt động. Vui lòng thử lại sau.',
     };
   }
 
   return {
-    title: mode === 'register' ? 'Account creation failed' : 'Sign-in failed',
+    title: mode === 'register' ? 'Không thể tạo tài khoản' : 'Không thể đăng nhập',
     message:
       mode === 'register'
-        ? 'We could not create your account yet. Try again in a moment.'
-        : 'We could not sign you in yet. Try again in a moment.',
-    detail: error.code ? `Backend detail: ${error.code} - ${error.message}` : `Backend detail: ${error.message}`,
+        ? 'Tài khoản chưa được tạo. Vui lòng thử lại sau.'
+        : 'Đăng nhập chưa thành công. Vui lòng thử lại sau.',
   };
 }
 
@@ -316,7 +308,6 @@ export function AuthEntrySurface({
               error={activeError}
               title={errorCopy?.title}
               message={errorCopy?.message}
-              detail={errorCopy?.detail}
             />
           ) : null}
 
@@ -411,25 +402,24 @@ export function KeycloakAuthEntrySurface({
           {configIssue ? (
             <ErrorBanner
               error={new Error(configIssue.message)}
-              title="Keycloak configuration incomplete"
-              message={configIssue.message}
-              detail={configIssue.missingKeys?.length ? `Missing: ${configIssue.missingKeys.join(', ')}` : undefined}
+              title="Cấu hình đăng nhập chưa sẵn sàng"
+              message="Ứng dụng chưa thể khởi tạo phương thức đăng nhập. Vui lòng liên hệ quản trị viên."
             />
           ) : null}
 
           {authModeUnavailable ? (
             <ErrorBanner
-              error={new Error(authErrorMessage ?? 'Backend auth mode mismatch.')}
-              title="Backend auth mode mismatch"
-              message="The frontend is configured for bearer-token authentication, but the backend did not accept that auth mode for this request."
+              error={new Error(authErrorMessage ?? 'Authentication mode is unavailable.')}
+              title="Phương thức đăng nhập chưa sẵn sàng"
+              message="Phương thức đăng nhập hiện tại chưa được hệ thống chấp nhận. Vui lòng thử lại sau."
             />
           ) : null}
 
           {!configIssue && !authModeUnavailable && authErrorMessage ? (
             <ErrorBanner
               error={new Error(authErrorMessage)}
-              title="Keycloak sign-in did not finish"
-              message={authErrorMessage}
+              title="Đăng nhập chưa hoàn tất"
+              message="Không thể hoàn tất đăng nhập. Vui lòng thử lại."
             />
           ) : null}
 

@@ -13,47 +13,47 @@ function getDeleteErrorCopy(error: unknown): DeleteErrorCopy | null {
   if (!isApiClientError(error)) {
     return error ? {
       tone: 'error',
-      title: 'Workspace delete failed',
-      message: 'The workspace was not removed. Try again after checking the current workspace state.',
+      title: 'Không thể xóa workspace',
+      message: 'Workspace chưa bị xóa. Vui lòng thử lại sau.',
     } : null;
   }
 
   if (error.status === 409 && error.code === 'DEFAULT_WORKSPACE_DELETE_FORBIDDEN') {
     return {
       tone: 'warning',
-      title: 'Default workspace stays protected',
-      message: 'The default workspace cannot be deleted. Switch to another workspace if you want to remove it instead.',
+      title: 'Không thể xóa workspace mặc định',
+      message: 'Workspace mặc định được bảo vệ và không thể xóa.',
     };
   }
 
   if (error.status === 409 && error.code === 'WORKSPACE_NOT_EMPTY') {
     return {
       tone: 'warning',
-      title: 'Workspace still contains assets',
-      message: 'Delete the assets in this workspace first. Workspace deletion stays blocked until it is empty.',
+      title: 'Workspace vẫn còn tài liệu',
+      message: 'Hãy xóa các tài liệu trong workspace trước rồi thử lại.',
     };
   }
 
   if (error.status === 404) {
     return {
       tone: 'warning',
-      title: 'Workspace already unavailable',
-      message: 'This workspace is no longer visible. Refresh the workspace scope before choosing another action.',
+      title: 'Không tìm thấy workspace',
+      message: 'Workspace không còn tồn tại hoặc bạn không có quyền truy cập.',
     };
   }
 
   if (error.status === 0) {
     return {
       tone: 'error',
-      title: 'Delete is temporarily unavailable',
-      message: 'We could not reach the service, so the workspace was not removed.',
+      title: 'Chưa thể xóa workspace',
+      message: 'Kiểm tra kết nối mạng rồi thử lại. Workspace chưa bị xóa.',
     };
   }
 
   return {
     tone: 'error',
-    title: 'Workspace delete failed',
-    message: 'The workspace was not removed. Try again after checking the current workspace state.',
+    title: 'Không thể xóa workspace',
+    message: 'Workspace chưa bị xóa. Vui lòng thử lại sau.',
   };
 }
 

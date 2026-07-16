@@ -10,7 +10,11 @@ export type AssistantResultState =
   | { status: 'error'; error: unknown };
 
 export function isAssistantUnavailableError(error: unknown): boolean {
-  return error instanceof ApiClientError && (error.status === 503 || error.code === 'ASSISTANT_PROVIDER_UNAVAILABLE');
+  return error instanceof ApiClientError && (
+    error.status === 503 ||
+    error.code === 'ASSISTANT_SERVICE_UNAVAILABLE' ||
+    error.code === 'ASSISTANT_PROVIDER_UNAVAILABLE'
+  );
 }
 
 export function getGenericAssistantErrorMessage(error: unknown): string {
@@ -18,5 +22,5 @@ export function getGenericAssistantErrorMessage(error: unknown): string {
     return 'Use a focused, non-empty question about this asset transcript.';
   }
 
-  return 'The request could not be completed. Refine the question or inspect transcript and search results directly.';
+  return 'Không thể hoàn tất câu hỏi. Hãy thử diễn đạt ngắn gọn hơn hoặc xem trực tiếp transcript và kết quả tìm kiếm.';
 }

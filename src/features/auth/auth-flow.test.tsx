@@ -154,7 +154,8 @@ describe('auth mode UI boundary', () => {
 
     renderApp(missingConfig, oidcClient);
 
-    expect(await screen.findByText(/keycloak configuration incomplete/i)).toBeInTheDocument();
+    expect(await screen.findByText('Cấu hình đăng nhập chưa sẵn sàng')).toBeInTheDocument();
+    expect(screen.queryByText(/VITE_KEYCLOAK_REALM/)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /continue with keycloak/i })).toBeDisabled();
     expect(oidcClient.startLogin).not.toHaveBeenCalled();
   });
@@ -294,7 +295,8 @@ describe('auth mode UI boundary', () => {
 
     renderApp(keycloakConfig, oidcClient);
 
-    expect(await screen.findByText(/backend auth mode mismatch/i)).toBeInTheDocument();
+    expect(await screen.findByText('Phương thức đăng nhập chưa sẵn sàng')).toBeInTheDocument();
+    expect(screen.queryByText(/Legacy session authentication/)).not.toBeInTheDocument();
     expect(oidcClient.startLogin).not.toHaveBeenCalled();
     expect(fetchMock.mock.calls.filter(([input]) => String(input) === '/api/me')).toHaveLength(1);
   });

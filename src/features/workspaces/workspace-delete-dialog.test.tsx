@@ -99,7 +99,7 @@ describe('WorkspaceDeleteDialog', () => {
       />,
     );
 
-    expect(screen.getByText('Workspace still contains assets')).toBeInTheDocument();
+    expect(screen.getByText('Workspace vẫn còn tài liệu')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Delete workspace' }));
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
@@ -115,7 +115,7 @@ describe('WorkspaceDeleteDialog', () => {
       />,
     );
 
-    expect(screen.getByText('Default workspace stays protected')).toBeInTheDocument();
+    expect(screen.getByText('Không thể xóa workspace mặc định')).toBeInTheDocument();
     expect(screen.queryByText('raw backend detail')).not.toBeInTheDocument();
   });
 
@@ -132,7 +132,7 @@ describe('WorkspaceDeleteDialog', () => {
       />,
     );
 
-    expect(screen.getByText('Workspace delete failed')).toBeInTheDocument();
+    expect(screen.getByText('Không thể xóa workspace')).toBeInTheDocument();
     expect(screen.queryByText('internal stack detail')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Delete workspace' }));
     expect(onConfirm).toHaveBeenCalledTimes(1);

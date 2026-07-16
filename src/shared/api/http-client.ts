@@ -3,8 +3,6 @@ import { ApiClientError } from './api-error';
 
 type ApiErrorPayload = {
   code?: string;
-  message?: string;
-  error?: string;
 };
 
 export type ApiAuthContext = {
@@ -45,22 +43,10 @@ export function buildQueryString(params: Record<string, string | undefined>): st
   return queryString ? `?${queryString}` : '';
 }
 
-function getErrorMessage(payload: unknown, status: number): string {
-  if (payload && typeof payload === 'object') {
-    const maybePayload = payload as ApiErrorPayload;
-    if (typeof maybePayload.message === 'string' && maybePayload.message.trim()) {
-      return maybePayload.message;
-    }
-    if (typeof maybePayload.error === 'string' && maybePayload.error.trim()) {
-      return maybePayload.error;
-    }
-  }
-
-  if (typeof payload === 'string' && payload.trim()) {
-    return payload;
-  }
-
-  return status === 0 ? 'Unable to reach the backend.' : 'The backend returned an unexpected response.';
+function getSafeTransportErrorMessage(status: number): string {
+  return status === 0
+    ? 'Không thể kết nối đến dịch vụ.'
+    : 'Yêu cầu không thể hoàn tất.';
 }
 
 function getErrorCode(payload: unknown): string | undefined {
@@ -120,13 +106,17 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     response = await fetch(buildUrl(path), buildRequestInit(init));
   } catch {
-    throw new ApiClientError(0, 'Unable to reach the backend.');
+    throw new ApiClientError(0, getSafeTransportErrorMessage(0));
   }
 
   const payload = await parseResponseBody(response);
 
   if (!response.ok) {
-    const error = new ApiClientError(response.status, getErrorMessage(payload, response.status), getErrorCode(payload));
+    const error = new ApiClientError(
+      response.status,
+      getSafeTransportErrorMessage(response.status),
+      getErrorCode(payload),
+    );
 
     if (apiAuthContext.mode === 'keycloak_jwt' && error.status === 401) {
       apiAuthContext.onUnauthorized?.(error);

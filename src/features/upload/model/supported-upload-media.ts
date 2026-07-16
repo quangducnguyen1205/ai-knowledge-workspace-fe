@@ -14,7 +14,7 @@ export const SUPPORTED_UPLOAD_MEDIA_ACCEPT = [
   'video/msvideo',
 ].join(',');
 
-export const SUPPORTED_UPLOAD_MEDIA_MESSAGE = 'Choose an MP4, MOV, M4V, WebM, or AVI video file.';
+export const SUPPORTED_UPLOAD_MEDIA_MESSAGE = 'Chọn tệp video MP4, MOV, M4V, WebM hoặc AVI hợp lệ.';
 
 const GENERIC_CONTENT_TYPES = new Set(['', 'application/octet-stream', 'video/*']);
 
@@ -29,7 +29,7 @@ const supportedMediaTypesByExtension: Record<string, ReadonlySet<string>> = {
 export function getUploadMediaValidationError(
   file: Pick<File, 'name' | 'type'> | null,
 ): string | null {
-  if (!file) return 'Choose a video file before uploading.';
+  if (!file) return 'Chọn một tệp video trước khi tải lên.';
 
   const extension = extensionOf(file.name);
   const supportedMediaTypes = extension ? supportedMediaTypesByExtension[extension] : undefined;

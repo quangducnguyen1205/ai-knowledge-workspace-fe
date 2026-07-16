@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react';
-import { isApiClientError } from '../shared/api/api-error';
+import { getUserSafeErrorCopy } from '../shared/api/user-error-copy';
 
 const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
   dateStyle: 'medium',
@@ -70,32 +70,6 @@ export function Section({
   );
 }
 
-type ErrorCopy = {
-  title: string;
-  message: string;
-};
-
-function getErrorCopy(error: unknown): ErrorCopy {
-  if (isApiClientError(error)) {
-    return {
-      title: error.code ?? `Request failed (${error.status})`,
-      message: error.message,
-    };
-  }
-
-  if (error instanceof Error) {
-    return {
-      title: 'Request failed',
-      message: error.message,
-    };
-  }
-
-  return {
-    title: 'Request failed',
-    message: 'Something unexpected happened.',
-  };
-}
-
 export function ErrorBanner({
   error,
   className,
@@ -109,7 +83,7 @@ export function ErrorBanner({
   message?: string;
   detail?: string;
 }) {
-  const copy = getErrorCopy(error);
+  const copy = getUserSafeErrorCopy(error);
   const resolvedTitle = title ?? copy.title;
   const resolvedMessage = message ?? copy.message;
 

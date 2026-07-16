@@ -66,10 +66,8 @@ function getInitialKeycloakPhase(config: FrontendAuthConfig): KeycloakAuthPhase 
   return isOidcCallbackUrl() ? 'completing_callback' : 'unauthenticated';
 }
 
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error && error.message.trim()
-    ? error.message
-    : 'The Keycloak sign-in flow could not be completed.';
+function getErrorMessage(_error: unknown): string {
+  return 'Không thể hoàn tất đăng nhập. Vui lòng thử lại.';
 }
 
 export function AuthProvider({
@@ -112,7 +110,7 @@ export function AuthProvider({
     }
 
     clearBearerToken();
-    setAuthErrorMessage('The backend is not accepting bearer-token authentication for this request.');
+    setAuthErrorMessage('Phương thức đăng nhập hiện tại chưa được hệ thống chấp nhận.');
     setKeycloakPhase('auth_mode_unavailable');
     queryClient.removeQueries({ queryKey: ['auth', 'me'] });
   }, [clearBearerToken, config.mode, queryClient]);

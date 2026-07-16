@@ -166,6 +166,21 @@ describe('assistant answer API client', () => {
 });
 
 describe('asset and search API contracts', () => {
+  it('keeps stable codes but discards raw backend exception content', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({
+      code: 'SEARCH_SERVICE_UNAVAILABLE',
+      message: 'SQLException at jdbc:postgresql://private-host password=secret',
+      detail: 'java.package.InternalException',
+    }, 503));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(listWorkspaces()).rejects.toMatchObject({
+      status: 503,
+      code: 'SEARCH_SERVICE_UNAVAILABLE',
+      message: 'Yêu cầu không thể hoàn tất.',
+    });
+  });
+
   it('keeps upload multipart fields and optional title normalization unchanged', async () => {
     const fetchMock = vi.fn(async () => jsonResponse({
       assetId: 'asset-1',
