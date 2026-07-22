@@ -13,6 +13,8 @@ const resultRow: SearchResult = {
   assetTitle: 'Vector Clocks Lecture',
   transcriptRowId: 'row-2',
   segmentIndex: 2,
+  startMs: 0,
+  endMs: 1250,
   text: 'Vector clocks preserve causality.',
   createdAt: '2026-06-26T10:02:00Z',
   score: 3.21,
@@ -49,6 +51,7 @@ describe('useSearchController', () => {
     expect(api.searchTranscript.mock.calls[0]?.slice(0, 3)).toEqual(['vector clocks', 'workspace-1', 'asset-1']);
 
     act(() => result.current.setSelectedResult(resultRow));
+    expect(result.current.selectedResult).toMatchObject({ startMs: 0, endMs: 1250 });
     await waitFor(() => expect(result.current.contextResponse?.transcriptRowId).toBe('row-2'));
     expect(api.getTranscriptContext.mock.calls[0]?.slice(0, 3)).toEqual(['asset-1', 'row-2', 2]);
   });

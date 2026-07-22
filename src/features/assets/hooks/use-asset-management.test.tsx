@@ -43,8 +43,8 @@ describe('useAssetManagement deletion cleanup', () => {
       assetIdFilter: null,
       resultCount: 2,
       results: [
-        { assetId: 'asset-1', assetTitle: 'Delete me', transcriptRowId: 'row-1', segmentIndex: 1, text: 'topic', createdAt: null, score: 2 },
-        { assetId: 'asset-2', assetTitle: 'Keep me', transcriptRowId: 'row-2', segmentIndex: 2, text: 'topic', createdAt: null, score: 1 },
+        { assetId: 'asset-1', assetTitle: 'Delete me', transcriptRowId: 'row-1', segmentIndex: 1, startMs: null, endMs: null, text: 'topic', createdAt: null, score: 2 },
+        { assetId: 'asset-2', assetTitle: 'Keep me', transcriptRowId: 'row-2', segmentIndex: 2, startMs: null, endMs: null, text: 'topic', createdAt: null, score: 1 },
       ],
     });
     vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 204 })));

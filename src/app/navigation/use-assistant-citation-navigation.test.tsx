@@ -9,6 +9,8 @@ const baseCitation: AssistantAnswerCitation = {
   assetTitle: 'Vector Clocks Lecture',
   transcriptRowId: 'row-2',
   segmentIndex: 2,
+  startMs: 1000,
+  endMs: 2000,
   createdAt: '2026-06-26T10:02:00Z',
 };
 

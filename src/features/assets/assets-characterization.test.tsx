@@ -24,6 +24,8 @@ const transcriptRows: TranscriptRow[] = [
     id: 'row-1',
     videoId: 'asset-1',
     segmentIndex: 1,
+    startMs: null,
+    endMs: null,
     text: 'Automatic indexing follows transcript readiness.',
     createdAt: '2026-06-26T10:01:00Z',
   },

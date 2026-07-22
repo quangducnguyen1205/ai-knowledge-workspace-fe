@@ -77,6 +77,8 @@ This refactor preserves existing routes, API request shapes, auth defaults, toke
 - Review ranked search results with a distinct asset title, transcript excerpt, and transcript moment metadata
 - Open a result into the existing Study route with the asset id, selected transcript-row reference, and optional source query preserved in the hash route
 - Read nearby transcript rows from the existing transcript context API in Study
+- Preserve nullable integer-millisecond transcript timing through API mapping, React Query
+  cache/state, search selection, transcript context, and assistant citations
 - Return to Search from a detail page that originated from a workspace result, preserving the safe query as `#/search?q=<query>` when available
 - Keep Workspace Search and Find in transcript as explicitly distinct tasks
 - Open transcript context around a selected result
@@ -103,6 +105,11 @@ This refactor preserves existing routes, API request shapes, auth defaults, toke
 - `POST /api/assets/{assetId}/index`
 - `GET /api/search`
 - `GET /api/assets/{assetId}/transcript/context`
+- `POST /api/assistant/answer`
+
+Transcript, search, context, and assistant citation responses use additive nullable `startMs`
+and `endMs` fields. Legacy responses that omit either field are normalized to `null`; frontend
+logic does not use truthiness because `startMs = 0` is valid.
 
 ## 7. Project 3 Auth Foundation
 

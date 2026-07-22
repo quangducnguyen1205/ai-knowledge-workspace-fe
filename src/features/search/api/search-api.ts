@@ -1,4 +1,8 @@
-import type { TranscriptContextResponse } from '../../../entities/transcript/model/types';
+import {
+  normalizeTranscriptContext,
+  type TranscriptContextResponse,
+  type TranscriptContextResponsePayload,
+} from '../../../entities/transcript/model/types';
 import { buildQueryString, request } from '../../../shared/api/http-client';
 
 export type SearchResult = {
@@ -6,9 +10,20 @@ export type SearchResult = {
   assetTitle: string;
   transcriptRowId: string | null;
   segmentIndex: number | null;
+  startMs: number | null;
+  endMs: number | null;
   text: string;
   createdAt: string | null;
   score: number | null;
+};
+
+type SearchResultPayload = Omit<SearchResult, 'startMs' | 'endMs'> & {
+  startMs?: number | null;
+  endMs?: number | null;
+};
+
+type SearchResponsePayload = Omit<SearchResponse, 'results'> & {
+  results: SearchResultPayload[];
 };
 
 export type SearchResponse = {
@@ -25,10 +40,18 @@ export async function searchTranscript(
   assetId?: string | null,
   signal?: AbortSignal,
 ): Promise<SearchResponse> {
-  return request<SearchResponse>(
+  const response = await request<SearchResponsePayload>(
     `/api/search${buildQueryString({ q: query, workspaceId, assetId: assetId ?? undefined })}`,
     { signal },
   );
+  return {
+    ...response,
+    results: response.results.map((result) => ({
+      ...result,
+      startMs: result.startMs ?? null,
+      endMs: result.endMs ?? null,
+    })),
+  };
 }
 
 export async function getTranscriptContext(
@@ -37,11 +60,12 @@ export async function getTranscriptContext(
   window = 2,
   signal?: AbortSignal,
 ): Promise<TranscriptContextResponse> {
-  return request<TranscriptContextResponse>(
+  const response = await request<TranscriptContextResponsePayload>(
     `/api/assets/${assetId}/transcript/context${buildQueryString({
       transcriptRowId,
       window: String(window),
     })}`,
     { signal },
   );
+  return normalizeTranscriptContext(response);
 }

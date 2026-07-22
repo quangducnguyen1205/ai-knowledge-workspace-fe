@@ -64,6 +64,11 @@ The baseline was `0c4797436c9e7106146388a09322e2d32782fceb`. `AppShell.tsx` was 
 
 `shared/api/http-client.ts` is the only request boundary. It preserves Spring base URL resolution, proxy behavior, cookie credentials, in-memory bearer headers, JSON/multipart handling, `AbortSignal`, error parsing, and JWT boundary callbacks. Endpoint paths and DTOs live with auth, workspaces, assets, upload, search, and assistant features. Shared HTTP never imports a product feature.
 
+Transcript rows, search results, transcript-context rows, and assistant citations preserve
+nullable `startMs`/`endMs` integer-millisecond metadata. Feature API adapters normalize legacy
+payloads with missing timing fields to the single internal representation `null`; `0` remains a
+valid value. This phase adds no display, seek, player, or synchronization behavior.
+
 ## Asset, upload, lifecycle, and search ownership
 
 - `useAssetSelection` owns the workspace list query, deep-link/preferred selection reconciliation, selected ID refs, and selection continuity across list refreshes.

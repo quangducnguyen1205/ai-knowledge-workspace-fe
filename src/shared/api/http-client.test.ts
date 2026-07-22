@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { answerAssistant } from '../../features/assistant/api/assistant-api';
+import { getAssetTranscript } from '../../features/assets/api/assets-api';
 import { getCurrentUser, loginUser } from '../../features/auth/api/auth-api';
-import { searchTranscript } from '../../features/search/api/search-api';
+import { getTranscriptContext, searchTranscript } from '../../features/search/api/search-api';
 import { uploadAsset } from '../../features/upload/api/upload-api';
 import { listWorkspaces } from '../../features/workspaces/api/workspaces-api';
 import { configureApiAuth, resetApiAuthForTests } from './http-client';
@@ -163,9 +164,99 @@ describe('assistant answer API client', () => {
     expect(body).not.toHaveProperty('temperature');
     expect(body).not.toHaveProperty('timeout');
   });
+
+  it('preserves canonical citation timing and normalizes legacy citations', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({
+      answer: 'Grounded answer',
+      citations: [
+        {
+          sourceId: 'source-1', assetId: 'asset-1', assetTitle: 'Lecture',
+          transcriptRowId: 'row-0', segmentIndex: 0, startMs: 0, endMs: 1000, createdAt: null,
+        },
+        {
+          sourceId: 'source-2', assetId: 'asset-1', assetTitle: 'Lecture',
+          transcriptRowId: 'row-1', segmentIndex: 1, createdAt: null,
+        },
+      ],
+      insufficientContext: false,
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await answerAssistant({
+      workspaceId: 'workspace-1', assetId: 'asset-1', question: 'What happened?',
+    });
+
+    expect(response.citations.map(({ startMs, endMs }) => [startMs, endMs])).toEqual([
+      [0, 1000],
+      [null, null],
+    ]);
+  });
 });
 
 describe('asset and search API contracts', () => {
+  it('normalizes transcript timing while preserving zero, null, and legacy missing fields', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse([
+      {
+        id: 'row-0', videoId: 'asset-1', segmentIndex: 0,
+        startMs: 0, endMs: 1250, text: 'Timed row', createdAt: null,
+      },
+      {
+        id: 'row-null', videoId: 'asset-1', segmentIndex: 1,
+        startMs: null, endMs: null, text: 'Explicit legacy row', createdAt: null,
+      },
+      {
+        id: 'row-missing', videoId: 'asset-1', segmentIndex: 2,
+        text: 'Legacy payload row', createdAt: null,
+      },
+    ]));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const rows = await getAssetTranscript('asset-1');
+
+    expect(rows.map(({ startMs, endMs }) => [startMs, endMs])).toEqual([
+      [0, 1250],
+      [null, null],
+      [null, null],
+    ]);
+  });
+
+  it('preserves timing in search and transcript-context mappings', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({
+        query: 'vector clocks',
+        workspaceIdFilter: 'workspace-1',
+        assetIdFilter: null,
+        resultCount: 2,
+        results: [
+          {
+            assetId: 'asset-1', assetTitle: 'Lecture', transcriptRowId: 'row-0', segmentIndex: 0,
+            startMs: 0, endMs: 900, text: 'Timed hit', createdAt: null, score: 1,
+          },
+          {
+            assetId: 'asset-1', assetTitle: 'Lecture', transcriptRowId: 'row-1', segmentIndex: 1,
+            text: 'Legacy hit', createdAt: null, score: 0.5,
+          },
+        ],
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        assetId: 'asset-1', transcriptRowId: 'row-0', hitSegmentIndex: 0, window: 2,
+        rows: [{
+          id: 'row-0', videoId: 'asset-1', segmentIndex: 0,
+          startMs: 0, endMs: 900, text: 'Timed context', createdAt: null,
+        }],
+      }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const search = await searchTranscript('vector clocks', 'workspace-1');
+    const context = await getTranscriptContext('asset-1', 'row-0');
+
+    expect(search.results.map(({ startMs, endMs }) => [startMs, endMs])).toEqual([
+      [0, 900],
+      [null, null],
+    ]);
+    expect(context.rows[0]).toMatchObject({ startMs: 0, endMs: 900 });
+  });
+
   it('keeps stable codes but discards raw backend exception content', async () => {
     const fetchMock = vi.fn(async () => jsonResponse({
       code: 'SEARCH_SERVICE_UNAVAILABLE',

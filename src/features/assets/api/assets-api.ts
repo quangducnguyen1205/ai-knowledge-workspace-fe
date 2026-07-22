@@ -1,4 +1,8 @@
-import type { TranscriptRow } from '../../../entities/transcript/model/types';
+import {
+  normalizeTranscriptRow,
+  type TranscriptRow,
+  type TranscriptRowPayload,
+} from '../../../entities/transcript/model/types';
 import { buildQueryString, request } from '../../../shared/api/http-client';
 import type {
   AssetIndexResponse,
@@ -46,7 +50,8 @@ export async function getAssetStatus(assetId: string, signal?: AbortSignal): Pro
 }
 
 export async function getAssetTranscript(assetId: string, signal?: AbortSignal): Promise<TranscriptRow[]> {
-  return request<TranscriptRow[]>(`/api/assets/${assetId}/transcript`, { signal });
+  const rows = await request<TranscriptRowPayload[]>(`/api/assets/${assetId}/transcript`, { signal });
+  return rows.map(normalizeTranscriptRow);
 }
 
 export async function indexAssetTranscript(assetId: string): Promise<AssetIndexResponse> {

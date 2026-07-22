@@ -1,11 +1,15 @@
 import { request } from '../../../shared/api/http-client';
-import type { AssistantAnswerInput, AssistantAnswerResponse } from '../model/types';
+import type {
+  AssistantAnswerInput,
+  AssistantAnswerResponse,
+  AssistantAnswerResponsePayload,
+} from '../model/types';
 
 export async function answerAssistant(
   input: AssistantAnswerInput,
   signal?: AbortSignal,
 ): Promise<AssistantAnswerResponse> {
-  return request<AssistantAnswerResponse>('/api/assistant/answer', {
+  const response = await request<AssistantAnswerResponsePayload>('/api/assistant/answer', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -15,4 +19,12 @@ export async function answerAssistant(
     }),
     signal,
   });
+  return {
+    ...response,
+    citations: response.citations.map((citation) => ({
+      ...citation,
+      startMs: citation.startMs ?? null,
+      endMs: citation.endMs ?? null,
+    })),
+  };
 }
