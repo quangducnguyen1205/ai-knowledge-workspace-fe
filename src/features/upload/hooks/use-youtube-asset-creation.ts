@@ -1,22 +1,26 @@
 import { useEffect, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { assetKeys } from '../../assets/hooks/asset-queries';
-import { uploadAsset, type AssetUploadResponse, type UploadAssetInput } from '../api/upload-api';
+import type { AssetProcessingResponse } from '../../assets/model/types';
+import {
+  createYouTubeAsset,
+  type CreateYouTubeAssetInput,
+} from '../api/upload-api';
 
-export function useAssetUpload({
+export function useYouTubeAssetCreation({
   workspaceId,
-  onUploaded,
+  onCreated,
 }: {
   workspaceId: string | null;
-  onUploaded: (response: AssetUploadResponse, input: UploadAssetInput) => void;
+  onCreated: (response: AssetProcessingResponse, input: CreateYouTubeAssetInput) => void;
 }) {
   const queryClient = useQueryClient();
   const submissionPendingRef = useRef(false);
   const mutation = useMutation({
-    mutationFn: uploadAsset,
+    mutationFn: createYouTubeAsset,
     onSuccess: async (response, input) => {
       await queryClient.invalidateQueries({ queryKey: assetKeys.list(response.workspaceId) });
-      onUploaded(response, input);
+      onCreated(response, input);
     },
     onSettled: () => {
       submissionPendingRef.current = false;
@@ -29,14 +33,14 @@ export function useAssetUpload({
   }, [mutation.reset, workspaceId]);
 
   return {
-    submit: (input: { file: File; title?: string }) => {
+    submit: (input: { url: string; title?: string }) => {
       if (!workspaceId || submissionPendingRef.current) return;
       submissionPendingRef.current = true;
-      mutation.mutate({ workspaceId, file: input.file, title: input.title });
+      mutation.mutate({ workspaceId, url: input.url, title: input.title });
     },
     error: mutation.error,
-    isUploading: mutation.isPending,
-    uploadedAssetId: mutation.data?.assetId,
+    isCreating: mutation.isPending,
+    createdAssetId: mutation.data?.assetId,
     reset: mutation.reset,
   };
 }

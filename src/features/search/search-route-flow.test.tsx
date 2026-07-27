@@ -17,6 +17,9 @@ const asset = {
   title: 'Vector Clocks Lecture',
   assetStatus: 'SEARCHABLE',
   workspaceId: 'workspace-1',
+  sourceType: 'UPLOAD',
+  youtubeVideoId: null,
+  sourceUrl: null,
   createdAt: '2026-06-26T10:00:00Z',
 };
 
@@ -90,6 +93,12 @@ function createFetchMock() {
         title: asset.title,
         status: asset.assetStatus,
         workspaceId: asset.workspaceId,
+        sourceType: asset.sourceType,
+        youtubeVideoId: asset.youtubeVideoId,
+        sourceUrl: asset.sourceUrl,
+        originalFilename: 'vector-clocks.mp4',
+        contentType: 'video/mp4',
+        sizeBytes: 1_024,
         createdAt: asset.createdAt,
         updatedAt: asset.createdAt,
       });

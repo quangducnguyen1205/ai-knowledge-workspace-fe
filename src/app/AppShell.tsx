@@ -196,11 +196,12 @@ export function AppShell({
               <Button
                 type="button"
                 className="product-upload-action"
+                aria-label="Add video to current workspace"
                 onClick={() => navigateFromShell({ name: 'library', upload: true })}
                 disabled={!selectedWorkspace}
-                title={!selectedWorkspace ? 'Create or select a workspace before uploading.' : undefined}
+                title={!selectedWorkspace ? 'Create or select a workspace before adding a video.' : undefined}
               >
-                Upload
+                Add video
               </Button>
 
               <div ref={accountMenuRef} className="account-menu">

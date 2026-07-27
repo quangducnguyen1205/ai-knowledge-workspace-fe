@@ -1,11 +1,12 @@
 import { request } from '../../../shared/api/http-client';
-import type { AssetStatus } from '../../assets/model/types';
+import type { AssetProcessingResponse } from '../../assets/model/types';
 
-export type AssetUploadResponse = {
-  assetId: string;
-  processingJobId: string;
-  assetStatus: AssetStatus;
+export type AssetUploadResponse = AssetProcessingResponse;
+
+export type CreateYouTubeAssetInput = {
   workspaceId: string;
+  url: string;
+  title?: string;
 };
 
 export type UploadAssetInput = {
@@ -26,5 +27,21 @@ export async function uploadAsset(input: UploadAssetInput): Promise<AssetUploadR
   return request<AssetUploadResponse>('/api/assets/upload', {
     method: 'POST',
     body: formData,
+  });
+}
+
+export async function createYouTubeAsset(
+  input: CreateYouTubeAssetInput,
+): Promise<AssetProcessingResponse> {
+  const title = input.title?.trim();
+
+  return request<AssetProcessingResponse>('/api/assets/youtube', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      workspaceId: input.workspaceId,
+      url: input.url.trim(),
+      ...(title ? { title } : {}),
+    }),
   });
 }

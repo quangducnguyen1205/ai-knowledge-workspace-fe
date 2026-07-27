@@ -6,7 +6,7 @@ This repo implements the focused learning-workspace frontend for AI Knowledge Wo
 
 - auth
 - workspace selection and management
-- lecture video upload
+- source-explicit video entry through upload file or YouTube URL
 - processing and transcript review
 - automatic search preparation with explicit indexing retained only as recovery
 - workspace-scoped search
@@ -34,12 +34,12 @@ The frontend behaves like a routed learning product:
 
 - Public Landing, Login, and Register
 - Home for immediate actions and recent learning
-- Library with controlled upload, filtering, and video actions
+- Library with controlled Add video source entry, filtering, source indicators, and video actions
 - Study with transcript, selected context, assistant, and disclosed details
 - Workspace Search
 - Settings for workspace management and account
 
-Authenticated primary navigation contains only `Home`, `Library`, and `Search`. The shell also owns the workspace selector, Upload action, and account menu; Settings and sign out live in that menu. Upload opens a controlled Library dialog through `#/library?upload=1`. Study keeps the compatible `#/assets/:assetId` deep route and compact focus query parameters.
+Authenticated primary navigation contains only `Home`, `Library`, and `Search`. The shell also owns the workspace selector, Add video action, and account menu; Settings and sign out live in that menu. Add video opens a controlled Library dialog through `#/library?upload=1` and explicitly selects either Upload file or YouTube URL. Study keeps the compatible `#/assets/:assetId` deep route and compact focus query parameters.
 
 ## 4. Frontend Modular Boundaries
 
@@ -63,13 +63,15 @@ This refactor preserves existing routes, API request shapes, auth defaults, toke
 - Create, rename, and conservatively delete workspaces through Settings
 - Land on Home with upload/search actions and recent learning
 - Open a dedicated asset library screen
-- Upload learning videos through a focus-managed dialog
+- Upload learning videos or submit a public YouTube URL through one focus-managed Add video dialog
+- Preserve Spring-owned source type, YouTube video identity, canonical source URL, and nullable upload metadata
 - Filter the video library and use stable overflow actions for open, rename, and delete
 - Open Study with transcript and assistant side by side on desktop
 - Use Transcript, Ask, and Details views on mobile
 - Find within the current transcript once the video is ready
 - Rename and delete assets
 - Poll processing state until terminal
+- Retry authorized failed processing on the same upload or YouTube Asset and resume the existing polling lifecycle
 - Load transcript rows only when the backend says they are ready
 - Explicitly index transcript rows to unlock search
 - Open a dedicated workspace search screen
@@ -98,6 +100,8 @@ This refactor preserves existing routes, API request shapes, auth defaults, toke
 - `DELETE /api/workspaces/{workspaceId}`
 - `GET /api/assets`
 - `POST /api/assets/upload`
+- `POST /api/assets/youtube`
+- `POST /api/assets/{assetId}/retry-processing`
 - `PATCH /api/assets/{assetId}`
 - `DELETE /api/assets/{assetId}`
 - `GET /api/assets/{assetId}/status`
@@ -110,6 +114,13 @@ This refactor preserves existing routes, API request shapes, auth defaults, toke
 Transcript, search, context, and assistant citation responses use additive nullable `startMs`
 and `endMs` fields. Legacy responses that omit either field are normalized to `null`; frontend
 logic does not use truthiness because `startMs = 0` is valid.
+
+Asset list/detail/create/retry responses preserve the authoritative `sourceType` plus nullable
+`youtubeVideoId` and Spring-derived `sourceUrl`. Status responses may expose a bounded
+`failureCode`; the frontend maps supported codes to safe product copy and never renders raw
+diagnostics. Upload remains multipart and YouTube creation remains JSON. Spring owns URL
+normalization, duplicate detection, authorization, and canonical product state. Internal
+FastAPI V2 performs temporary YouTube acquisition; the browser calls Spring only.
 
 ## 7. Project 3 Auth Foundation
 
@@ -154,6 +165,7 @@ logic does not use truthiness because `startMs = 0` is valid.
 - The UI uses a concise public landing experience and a persistent authenticated learning shell
 - Routing is hash-based to stay compatible with the current frontend setup and avoid new backend/server route assumptions
 - Upload copy and accepted file input remain lecture-video-first to match the current real product path
+- YouTube entry performs only small nonblank/HTTPS UX checks and leaves full normalization to Spring
 - Search stays disabled until automatic search preparation produces ready videos
 - Workspace Search opens relevant results into Study so the learner can continue reading nearby transcript context without losing the source Search orientation
 - Search return links carry only compact route state and reuse the existing product search path; result rows are not cached, fabricated, or serialized into the URL
@@ -162,11 +174,15 @@ logic does not use truthiness because `startMs = 0` is valid.
   The supported asset-scoped grounded answer and citation UI calls Spring only.
 - Unsupported media seek behavior, provider inference in the browser and persisted chat state
   remain out of scope.
+- Runtime YouTube success has not yet been accepted. This slice does not mark Phase 2 complete.
 
 ## 11. Intentionally Deferred
 
 - Chat or assistant flows
 - Timestamp seek or media playback controls
+- YouTube embedding, playback, click-to-seek, active transcript synchronization, timeline
+  state, auto-scroll, playlist/channel ingestion, and source metadata editing
+- Cross-repository runtime acceptance and successful live YouTube acquisition
 - Collaboration features
 - Cross-workspace asset movement
 - Advanced search filters

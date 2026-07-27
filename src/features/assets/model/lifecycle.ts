@@ -35,6 +35,7 @@ export function deriveAssetStatus(
 ): AssetStatus | null {
   if (indexResponse?.assetStatus) return indexResponse.assetStatus;
   if (asset?.assetStatus === 'SEARCHABLE' || statusResponse?.assetStatus === 'SEARCHABLE') return 'SEARCHABLE';
+  if (statusResponse?.assetStatus === 'FAILED' || (!statusResponse && asset?.assetStatus === 'FAILED')) return 'FAILED';
   if (transcriptRows?.length) return 'TRANSCRIPT_READY';
   return statusResponse?.assetStatus ?? asset?.assetStatus ?? null;
 }

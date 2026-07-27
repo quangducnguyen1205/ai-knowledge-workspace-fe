@@ -31,6 +31,7 @@ import { resolveTranscriptLookupId } from '../features/search/model/search-resul
 import { useRouteSearchHydration } from '../features/search/model/use-route-search-hydration';
 import { WorkspaceSearchScreen } from '../features/search/search-screen';
 import { useAssetUpload } from '../features/upload/hooks/use-asset-upload';
+import { useYouTubeAssetCreation } from '../features/upload/hooks/use-youtube-asset-creation';
 import { SettingsScreen } from '../features/settings/settings';
 import {
   useWorkspacesQuery,
@@ -40,7 +41,7 @@ import {
 import { useWorkspaceManagement } from '../features/workspaces/hooks/use-workspace-management';
 import { useAssistantCitationNavigation } from './navigation/use-assistant-citation-navigation';
 import { useAssetRouteWorkspaceHydration } from './bootstrap/use-asset-route-workspace-hydration';
-import type { AssetSummary } from '../features/assets/model/types';
+import type { AssetProcessingResponse, AssetSummary } from '../features/assets/model/types';
 
 export function AppRouter() {
   const auth = useAuth();
@@ -161,14 +162,25 @@ export function AppRouter() {
     },
   });
 
+  function finishAssetCreation(response: AssetProcessingResponse, displayTitle: string) {
+    selectAsset(response.assetId);
+    workspaceSearch.reset();
+    assetSearch.reset();
+    assetManagement.recordCreationSuccess(response.sourceType, displayTitle);
+    navigate({ name: 'asset', assetId: response.assetId });
+  }
+
   const upload = useAssetUpload({
     workspaceId: selectedWorkspaceId,
     onUploaded: (response, input) => {
-      selectAsset(response.assetId);
-      workspaceSearch.reset();
-      assetSearch.reset();
-      assetManagement.recordUploadSuccess(input.title?.trim() || input.file.name);
-      navigate({ name: 'asset', assetId: response.assetId });
+      finishAssetCreation(response, input.title?.trim() || input.file.name);
+    },
+  });
+
+  const youtubeCreation = useYouTubeAssetCreation({
+    workspaceId: selectedWorkspaceId,
+    onCreated: (response, input) => {
+      finishAssetCreation(response, input.title?.trim() || 'YouTube video');
     },
   });
 
@@ -205,6 +217,9 @@ export function AppRouter() {
       title: routedAsset.title,
       assetStatus: routedAsset.status,
       workspaceId: routedAsset.workspaceId,
+      sourceType: routedAsset.sourceType,
+      youtubeVideoId: routedAsset.youtubeVideoId,
+      sourceUrl: routedAsset.sourceUrl,
       createdAt: routedAsset.createdAt ?? '',
     };
 
@@ -219,6 +234,9 @@ export function AppRouter() {
         existing.title === summary.title &&
         existing.assetStatus === summary.assetStatus &&
         existing.workspaceId === summary.workspaceId &&
+        existing.sourceType === summary.sourceType &&
+        existing.youtubeVideoId === summary.youtubeVideoId &&
+        existing.sourceUrl === summary.sourceUrl &&
         existing.createdAt === summary.createdAt
       ) {
         return current;
@@ -601,11 +619,19 @@ export function AppRouter() {
             uploadError={upload.error}
             uploadSuccessId={upload.uploadedAssetId}
             isUploading={upload.isUploading}
+            youtubeError={youtubeCreation.error}
+            youtubeSuccessId={youtubeCreation.createdAssetId}
+            isCreatingYouTube={youtubeCreation.isCreating}
             isUploadOpen={Boolean(route.upload)}
             onSelectAsset={openAsset}
             onDeleteAsset={assetManagement.handleDeleteAsset}
             onRenameAsset={(asset, title) => assetManagement.handleRenameAsset(title, asset)}
             onUpload={upload.submit}
+            onCreateYouTube={youtubeCreation.submit}
+            onResetCreation={() => {
+              upload.reset();
+              youtubeCreation.reset();
+            }}
             onOpenUpload={() => navigate({ name: 'library', upload: true })}
             onCloseUpload={() => navigate({ name: 'library' })}
           />
@@ -617,6 +643,7 @@ export function AppRouter() {
             workspaceId={selectedWorkspace.id}
             workspaceName={selectedWorkspace.name}
             asset={selectedAsset}
+            assetRecord={assetRouteQuery.data}
             successNotice={assetManagement.detailSuccessNotice}
             resolvedAssetStatus={lifecycle.resolvedAssetStatus}
             statusResponse={lifecycle.statusResponse}
@@ -627,6 +654,8 @@ export function AppRouter() {
             indexError={lifecycle.indexError}
             indexResponse={lifecycle.indexResponse}
             isIndexing={lifecycle.isIndexing}
+            retryError={lifecycle.retryError}
+            isRetrying={lifecycle.isRetrying}
             isRenaming={Boolean(assetManagement.isRenamingSelectedAsset)}
             isDeleting={assetManagement.deletingAssetId === selectedAsset?.assetId}
             renameError={assetManagement.visibleRenameError}
@@ -645,6 +674,7 @@ export function AppRouter() {
             isStudyContextLoading={routedStudyContextQuery.isLoading || routedStudyContextQuery.isFetching}
             searchResetToken={assetSearch.resetToken}
             onIndex={lifecycle.runRecoveryIndexing}
+            onRetryProcessing={lifecycle.runProcessingRetry}
             onRename={assetManagement.handleRenameAsset}
             onResetRename={assetManagement.resetRename}
             onDelete={assetManagement.handleDeleteAsset}

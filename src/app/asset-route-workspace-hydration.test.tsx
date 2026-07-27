@@ -31,6 +31,12 @@ function assetRecord(assetId: string, workspaceId: string) {
     title: assetId === 'asset-2' ? 'Asset in the authorized workspace' : 'Asset in the default workspace',
     status: 'SEARCHABLE' as const,
     workspaceId,
+    sourceType: 'UPLOAD' as const,
+    youtubeVideoId: null,
+    sourceUrl: null,
+    originalFilename: `${assetId}.mp4`,
+    contentType: 'video/mp4',
+    sizeBytes: 1_024,
     createdAt: '2026-01-03T00:00:00Z',
     updatedAt: '2026-01-03T00:00:00Z',
   };
@@ -43,6 +49,9 @@ function assetSummary(assetId: string, workspaceId: string) {
     title: asset.title,
     assetStatus: asset.status,
     workspaceId,
+    sourceType: asset.sourceType,
+    youtubeVideoId: asset.youtubeVideoId,
+    sourceUrl: asset.sourceUrl,
     createdAt: asset.createdAt,
   };
 }

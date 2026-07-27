@@ -2,6 +2,7 @@ import type { PropsWithChildren } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ApiClientError } from '../../../shared/api/api-error';
 import type { AssetSummary } from '../model/types';
 import { ASSET_LIFECYCLE_POLL_INTERVAL_MS, useAssetLifecycle } from './use-asset-lifecycle';
 
@@ -9,6 +10,7 @@ const api = vi.hoisted(() => ({
   getAssetStatus: vi.fn(),
   getAssetTranscript: vi.fn(),
   indexAssetTranscript: vi.fn(),
+  retryAssetProcessing: vi.fn(),
 }));
 
 vi.mock('../api/assets-api', () => api);
@@ -18,6 +20,9 @@ const processingAsset: AssetSummary = {
   title: 'Lifecycle lecture',
   assetStatus: 'PROCESSING',
   workspaceId: 'workspace-1',
+  sourceType: 'UPLOAD',
+  youtubeVideoId: null,
+  sourceUrl: null,
   createdAt: '2026-06-26T10:00:00Z',
 };
 
@@ -119,5 +124,106 @@ describe('useAssetLifecycle', () => {
     expect(api.indexAssetTranscript).toHaveBeenCalledWith('asset-1', expect.any(Object));
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['assets', 'list', 'workspace-1'] });
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['search'] });
+  });
+
+  it.each([
+    ['UPLOAD' as const, null, null],
+    ['YOUTUBE' as const, 'abc_DEF-123', 'https://www.youtube.com/watch?v=abc_DEF-123'],
+  ])('retries a failed %s asset and resumes the existing PROCESSING poll lifecycle', async (
+    sourceType,
+    youtubeVideoId,
+    sourceUrl,
+  ) => {
+    api.getAssetStatus
+      .mockResolvedValueOnce({
+        assetId: 'asset-1',
+        processingJobId: 'job-failed',
+        assetStatus: 'FAILED',
+        processingJobStatus: 'FAILED',
+        failureCode: sourceType === 'YOUTUBE' ? 'YOUTUBE_ACQUISITION_FAILED' : 'PROCESSING_FAILED',
+      })
+      .mockResolvedValue({
+        assetId: 'asset-1',
+        processingJobId: 'job-retry',
+        assetStatus: 'PROCESSING',
+        processingJobStatus: 'PENDING',
+        failureCode: null,
+      });
+    api.retryAssetProcessing.mockResolvedValue({
+      assetId: 'asset-1',
+      processingJobId: 'job-retry',
+      assetStatus: 'PROCESSING',
+      workspaceId: 'workspace-1',
+      sourceType,
+      youtubeVideoId,
+      sourceUrl,
+    });
+    const failedAsset: AssetSummary = {
+      ...processingAsset,
+      assetStatus: 'FAILED',
+      sourceType,
+      youtubeVideoId,
+      sourceUrl,
+    };
+    const { queryClient, invalidateQueries, wrapper } = createHarness();
+    queryClient.setQueryData(['assets', 'transcript', 'asset-1'], [{
+      id: 'stale-row',
+      videoId: 'asset-1',
+      segmentIndex: 1,
+      text: 'Stale transcript from the failed attempt',
+    }]);
+    const { result } = renderHook(
+      () => useAssetLifecycle({ asset: failedAsset, workspaceId: 'workspace-1' }),
+      { wrapper },
+    );
+
+    await waitFor(() => expect(result.current.resolvedAssetStatus).toBe('FAILED'));
+    act(() => {
+      result.current.runProcessingRetry();
+      result.current.runProcessingRetry();
+    });
+    await waitFor(() => expect(result.current.resolvedAssetStatus).toBe('PROCESSING'));
+
+    expect(api.retryAssetProcessing).toHaveBeenCalledTimes(1);
+    expect(api.retryAssetProcessing).toHaveBeenCalledWith('asset-1', expect.any(Object));
+    expect(result.current.shouldPoll).toBe(true);
+    expect(result.current.retryError).toBeNull();
+    expect(queryClient.getQueryData(['assets', 'transcript', 'asset-1'])).toBeUndefined();
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['assets', 'list', 'workspace-1'] });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['assets', 'detail', 'asset-1'] });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['assets', 'status', 'asset-1'] });
+  });
+
+  it('refreshes stale state and exposes bounded conflict handling when retry is no longer allowed', async () => {
+    api.getAssetStatus.mockResolvedValue({
+      assetId: 'asset-1',
+      processingJobId: 'job-failed',
+      assetStatus: 'FAILED',
+      processingJobStatus: 'FAILED',
+      failureCode: 'PROCESSING_FAILED',
+    });
+    api.retryAssetProcessing.mockRejectedValue(new ApiClientError(
+      409,
+      'raw backend diagnostics',
+      'ASSET_PROCESSING_RETRY_NOT_ALLOWED',
+    ));
+    const { invalidateQueries, wrapper } = createHarness();
+    const { result } = renderHook(
+      () => useAssetLifecycle({
+        asset: { ...processingAsset, assetStatus: 'FAILED' },
+        workspaceId: 'workspace-1',
+      }),
+      { wrapper },
+    );
+
+    await waitFor(() => expect(result.current.canRetryProcessing).toBe(true));
+    act(() => result.current.runProcessingRetry());
+    await waitFor(() => expect(result.current.retryError).toMatchObject({
+      code: 'ASSET_PROCESSING_RETRY_NOT_ALLOWED',
+    }));
+
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['assets', 'list', 'workspace-1'] });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['assets', 'detail', 'asset-1'] });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['assets', 'status', 'asset-1'] });
   });
 });

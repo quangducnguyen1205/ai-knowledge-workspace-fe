@@ -12,6 +12,9 @@ const deletedAsset: AssetSummary = {
   title: 'Delete me',
   assetStatus: 'PROCESSING',
   workspaceId: 'workspace-1',
+  sourceType: 'UPLOAD',
+  youtubeVideoId: null,
+  sourceUrl: null,
   createdAt: '2026-07-16T00:00:00Z',
 };
 

@@ -247,7 +247,7 @@ describe('auth mode UI boundary', () => {
     expect(screen.getByRole('navigation', { name: /primary navigation/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: 'Library' })).toHaveAttribute('href', '#/library');
-    expect(screen.getByRole('button', { name: 'Upload' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Add video to current workspace' })).toBeEnabled();
 
     const menuButton = screen.getByRole('button', { name: /^menu$/i });
     await user.click(menuButton);

@@ -1046,6 +1046,21 @@ summary:focus-visible {
 .status-badge--searchable { color: var(--blue); background: var(--blue-soft); }
 .status-badge--failed { color: var(--danger); background: var(--danger-soft); }
 
+.source-badge {
+  min-height: 22px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.48rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: var(--surface-muted);
+  font-size: 0.68rem;
+  font-weight: 750;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 /* Home */
 
 .home-screen {
@@ -1223,6 +1238,13 @@ summary:focus-visible {
   width: 100%;
 }
 
+.video-row__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 .modal-backdrop,
 .workspace-delete-dialog__backdrop {
   position: fixed;
@@ -1269,6 +1291,52 @@ summary:focus-visible {
 .upload-form__intro {
   margin-bottom: 0;
   color: var(--text-muted);
+}
+
+.source-selector {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-5);
+  padding: 0;
+  border: 0;
+}
+
+.source-selector legend {
+  margin-bottom: var(--space-2);
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--text-muted);
+}
+
+.source-selector__options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.source-selector__option {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-strong);
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.source-selector__option--selected {
+  color: var(--primary-strong);
+  border-color: rgba(23, 111, 100, 0.35);
+  background: var(--primary-soft);
+}
+
+.source-selector__option:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 
 .upload-form__actions {
@@ -1481,6 +1549,11 @@ summary:focus-visible {
   font-weight: 700;
 }
 
+.external-source-link {
+  color: var(--primary-strong);
+  text-underline-offset: 0.18em;
+}
+
 .processing-details {
   border-radius: var(--radius-sm);
   background: var(--surface-muted);
@@ -1521,6 +1594,14 @@ summary:focus-visible {
 .action-card p {
   margin-bottom: 0;
   color: var(--text-muted);
+}
+
+.action-card--failure {
+  background: var(--danger-soft);
+}
+
+.action-card--failure > .message {
+  margin: 0;
 }
 
 /* Assistant */

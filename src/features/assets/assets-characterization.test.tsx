@@ -16,6 +16,9 @@ const asset: AssetSummary = {
   title: 'Indexing Lecture',
   assetStatus: 'TRANSCRIPT_READY',
   workspaceId: 'workspace-1',
+  sourceType: 'UPLOAD',
+  youtubeVideoId: null,
+  sourceUrl: null,
   createdAt: '2026-06-26T10:00:00Z',
 };
 
@@ -89,6 +92,23 @@ describe('asset lifecycle characterization', () => {
     ).toBe('SEARCHABLE');
   });
 
+  it('keeps a failed lifecycle authoritative over stale transcript cache data', () => {
+    expect(
+      deriveAssetStatus(
+        { ...asset, assetStatus: 'FAILED' },
+        {
+          assetId: asset.assetId,
+          processingJobId: 'job-failed',
+          assetStatus: 'FAILED',
+          processingJobStatus: 'FAILED',
+          failureCode: 'PROCESSING_FAILED',
+        },
+        transcriptRows,
+        undefined,
+      ),
+    ).toBe('FAILED');
+  });
+
   it('presents manual search preparation only as a secondary recovery action', async () => {
     const user = userEvent.setup();
     const props = renderIndexingRecovery();
@@ -131,13 +151,17 @@ describe('asset upload characterization', () => {
         workspaceName="Distributed Systems"
         uploadError={null}
         isUploading={false}
+        youtubeError={null}
+        isCreatingYouTube={false}
         onUpload={vi.fn()}
+        onCreateYouTube={vi.fn()}
+        onResetCreation={vi.fn()}
         onClose={onClose}
       />,
     );
 
-    expect(screen.getByRole('dialog', { name: 'Upload video' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Close upload dialog' })).toHaveFocus();
+    expect(screen.getByRole('dialog', { name: 'Add video' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Close add video dialog' })).toHaveFocus();
     await user.keyboard('{Escape}');
     expect(onClose).toHaveBeenCalledTimes(1);
     unmount();

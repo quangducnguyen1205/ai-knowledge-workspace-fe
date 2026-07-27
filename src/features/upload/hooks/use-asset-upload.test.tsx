@@ -23,9 +23,11 @@ describe('useAssetUpload', () => {
     api.uploadAsset.mockResolvedValue({
       assetId: 'asset-2',
       workspaceId: 'workspace-1',
-      title: 'Lifecycle lecture',
-      status: 'PROCESSING',
-      createdAt: '2026-06-26T10:00:00Z',
+      processingJobId: 'job-2',
+      assetStatus: 'PROCESSING',
+      sourceType: 'UPLOAD',
+      youtubeVideoId: null,
+      sourceUrl: null,
     });
     const onUploaded = vi.fn();
     const { invalidateQueries, wrapper } = createHarness();
@@ -45,7 +47,7 @@ describe('useAssetUpload', () => {
     });
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['assets', 'list', 'workspace-1'] });
     expect(onUploaded).toHaveBeenCalledWith(
-      expect.objectContaining({ assetId: 'asset-2', status: 'PROCESSING' }),
+      expect.objectContaining({ assetId: 'asset-2', assetStatus: 'PROCESSING', sourceType: 'UPLOAD' }),
       expect.objectContaining({ workspaceId: 'workspace-1', file }),
     );
   });
@@ -54,9 +56,11 @@ describe('useAssetUpload', () => {
     api.uploadAsset.mockResolvedValue({
       assetId: 'asset-2',
       workspaceId: 'workspace-1',
-      title: 'lecture.mp4',
-      status: 'PROCESSING',
-      createdAt: '2026-06-26T10:00:00Z',
+      processingJobId: 'job-2',
+      assetStatus: 'PROCESSING',
+      sourceType: 'UPLOAD',
+      youtubeVideoId: null,
+      sourceUrl: null,
     });
     const file = new File(['video'], 'lecture.mp4', { type: 'video/mp4' });
     const { wrapper } = createHarness();

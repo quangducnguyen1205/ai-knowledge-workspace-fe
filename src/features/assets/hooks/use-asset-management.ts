@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ApiClientError } from '../../../shared/api/api-error';
 import { assetKeys, useDeleteAssetMutation, useRenameAssetMutation } from './asset-queries';
-import type { AssetSummary } from '../model/types';
+import type { AssetSourceType, AssetSummary } from '../model/types';
 import { useEphemeralNotice } from '../../../shared/ui/use-ephemeral-notice';
 import type { SearchResponse } from '../../search/api/search-api';
 
@@ -143,8 +143,8 @@ export function useAssetManagement({
   return {
     librarySuccessNotice: libraryFeedback.notice,
     detailSuccessNotice: detailFeedback.notice,
-    recordUploadSuccess: (title: string) => libraryFeedback.showNotice({
-      title: 'Video uploaded',
+    recordCreationSuccess: (sourceType: AssetSourceType, title: string) => libraryFeedback.showNotice({
+      title: sourceType === 'YOUTUBE' ? 'YouTube video added' : 'Video uploaded',
       message: `Added "${title}" to ${workspaceName ?? 'the active workspace'}.`,
     }),
     clearNotices: () => {

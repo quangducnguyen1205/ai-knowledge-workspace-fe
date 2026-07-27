@@ -9,7 +9,8 @@ for cross-repository ownership and evidence.
 
 - concise public landing page plus dedicated Login and Register routes
 - workspace selection and creation
-- workspace-scoped video upload in a controlled dialog and focused library management
+- workspace-scoped `Add video` entry for either a validated upload file or a public YouTube URL
+- source-aware library/detail presentation and authorized failed-processing retry
 - processing status polling
 - transcript retrieval
 - automatic indexing as the normal lifecycle, with explicit indexing retained as a fallback
@@ -18,7 +19,7 @@ for cross-repository ownership and evidence.
 - desktop transcript/assistant study layout with deliberate Transcript, Ask, and Details mobile views
 - search/context state kept in sync across workspace switch, upload completion, indexing completion, and refreshed results
 - responsive product shell with Home, Library, and Search primary navigation
-- workspace selector, Upload action, and compact account menu with Settings and sign out
+- workspace selector, Add video action, and compact account menu with Settings and sign out
 - grounded Ask-this-video answers with insufficient-context handling, actionable citations, and transcript navigation
 - incremental frontend module boundaries documented in `FRONTEND_STATUS.md`
 
@@ -36,11 +37,25 @@ Authenticated product screens use a compact top navigation model:
 - `Library` for upload, filtering, and video management
 - `Search` for workspace-wide transcript search and opening relevant moments
 
-Settings remains available from the account menu at `#/settings`. Study remains a compatible deep route at `#/assets/:assetId`, with existing compact query state for search and citation focus. The shell includes a skip-to-content link, active state with `aria-current`, keyboard-operable mobile and account menus, and a shell-level Upload action that opens `#/library?upload=1`. The upload dialog, workspace deletion dialog, and mobile Study views preserve focus, Escape, and duplicate-submit protections.
+Settings remains available from the account menu at `#/settings`. Study remains a compatible deep route at `#/assets/:assetId`, with existing compact query state for search and citation focus. The shell includes a skip-to-content link, active state with `aria-current`, keyboard-operable mobile and account menus, and a shell-level Add video action that opens `#/library?upload=1`. The Add video dialog explicitly selects `Upload file` or `YouTube URL`; source forms stay separate, preserve upload validation, and prevent stale or duplicate submission.
+
+## Source Entry And Ownership
+
+Upload creation remains multipart through `POST /api/assets/upload`. YouTube creation uses a
+separate JSON request to `POST /api/assets/youtube` with the current workspace, URL, and
+optional title. Spring remains the normalization, duplicate-detection, authorization, and
+canonical source-URL authority. The browser does not parse persisted YouTube identity, fetch
+YouTube metadata, or call FastAPI directly.
+
+Both sources enter the existing Asset lifecycle. The frontend preserves Spring-returned
+`sourceType`, nullable `youtubeVideoId`, canonical `sourceUrl`, and safe processing failure
+codes. Upload-only filename, content type, and size fields are rendered only when applicable.
+Internal FastAPI V2 performs temporary YouTube acquisition as part of processing; that
+internal boundary is not browser-accessible.
 
 ## Asset Processing And Indexing Lifecycle
 
-The frontend remains processing-mode agnostic. It polls Spring while an asset is `PROCESSING` or `TRANSCRIPT_READY`, stops when the backend reports `SEARCHABLE` or `FAILED`, and refreshes workspace/search state when the lifecycle advances. In the normal integrated path, indexing follows transcript readiness automatically. The `Index transcript` control remains available only in `TRANSCRIPT_READY` as an explicit fallback when automatic completion has not advanced the asset; it is not required after a normal transition to `SEARCHABLE`.
+The frontend remains processing-mode agnostic. It polls Spring while an asset is `PROCESSING` or `TRANSCRIPT_READY`, stops when the backend reports `SEARCHABLE` or `FAILED`, and refreshes workspace/search state when the lifecycle advances. A failed upload or YouTube Asset exposes the authorized `POST /api/assets/{assetId}/retry-processing` action; a successful `202` moves the same Asset back to `PROCESSING` and resumes the existing polling loop. In the normal integrated path, indexing follows transcript readiness automatically. The `Index transcript` control remains available only in `TRANSCRIPT_READY` as an explicit fallback when automatic completion has not advanced the asset; it is not required after a normal transition to `SEARCHABLE`.
 
 The frontend tests, typecheck and production build are green. The bounded B4 browser
 validation also passed upload through automatic indexing, SEARCHABLE, search, grounded
@@ -111,8 +126,14 @@ Dockerized frontend build has also passed successfully, and the Docker local-dev
 - no full accessibility certification; P3-C4 was a targeted local browser smoke with keyboard/focus/error-state checks
 - no collaboration, chat history, provider/model controls, or browser-to-provider access
 - no media player or timestamp-seek UI
+- no YouTube embed, video playback, click-to-seek, active transcript synchronization,
+  timeline state, auto-scroll, playlist/channel ingestion, or source metadata editing
 - no transcript timestamps invented on the frontend
 - no heavy design system or production-grade docs set
+
+Phase 2 is not marked complete by this frontend slice. Successful live YouTube acquisition
+still requires cross-repository runtime acceptance. Player, seek, and transcript
+synchronization remain explicitly deferred to Phase 3.
 
 ## Optional Host-Node Path
 

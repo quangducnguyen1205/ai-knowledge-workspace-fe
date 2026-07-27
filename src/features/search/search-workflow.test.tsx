@@ -47,6 +47,9 @@ const asset: AssetSummary = {
   title: 'Vector Clocks Lecture',
   assetStatus: 'SEARCHABLE',
   workspaceId: 'workspace-1',
+  sourceType: 'UPLOAD',
+  youtubeVideoId: null,
+  sourceUrl: null,
   createdAt: '2026-06-26T10:00:00Z',
 };
 
@@ -125,6 +128,8 @@ function renderAssetDetail(overrides: Partial<ComponentProps<typeof AssetDetailS
     indexError: null,
     indexResponse: undefined,
     isIndexing: false,
+    retryError: null,
+    isRetrying: false,
     isRenaming: false,
     isDeleting: false,
     renameError: null,
@@ -142,6 +147,7 @@ function renderAssetDetail(overrides: Partial<ComponentProps<typeof AssetDetailS
     isStudyContextLoading: false,
     searchResetToken: 0,
     onIndex: vi.fn(),
+    onRetryProcessing: vi.fn(),
     onRename: vi.fn(),
     onResetRename: vi.fn(),
     onDelete: vi.fn(),

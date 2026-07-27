@@ -35,6 +35,89 @@ export function getFriendlyUploadErrorCopy(error: unknown): FriendlyMessageCopy 
   return null;
 }
 
+export function getFriendlyYouTubeCreationErrorCopy(error: unknown): FriendlyMessageCopy | null {
+  if (!isApiClientError(error)) return null;
+  if (error.code === 'INVALID_YOUTUBE_URL') {
+    return {
+      title: 'YouTube URL is not supported',
+      message: 'Enter a supported public YouTube video URL.',
+    };
+  }
+  if (error.code === 'DUPLICATE_YOUTUBE_ASSET') {
+    return {
+      title: 'Video already added',
+      message: 'This YouTube video is already in the workspace.',
+    };
+  }
+  if (error.status === 0) {
+    return {
+      title: 'Could not add YouTube video',
+      message: 'Check your connection and try again. The video was not added.',
+    };
+  }
+  return null;
+}
+
+const ASSET_FAILURE_COPY: Record<string, FriendlyMessageCopy> = {
+  YOUTUBE_UNAVAILABLE: {
+    title: 'YouTube video unavailable',
+    message: 'This YouTube video is unavailable or cannot be accessed.',
+  },
+  YOUTUBE_LIVE_NOT_SUPPORTED: {
+    title: 'Live video not supported',
+    message: 'Live YouTube videos are not supported.',
+  },
+  YOUTUBE_DURATION_LIMIT_EXCEEDED: {
+    title: 'Video is too long',
+    message: 'This video is longer than the supported limit.',
+  },
+  YOUTUBE_SIZE_LIMIT_EXCEEDED: {
+    title: 'Video is too large',
+    message: 'This video is larger than the supported limit.',
+  },
+  YOUTUBE_ACQUISITION_TIMEOUT: {
+    title: 'Video preparation timed out',
+    message: 'Downloading this video timed out. Try again later.',
+  },
+  YOUTUBE_ACQUISITION_FAILED: {
+    title: 'Video preparation failed',
+    message: 'The video could not be prepared for processing.',
+  },
+  PROCESSING_FAILED: {
+    title: 'Processing failed',
+    message: 'Processing failed. You can try again.',
+  },
+};
+
+export function getAssetFailureCopy(failureCode: string | null | undefined): FriendlyMessageCopy {
+  return failureCode && ASSET_FAILURE_COPY[failureCode]
+    ? ASSET_FAILURE_COPY[failureCode]
+    : {
+        title: 'Processing failed',
+        message: 'This video could not be processed. You can try again.',
+      };
+}
+
+export function getFriendlyRetryErrorCopy(error: unknown): FriendlyMessageCopy | null {
+  if (!isApiClientError(error)) return null;
+  if (error.code === 'ASSET_PROCESSING_RETRY_NOT_ALLOWED') {
+    return {
+      title: 'Retry no longer available',
+      message: 'The video state changed, so processing cannot be retried right now. The latest status is being loaded.',
+    };
+  }
+  if (error.status === 0) {
+    return {
+      title: 'Could not retry processing',
+      message: 'Check your connection and try again.',
+    };
+  }
+  return {
+    title: 'Could not retry processing',
+    message: 'Processing was not restarted. Try again later.',
+  };
+}
+
 export function getFriendlyDeleteErrorCopy(error: unknown): (FriendlyMessageCopy & { tone: 'warning' | 'error' }) | null {
   if (!isApiClientError(error)) return null;
   if (error.status === 404) {

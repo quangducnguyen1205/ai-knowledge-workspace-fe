@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type {
   AssetIndexResponse,
+  AssetRecordResponse,
   AssetStatus,
   AssetStatusResponse,
   AssetSummary,
@@ -12,6 +13,8 @@ import { Button, EmptyState, ErrorBanner, InfoBanner, SuccessNotification, forma
 import type { EphemeralNotice } from '../../shared/ui/use-ephemeral-notice';
 import { getFriendlyRenameErrorCopy } from './model/error-copy';
 import { AssetIndexingRecoveryAction } from './components/asset-indexing-recovery-action';
+import { AssetProcessingRetryAction } from './components/asset-processing-retry-action';
+import { AssetSourceDetails } from './components/asset-source-details';
 import { SelectedAssetTranscriptPanel } from './components/selected-asset-transcript-panel';
 import { StatusBadge } from './components/status-badge';
 import { AssetAssistantPanel } from '../assistant/components/asset-assistant-panel';
@@ -23,6 +26,7 @@ type AssetDetailScreenProps = {
   workspaceId?: string;
   workspaceName: string;
   asset: AssetSummary | null;
+  assetRecord?: AssetRecordResponse;
   successNotice: EphemeralNotice | null;
   resolvedAssetStatus: AssetStatus | null;
   statusResponse?: AssetStatusResponse;
@@ -33,6 +37,8 @@ type AssetDetailScreenProps = {
   indexError: unknown;
   indexResponse?: AssetIndexResponse;
   isIndexing: boolean;
+  retryError: unknown;
+  isRetrying: boolean;
   isRenaming: boolean;
   isDeleting: boolean;
   renameError: unknown;
@@ -51,6 +57,7 @@ type AssetDetailScreenProps = {
   isStudyContextLoading: boolean;
   searchResetToken: number;
   onIndex: () => void;
+  onRetryProcessing: () => void;
   onRename: (title: string) => void;
   onResetRename: () => void;
   onDelete: (asset: AssetSummary) => void;
@@ -67,6 +74,7 @@ export function AssetDetailScreen({
   workspaceId,
   workspaceName,
   asset,
+  assetRecord,
   successNotice,
   resolvedAssetStatus,
   statusResponse,
@@ -77,6 +85,8 @@ export function AssetDetailScreen({
   indexError,
   indexResponse,
   isIndexing,
+  retryError,
+  isRetrying,
   isRenaming,
   isDeleting,
   renameError,
@@ -95,6 +105,7 @@ export function AssetDetailScreen({
   isStudyContextLoading,
   searchResetToken,
   onIndex,
+  onRetryProcessing,
   onRename,
   onResetRename,
   onDelete,
@@ -374,10 +385,18 @@ export function AssetDetailScreen({
           </div>
           <dl className="detail-list">
             <div><dt>Workspace</dt><dd>{workspaceName}</dd></div>
+            <AssetSourceDetails asset={asset} assetRecord={assetRecord} />
             <div><dt>Status</dt><dd><StatusBadge status={resolvedAssetStatus} /></dd></div>
             <div><dt>Added</dt><dd>{formatDateTime(asset.createdAt)}</dd></div>
             <div><dt>Transcript</dt><dd>{transcriptRowCount ? `${transcriptRowCount} segments` : 'Not ready yet'}</dd></div>
           </dl>
+          <AssetProcessingRetryAction
+            assetStatus={resolvedAssetStatus}
+            failureCode={statusResponse?.failureCode}
+            retryError={retryError}
+            isRetrying={isRetrying}
+            onRetry={onRetryProcessing}
+          />
           <details className="processing-details">
             <summary>Processing details</summary>
             <p>{getProcessingSummary(resolvedAssetStatus)}</p>

@@ -1,9 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { answerAssistant } from '../../features/assistant/api/assistant-api';
-import { getAssetTranscript } from '../../features/assets/api/assets-api';
+import {
+  getAsset,
+  getAssetTranscript,
+  listAssets,
+  retryAssetProcessing,
+} from '../../features/assets/api/assets-api';
 import { getCurrentUser, loginUser } from '../../features/auth/api/auth-api';
 import { getTranscriptContext, searchTranscript } from '../../features/search/api/search-api';
-import { uploadAsset } from '../../features/upload/api/upload-api';
+import { createYouTubeAsset, uploadAsset } from '../../features/upload/api/upload-api';
 import { listWorkspaces } from '../../features/workspaces/api/workspaces-api';
 import { configureApiAuth, resetApiAuthForTests } from './http-client';
 
@@ -278,11 +283,14 @@ describe('asset and search API contracts', () => {
       processingJobId: 'job-1',
       assetStatus: 'PROCESSING',
       workspaceId: 'workspace-1',
+      sourceType: 'UPLOAD',
+      youtubeVideoId: null,
+      sourceUrl: null,
     }));
     vi.stubGlobal('fetch', fetchMock);
     const file = new File(['video'], 'lecture.mp4', { type: 'video/mp4' });
 
-    await uploadAsset({ workspaceId: 'workspace-1', file, title: '  Lecture title  ' });
+    const response = await uploadAsset({ workspaceId: 'workspace-1', file, title: '  Lecture title  ' });
 
     expect(fetchMock).toHaveBeenCalledWith('/api/assets/upload', expect.objectContaining({
       credentials: 'include',
@@ -292,6 +300,114 @@ describe('asset and search API contracts', () => {
     expect(body.get('workspaceId')).toBe('workspace-1');
     expect(body.get('title')).toBe('Lecture title');
     expect(body.get('file')).toBe(file);
+    expect(response).toMatchObject({
+      sourceType: 'UPLOAD',
+      youtubeVideoId: null,
+      sourceUrl: null,
+    });
+  });
+
+  it('creates a YouTube asset with the exact JSON request shape and Spring-derived source response', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({
+      assetId: 'asset-youtube',
+      processingJobId: 'job-youtube',
+      assetStatus: 'PROCESSING',
+      workspaceId: 'workspace-1',
+      sourceType: 'YOUTUBE',
+      youtubeVideoId: 'abc_DEF-123',
+      sourceUrl: 'https://www.youtube.com/watch?v=abc_DEF-123',
+    }, 202));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await createYouTubeAsset({
+      workspaceId: 'workspace-1',
+      url: '  https://youtu.be/abc_DEF-123  ',
+      title: '  Causal ordering  ',
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/assets/youtube', expect.objectContaining({
+      credentials: 'include',
+      method: 'POST',
+    }));
+    const init = getRequestInit(fetchMock);
+    expect((init.headers as Headers).get('Content-Type')).toBe('application/json');
+    expect(JSON.parse(String(init.body))).toEqual({
+      workspaceId: 'workspace-1',
+      url: 'https://youtu.be/abc_DEF-123',
+      title: 'Causal ordering',
+    });
+    expect(response).toMatchObject({
+      sourceType: 'YOUTUBE',
+      youtubeVideoId: 'abc_DEF-123',
+      sourceUrl: 'https://www.youtube.com/watch?v=abc_DEF-123',
+    });
+  });
+
+  it('retries processing through the exact asset endpoint and POST method', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({
+      assetId: 'asset-youtube',
+      processingJobId: 'job-retry',
+      assetStatus: 'PROCESSING',
+      workspaceId: 'workspace-1',
+      sourceType: 'YOUTUBE',
+      youtubeVideoId: 'abc_DEF-123',
+      sourceUrl: 'https://www.youtube.com/watch?v=abc_DEF-123',
+    }, 202));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await retryAssetProcessing('asset-youtube');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/assets/asset-youtube/retry-processing',
+      expect.objectContaining({ credentials: 'include', method: 'POST' }),
+    );
+  });
+
+  it('preserves authoritative source fields and nullable upload metadata from list and detail', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({
+        items: [{
+          assetId: 'asset-youtube',
+          title: 'YouTube lecture',
+          assetStatus: 'PROCESSING',
+          workspaceId: 'workspace-1',
+          sourceType: 'YOUTUBE',
+          youtubeVideoId: 'abc_DEF-123',
+          sourceUrl: 'https://www.youtube.com/watch?v=abc_DEF-123',
+          createdAt: '2026-07-27T00:00:00Z',
+        }],
+        page: 0,
+        size: 20,
+        totalElements: 1,
+        totalPages: 1,
+        hasNext: false,
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        id: 'asset-youtube',
+        originalFilename: null,
+        title: 'YouTube lecture',
+        status: 'PROCESSING',
+        workspaceId: 'workspace-1',
+        sourceType: 'YOUTUBE',
+        youtubeVideoId: 'abc_DEF-123',
+        sourceUrl: 'https://www.youtube.com/watch?v=abc_DEF-123',
+        contentType: null,
+        sizeBytes: null,
+        createdAt: '2026-07-27T00:00:00Z',
+        updatedAt: '2026-07-27T00:00:00Z',
+      }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const [summary] = await listAssets('workspace-1');
+    const detail = await getAsset('asset-youtube');
+
+    expect(summary).toMatchObject({ sourceType: 'YOUTUBE', youtubeVideoId: 'abc_DEF-123' });
+    expect(detail).toMatchObject({
+      sourceType: 'YOUTUBE',
+      originalFilename: null,
+      contentType: null,
+      sizeBytes: null,
+    });
   });
 
   it('keeps workspace, optional asset scope, and encoding in search query parameters', async () => {

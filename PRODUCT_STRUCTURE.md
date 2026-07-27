@@ -10,8 +10,8 @@ Public entry is intentionally concise:
 
 The authenticated learning workspace contains:
 
-- Home for upload/search actions and recent learning
-- Library for video filtering, upload, rename, open, and delete
+- Home for Add video/search actions and recent learning
+- Library for video filtering, upload or YouTube URL entry, source display, rename, open, and delete
 - Study for transcript reading, transcript-local search, grounded questions, citations, and disclosed details
 - Workspace Search for cross-video results and direct Study navigation
 - Settings for workspace management and account actions
@@ -35,9 +35,9 @@ Authenticated access to Login or Register returns to Home. Signed-out protected 
 
 ## Navigation and responsive composition
 
-Desktop primary navigation contains only Home, Library, and Search. Workspace selection and Upload remain global; identity, workspace settings, and sign out live in the account menu.
+Desktop primary navigation contains only Home, Library, and Search. Workspace selection and Add video remain global; identity, workspace settings, and sign out live in the account menu.
 
-Study uses a transcript-first desktop layout with the assistant on the right when space permits. At mobile widths, Transcript, Ask, and Details become keyboard-operable tabs instead of one long stack. Upload and workspace deletion use contained dialogs with Escape, focus trapping, and focus restoration.
+Study uses a transcript-first desktop layout with the assistant on the right when space permits. At mobile widths, Transcript, Ask, and Details become keyboard-operable tabs instead of one long stack. Add video and workspace deletion use contained dialogs with Escape, focus trapping, and focus restoration.
 
 ## Preserved behavior
 

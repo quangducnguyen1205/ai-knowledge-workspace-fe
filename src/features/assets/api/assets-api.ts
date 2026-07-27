@@ -6,6 +6,7 @@ import {
 import { buildQueryString, request } from '../../../shared/api/http-client';
 import type {
   AssetIndexResponse,
+  AssetProcessingResponse,
   AssetRecordResponse,
   AssetStatusResponse,
   AssetSummary,
@@ -56,4 +57,8 @@ export async function getAssetTranscript(assetId: string, signal?: AbortSignal):
 
 export async function indexAssetTranscript(assetId: string): Promise<AssetIndexResponse> {
   return request<AssetIndexResponse>(`/api/assets/${assetId}/index`, { method: 'POST' });
+}
+
+export async function retryAssetProcessing(assetId: string): Promise<AssetProcessingResponse> {
+  return request<AssetProcessingResponse>(`/api/assets/${assetId}/retry-processing`, { method: 'POST' });
 }

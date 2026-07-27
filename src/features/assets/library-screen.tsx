@@ -31,11 +31,16 @@ type AssetLibraryScreenProps = {
   uploadError: unknown;
   uploadSuccessId?: string;
   isUploading: boolean;
+  youtubeError: unknown;
+  youtubeSuccessId?: string;
+  isCreatingYouTube: boolean;
   isUploadOpen: boolean;
   onSelectAsset: (assetId: string) => void;
   onDeleteAsset: (asset: AssetSummary) => void;
   onRenameAsset: (asset: AssetSummary, title: string) => void;
   onUpload: (input: { file: File; title?: string }) => void;
+  onCreateYouTube: (input: { url: string; title?: string }) => void;
+  onResetCreation: () => void;
   onOpenUpload: () => void;
   onCloseUpload: () => void;
 };
@@ -56,11 +61,16 @@ export function AssetLibraryScreen({
   uploadError,
   uploadSuccessId,
   isUploading,
+  youtubeError,
+  youtubeSuccessId,
+  isCreatingYouTube,
   isUploadOpen,
   onSelectAsset,
   onDeleteAsset,
   onRenameAsset,
   onUpload,
+  onCreateYouTube,
+  onResetCreation,
   onOpenUpload,
   onCloseUpload,
 }: AssetLibraryScreenProps) {
@@ -86,7 +96,7 @@ export function AssetLibraryScreen({
           <p>Manage the videos in this workspace.</p>
         </div>
         <div className="page-header__actions">
-          <Button type="button" onClick={onOpenUpload}>Upload video</Button>
+          <Button type="button" onClick={onOpenUpload}>Add video</Button>
         </div>
       </header>
 
@@ -148,7 +158,12 @@ export function AssetLibraryScreen({
           uploadError={uploadError}
           uploadSuccessId={uploadSuccessId}
           isUploading={isUploading}
+          youtubeError={youtubeError}
+          youtubeSuccessId={youtubeSuccessId}
+          isCreatingYouTube={isCreatingYouTube}
           onUpload={onUpload}
+          onCreateYouTube={onCreateYouTube}
+          onResetCreation={onResetCreation}
           onClose={onCloseUpload}
         />
       ) : null}

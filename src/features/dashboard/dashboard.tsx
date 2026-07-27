@@ -1,5 +1,6 @@
 import type { AssetSummary } from '../assets/model/types';
 import { Button, EmptyState, Section, formatDateTime } from '../../lib/ui';
+import { SourceBadge } from '../assets/components/source-badge';
 import { StatusBadge } from '../assets/components/status-badge';
 
 type WorkspaceHomeScreenProps = {
@@ -40,7 +41,7 @@ export function WorkspaceHomeScreen({
           </div>
         </div>
         <div className="page-header__actions">
-          <Button type="button" onClick={onUploadVideo}>Upload video</Button>
+          <Button type="button" onClick={onUploadVideo}>Add video</Button>
           <Button type="button" tone="ghost" onClick={onOpenSearch} disabled={searchableAssetCount === 0}>
             Search workspace
           </Button>
@@ -56,9 +57,9 @@ export function WorkspaceHomeScreen({
           <div className="home-empty">
             <EmptyState
               title="Your first video starts here"
-              description="Upload a lecture or lesson and its transcript will appear in this workspace."
+              description="Upload a file or add a YouTube URL and its transcript will appear in this workspace."
             />
-            <Button type="button" onClick={onUploadVideo}>Upload video</Button>
+            <Button type="button" onClick={onUploadVideo}>Add video</Button>
           </div>
         ) : (
           <div className="recent-video-grid">
@@ -72,7 +73,10 @@ export function WorkspaceHomeScreen({
                 <span className="recent-video__icon" aria-hidden="true">▶</span>
                 <span className="recent-video__copy">
                   <strong>{asset.title}</strong>
-                  <small>{formatDateTime(asset.createdAt)}</small>
+                  <span className="video-row__meta">
+                    <small>{formatDateTime(asset.createdAt)}</small>
+                    <SourceBadge sourceType={asset.sourceType} />
+                  </span>
                 </span>
                 <StatusBadge status={asset.assetStatus} />
               </button>

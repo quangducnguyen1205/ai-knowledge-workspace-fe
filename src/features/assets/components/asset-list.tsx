@@ -3,6 +3,7 @@ import { Button, EmptyState, ErrorBanner, InfoBanner, LoadingBlock, SuccessNotif
 import type { EphemeralNotice } from '../../../shared/ui/use-ephemeral-notice';
 import { getFriendlyDeleteErrorCopy, getFriendlyRenameErrorCopy } from '../model/error-copy';
 import type { AssetSummary } from '../model/types';
+import { SourceBadge } from './source-badge';
 import { StatusBadge } from './status-badge';
 
 export function AssetList({
@@ -111,7 +112,7 @@ export function AssetList({
       ) : null}
 
       {!assetsLoading && !assetsError && assets.length === 0 ? (
-        <EmptyState title="No videos found" description={emptyDescription ?? 'Upload a video to begin learning in this workspace.'} />
+        <EmptyState title="No videos found" description={emptyDescription ?? 'Add a file or YouTube URL to begin learning in this workspace.'} />
       ) : null}
 
       {!assetsLoading && !assetsError && assets.length > 0 ? (
@@ -128,7 +129,10 @@ export function AssetList({
                   <span className="video-row__thumb" aria-hidden="true">▶</span>
                   <span className="video-row__copy">
                     <strong>{asset.title}</strong>
-                    <small>{formatDateTime(asset.createdAt)}</small>
+                    <span className="video-row__meta">
+                      <small>{formatDateTime(asset.createdAt)}</small>
+                      <SourceBadge sourceType={asset.sourceType} />
+                    </span>
                   </span>
                   <StatusBadge status={asset.assetStatus} />
                 </button>
