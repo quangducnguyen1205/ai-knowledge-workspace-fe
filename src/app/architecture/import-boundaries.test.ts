@@ -83,10 +83,12 @@ describe('frontend import boundaries', () => {
 
   it('keeps transcript presentation provider-neutral and YouTube playback request-free', () => {
     const transcriptPanel = readSource('features/assets/components/selected-asset-transcript-panel.tsx');
+    const activeRowResolver = readSource('entities/transcript/model/active-transcript-row.ts');
     const youtubePlayer = readSource('features/assets/player/youtube-player.tsx');
     const youtubeLoader = readSource('features/assets/player/youtube-iframe-api.ts');
 
     expect(transcriptPanel).not.toMatch(/window\.YT|iframe_api|youtube-nocookie/);
+    expect(activeRowResolver).not.toMatch(/window\.YT|youtube|player\/|features\//i);
     for (const playerSource of [youtubePlayer, youtubeLoader]) {
       expect(playerSource).not.toMatch(/fetch\s*\(|request\s*\(|\/api\//);
     }

@@ -75,6 +75,25 @@ production Content Security Policy; a deployment CSP must intentionally allow th
 YouTube API script and `youtube-nocookie.com` frame host without broadly weakening other
 directives.
 
+While a ready player is playing or buffering, the adapter samples provider position every
+250 milliseconds only while the document is visible. It stops immediately for pause, end,
+error, video change, hidden documents, and unmount; visibility restoration performs one
+immediate read before resuming. Provider seconds are floored to integer milliseconds at the
+adapter boundary. Playback position remains ephemeral and is never stored in React Query or
+sent to Spring.
+
+The provider-neutral transcript resolver activates only timestamped rows satisfying
+`startMs <= positionMs < endMs`. Gaps and missing timing produce no active row; overlaps use
+greatest eligible start, then lowest segment index, then stable input order. Playback-active
+and search/citation-focused markers are separate and may coexist.
+
+Transcript auto-follow begins enabled, scrolls only when the active row is near or outside
+the dedicated transcript viewport, and respects reduced-motion preferences. Wheel, touch,
+keyboard scrolling, scrollbar interaction, text selection, and search/citation navigation
+suspend following. `Resume following` or an explicit Play segment action restores it without
+moving focus as playback advances. Provider errors stop sampling and clear playback-active
+state while preserving transcript reading and the external YouTube fallback.
+
 ## Asset Processing And Indexing Lifecycle
 
 The frontend remains processing-mode agnostic. It polls Spring while an asset is `PROCESSING` or `TRANSCRIPT_READY`, stops when the backend reports `SEARCHABLE` or `FAILED`, and refreshes workspace/search state when the lifecycle advances. A failed upload or YouTube Asset exposes the authorized `POST /api/assets/{assetId}/retry-processing` action; a successful `202` moves the same Asset back to `PROCESSING` and resumes the existing polling loop. In the normal integrated path, indexing follows transcript readiness automatically. The `Index transcript` control remains available only in `TRANSCRIPT_READY` as an explicit fallback when automatic completion has not advanced the asset; it is not required after a normal transition to `SEARCHABLE`.
@@ -149,15 +168,14 @@ Dockerized frontend build has also passed successfully, and the Docker local-dev
 - no collaboration, chat history, provider/model controls, browser-to-FastAPI calls, or
   browser provider access beyond the official YouTube iframe
 - no upload playback because there is no authorized browser media URL contract
-- no active transcript highlighting, playback-position polling, synchronization drift
-  handling, timeline state, controlled auto-scroll, playlist/channel ingestion, or source
-  metadata editing
+- no synchronization telemetry or drift correction beyond deterministic provider-position
+  sampling, and no timeline state, playlist/channel ingestion, or source metadata editing
 - no transcript timestamps invented on the frontend
 - no heavy design system or production-grade docs set
 
-This Slice 3A foundation does not mark all of Phase 3 complete. Active transcript
-synchronization remains deferred to Slice 3B, and browser/runtime player acceptance plus
-production CSP hardening remain separate validation work.
+Static Slice 3B synchronization does not mark all of Phase 3 complete. Browser/runtime
+YouTube player acceptance, production CSP hardening, and upload playback remain separate
+work.
 
 ## Optional Host-Node Path
 

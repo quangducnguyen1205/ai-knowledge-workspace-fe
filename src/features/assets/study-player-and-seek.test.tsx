@@ -1,5 +1,5 @@
 import type { ComponentProps } from 'react';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { TranscriptRow } from '../../entities/transcript/model/types';
@@ -12,8 +12,10 @@ import {
   type YouTubePlayerOptions,
 } from './player/youtube-iframe-api';
 
-type MockPlayer = YouTubePlayerInstance & {
+type MockPlayer = Omit<YouTubePlayerInstance, 'getCurrentTime' | 'getPlayerState'> & {
   options: YouTubePlayerOptions;
+  getCurrentTime: ReturnType<typeof vi.fn>;
+  getPlayerState: ReturnType<typeof vi.fn>;
 };
 
 const transcriptRows: TranscriptRow[] = [
@@ -76,6 +78,8 @@ function installPlayerApi() {
       seekTo: vi.fn(),
       playVideo: vi.fn(),
       destroy: vi.fn(),
+      getCurrentTime: vi.fn(() => 0),
+      getPlayerState: vi.fn(() => -1),
       getIframe: () => iframe,
     };
     players.push(player);
@@ -169,6 +173,7 @@ describe('Study YouTube player and transcript seek', () => {
     await waitFor(() => expect(players).toHaveLength(1));
     players[0].options.events.onReady({ target: players[0] });
     await waitFor(() => expect(screen.getByLabelText('Selected transcript moment')).toHaveFocus());
+    expect(screen.getByRole('button', { name: 'Resume following' })).toBeInTheDocument();
 
     const action = screen.getByRole('button', {
       name: 'Play transcript segment from 00:00',
@@ -179,9 +184,91 @@ describe('Study YouTube player and transcript seek', () => {
     expect(players[0].seekTo).toHaveBeenCalledWith(0, true);
     expect(players[0].playVideo).toHaveBeenCalledTimes(1);
     expect(action).toHaveFocus();
+    expect(screen.queryByRole('button', { name: 'Resume following' })).not.toBeInTheDocument();
     expect(screen.getByLabelText('Selected transcript moment')).toHaveTextContent(
       'This segment explains causal ordering.',
     );
+    expect(screen.getByLabelText('Currently playing transcript segment')).toHaveTextContent(
+      'The introduction starts at zero.',
+    );
+  });
+
+  it('maps observed playback directly to active rows without moving keyboard focus', async () => {
+    const { players } = installPlayerApi();
+    renderStudy();
+    await waitFor(() => expect(players).toHaveLength(1));
+    const stableFocus = screen.getByRole('button', {
+      name: 'Play transcript segment from 00:00',
+    });
+    stableFocus.focus();
+
+    players[0].getPlayerState.mockReturnValue(1);
+    players[0].getCurrentTime.mockReturnValue(4.5);
+    players[0].options.events.onReady({ target: players[0] });
+
+    expect(await screen.findByLabelText('Currently playing transcript segment'))
+      .toHaveTextContent('This segment explains causal ordering.');
+    expect(stableFocus).toHaveFocus();
+
+    players[0].getCurrentTime.mockReturnValue(0.25);
+    players[0].options.events.onStateChange({ target: players[0], data: 1 });
+    await waitFor(() => {
+      expect(screen.getByLabelText('Currently playing transcript segment'))
+        .toHaveTextContent('The introduction starts at zero.');
+    });
+    expect(stableFocus).toHaveFocus();
+
+    players[0].getCurrentTime.mockReturnValue(20);
+    players[0].options.events.onStateChange({ target: players[0], data: 1 });
+    await waitFor(() => {
+      expect(screen.queryByLabelText('Currently playing transcript segment')).not.toBeInTheDocument();
+    });
+  });
+
+  it('clears playback-active identity when refreshed transcript timing is no longer eligible', async () => {
+    const { players } = installPlayerApi();
+    const view = renderStudy();
+    await waitFor(() => expect(players).toHaveLength(1));
+    players[0].getPlayerState.mockReturnValue(1);
+    players[0].getCurrentTime.mockReturnValue(4.5);
+    players[0].options.events.onReady({ target: players[0] });
+    expect(await screen.findByLabelText('Currently playing transcript segment'))
+      .toHaveTextContent('This segment explains causal ordering.');
+
+    view.rerender(
+      <AssetDetailScreen
+        {...view.props}
+        transcriptRows={transcriptRows.map((row) => (
+          row.id === 'row-1' ? { ...row, endMs: null } : row
+        ))}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByLabelText('Currently playing transcript segment')).not.toBeInTheDocument();
+    });
+  });
+
+  it('suspends on manual transcript reading and explicit Play segment restores following', async () => {
+    const user = userEvent.setup();
+    const { players } = installPlayerApi();
+    renderStudy();
+    await waitFor(() => expect(players).toHaveLength(1));
+    const viewport = screen.getByRole('list', { name: 'Video transcript' });
+
+    fireEvent.wheel(viewport);
+    expect(screen.getByRole('button', { name: 'Resume following' })).toBeInTheDocument();
+
+    const playAction = screen.getByRole('button', {
+      name: 'Play transcript segment from 00:04',
+    });
+    await user.click(playAction);
+
+    expect(screen.queryByRole('button', { name: 'Resume following' })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Currently playing transcript segment')).toHaveTextContent(
+      'This segment explains causal ordering.',
+    );
+    expect(playAction).toHaveFocus();
   });
 
   it('keeps upload Study transcript-first with no player or playback controls', () => {
@@ -206,6 +293,11 @@ describe('Study YouTube player and transcript seek', () => {
     const { players } = installPlayerApi();
     const view = renderStudy();
     await waitFor(() => expect(players).toHaveLength(1));
+    players[0].getPlayerState.mockReturnValue(1);
+    players[0].getCurrentTime.mockReturnValue(4.5);
+    players[0].options.events.onReady({ target: players[0] });
+    expect(await screen.findByLabelText('Currently playing transcript segment'))
+      .toHaveTextContent('This segment explains causal ordering.');
 
     view.rerender(
       <AssetDetailScreen
@@ -223,14 +315,23 @@ describe('Study YouTube player and transcript seek', () => {
     expect(players[0].destroy).toHaveBeenCalledTimes(1);
     expect(screen.queryByLabelText(/youtube player for/i)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /play transcript segment/i })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Currently playing transcript segment')).not.toBeInTheDocument();
     expect(screen.getByText('The introduction starts at zero.')).toBeInTheDocument();
   });
 
   it('keeps transcript and Study tabs usable after a provider error', async () => {
     const user = userEvent.setup();
     const { players } = installPlayerApi();
-    renderStudy();
+    renderStudy({
+      focusedTranscriptRowId: 'row-0',
+      focusedTranscriptSource: 'assistant',
+    });
     await waitFor(() => expect(players).toHaveLength(1));
+
+    players[0].getPlayerState.mockReturnValue(1);
+    players[0].getCurrentTime.mockReturnValue(4.5);
+    players[0].options.events.onReady({ target: players[0] });
+    expect(await screen.findByLabelText('Currently playing transcript segment')).toBeInTheDocument();
 
     players[0].options.events.onError();
 
@@ -238,6 +339,10 @@ describe('Study YouTube player and transcript seek', () => {
       'The YouTube player could not be loaded.',
     );
     expect(screen.getByText('This segment explains causal ordering.')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Currently playing transcript segment')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Selected transcript moment')).toHaveTextContent(
+      'The introduction starts at zero.',
+    );
     await user.click(screen.getByRole('tab', { name: 'Details' }));
     expect(screen.getByRole('heading', { name: 'Details' })).toBeInTheDocument();
   });

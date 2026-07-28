@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import type {
   AssetIndexResponse,
   AssetRecordResponse,
@@ -9,15 +9,26 @@ import type {
 import type { AssistantAnswerCitation } from '../assistant/model/types';
 import type { SearchResponse, SearchResult } from '../search/api/search-api';
 import type { TranscriptContextResponse, TranscriptRow } from '../../entities/transcript/model/types';
+import {
+  getTranscriptRowIdentity,
+  resolveActiveTranscriptRow,
+} from '../../entities/transcript/model/active-transcript-row';
 import { Button, EmptyState, ErrorBanner, InfoBanner, SuccessNotification, formatDateTime } from '../../lib/ui';
 import type { EphemeralNotice } from '../../shared/ui/use-ephemeral-notice';
 import { getFriendlyRenameErrorCopy } from './model/error-copy';
 import { AssetIndexingRecoveryAction } from './components/asset-indexing-recovery-action';
 import { AssetProcessingRetryAction } from './components/asset-processing-retry-action';
 import { AssetSourceDetails } from './components/asset-source-details';
-import { SelectedAssetTranscriptPanel } from './components/selected-asset-transcript-panel';
+import {
+  SelectedAssetTranscriptPanel,
+  type TranscriptFollowMode,
+} from './components/selected-asset-transcript-panel';
 import { StatusBadge } from './components/status-badge';
-import { YouTubePlayer, type MediaPlayerHandle } from './player/youtube-player';
+import {
+  YouTubePlayer,
+  type MediaPlaybackSnapshot,
+  type MediaPlayerHandle,
+} from './player/youtube-player';
 import { AssetAssistantPanel } from '../assistant/components/asset-assistant-panel';
 import { SearchPanel } from '../search/search';
 
@@ -122,6 +133,9 @@ export function AssetDetailScreen({
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [draftTitle, setDraftTitle] = useState('');
+  const [activePlaybackRowId, setActivePlaybackRowId] = useState<string | null>(null);
+  const [followMode, setFollowMode] = useState<TranscriptFollowMode>('following');
+  const [acknowledgedFocusedRowId, setAcknowledgedFocusedRowId] = useState<string | null>(null);
   const actionMenuRef = useRef<HTMLDivElement>(null);
   const actionButtonRef = useRef<HTMLButtonElement>(null);
   const playerRef = useRef<MediaPlayerHandle>(null);
@@ -132,6 +146,33 @@ export function AssetDetailScreen({
   const youtubeVideoId = asset?.sourceType === 'YOUTUBE'
     ? asset.youtubeVideoId
     : null;
+  const timestampedRowCount = useMemo(
+    () => (transcriptRows ?? []).filter(
+      (row) => row.startMs !== null && row.endMs !== null,
+    ).length,
+    [transcriptRows],
+  );
+  const effectiveFollowMode: TranscriptFollowMode =
+    focusedTranscriptRowId && focusedTranscriptRowId !== acknowledgedFocusedRowId
+      ? 'suspended-by-user'
+      : followMode;
+
+  const handlePlaybackSnapshot = useCallback((snapshot: MediaPlaybackSnapshot) => {
+    if (
+      snapshot.state === 'error' ||
+      snapshot.state === 'unstarted' ||
+      snapshot.state === 'cued'
+    ) {
+      setActivePlaybackRowId(null);
+      return;
+    }
+
+    const activeRow = resolveActiveTranscriptRow(transcriptRows ?? [], snapshot.positionMs);
+    setActivePlaybackRowId((current) => {
+      const next = activeRow?.identity ?? null;
+      return current === next ? current : next;
+    });
+  }, [transcriptRows]);
 
   useEffect(() => {
     setActiveTab('transcript');
@@ -143,6 +184,30 @@ export function AssetDetailScreen({
   useEffect(() => {
     if (focusedTranscriptRowId) setActiveTab('transcript');
   }, [focusedTranscriptRowId]);
+
+  useEffect(() => {
+    setActivePlaybackRowId(null);
+    setFollowMode('following');
+    setAcknowledgedFocusedRowId(null);
+  }, [asset?.assetId, youtubeVideoId]);
+
+  useEffect(() => {
+    if (!focusedTranscriptRowId) return;
+    setFollowMode('suspended-by-user');
+    setAcknowledgedFocusedRowId(focusedTranscriptRowId);
+  }, [focusedTranscriptRowId]);
+
+  useEffect(() => {
+    if (!activePlaybackRowId) return;
+    const activeStillEligible = (transcriptRows ?? []).some(
+      (row, index) =>
+        getTranscriptRowIdentity(row, index) === activePlaybackRowId &&
+        row.startMs !== null &&
+        row.endMs !== null &&
+        row.endMs > row.startMs,
+    );
+    if (!activeStillEligible) setActivePlaybackRowId(null);
+  }, [activePlaybackRowId, transcriptRows]);
 
   useEffect(() => {
     if (!isActionMenuOpen) return;
@@ -304,6 +369,8 @@ export function AssetDetailScreen({
           videoId={youtubeVideoId}
           title={asset.title}
           sourceUrl={asset.sourceUrl}
+          playbackObservationEnabled={timestampedRowCount > 0}
+          onPlaybackSnapshot={handlePlaybackSnapshot}
         />
       ) : null}
 
@@ -366,8 +433,22 @@ export function AssetDetailScreen({
             transcriptLoading={transcriptLoading}
             focusedTranscriptRowId={focusedTranscriptRowId}
             focusedTranscriptSource={focusedTranscriptSource}
+            activePlaybackRowId={youtubeVideoId ? activePlaybackRowId : null}
+            followMode={effectiveFollowMode}
+            transcriptViewVisible={!isMobileStudyLayout || activeTab === 'transcript'}
+            onSuspendFollowing={() => {
+              setFollowMode('suspended-by-user');
+              setAcknowledgedFocusedRowId(focusedTranscriptRowId);
+            }}
+            onResumeFollowing={() => {
+              setFollowMode('following');
+              setAcknowledgedFocusedRowId(focusedTranscriptRowId);
+            }}
             onPlaySegment={youtubeVideoId
-              ? (startMs) => {
+              ? (startMs, rowIdentity) => {
+                  setFollowMode('following');
+                  setAcknowledgedFocusedRowId(focusedTranscriptRowId);
+                  setActivePlaybackRowId(rowIdentity);
                   playerRef.current?.seekToMs(startMs);
                   playerRef.current?.play();
                 }

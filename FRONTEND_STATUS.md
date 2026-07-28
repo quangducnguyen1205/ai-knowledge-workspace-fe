@@ -8,6 +8,7 @@ This repo implements the focused learning-workspace frontend for AI Knowledge Wo
 - workspace selection and management
 - source-explicit video entry through upload file or YouTube URL
 - official YouTube iframe playback with explicit timestamped transcript seek actions
+- visibility-aware playback sampling, active transcript indication, and user-controlled follow
 - processing and transcript review
 - automatic search preparation with explicit indexing retained only as recovery
 - workspace-scoped search
@@ -74,6 +75,7 @@ This refactor preserves existing routes, API request shapes, auth defaults, toke
 - Poll processing state until terminal
 - Retry authorized failed processing on the same upload or YouTube Asset and resume the existing polling lifecycle
 - Play Spring-identified YouTube Assets in Study and seek from fully timestamped transcript rows
+- Follow the active timestamped transcript row while preserving manual reading and selected context
 - Load transcript rows only when the backend says they are ready
 - Explicitly index transcript rows to unlock search
 - Open a dedicated workspace search screen
@@ -130,6 +132,15 @@ privacy-enhanced host, exposes a minimal millisecond seek/play handle, destroys 
 instances, and retains only the latest pre-ready seek. The browser connects to YouTube only
 for this iframe and continues to use Spring for transcript and product state.
 
+The loader permits a later explicit mount retry after an owned script failure without
+removing externally owned scripts. The player maps provider states to a neutral model and
+samples position at 250 ms only while ready, playing/buffering, mounted, and document-visible.
+Transcript resolution uses canonical timing with inclusive start and exclusive end. Playback
+active is distinct from search/citation focus. Auto-follow uses a dedicated transcript
+viewport, respects reduced motion, suspends for manual reading intent, and exposes
+`Resume following`. Provider errors destroy the failed iframe once, stop sampling, clear the
+playback marker, and preserve transcript/fallback behavior.
+
 ## 7. Project 3 Auth Foundation
 
 - Default mode remains `VITE_AUTHENTICATION_MODE=legacy_session`.
@@ -180,18 +191,17 @@ for this iframe and continues to use Spring for transcript and product state.
 - Study exposes the same transcript-hit/context behavior as Find in transcript, scoped to the current video
 - No general-purpose chat history, provider controls or fake AI affordances were added.
   The supported asset-scoped grounded answer and citation UI calls Spring only.
-- Upload playback, provider inference from source URLs, persisted playback state and active
-  transcript synchronization remain out of scope.
-- Browser/runtime iframe acceptance remains pending. Slice 3A does not mark all of Phase 3 complete.
+- Upload playback, provider inference from source URLs, persisted playback state and optional
+  synchronization telemetry remain out of scope.
+- Browser/runtime iframe acceptance remains pending. Static Slice 3B does not mark all of Phase 3 complete.
 
 ## 11. Intentionally Deferred
 
 - Chat or assistant flows
-- Active transcript highlighting, playback-position polling, controlled auto-scroll and
-  synchronization drift handling
 - Upload playback until an authorized Spring media URL contract exists
 - Playlist/channel ingestion and source metadata editing
-- Browser/runtime player acceptance and production CSP/deployment hardening
+- Browser/runtime player acceptance, production CSP/deployment hardening, and optional
+  synchronization telemetry/drift diagnostics
 - Collaboration features
 - Cross-workspace asset movement
 - Advanced search filters

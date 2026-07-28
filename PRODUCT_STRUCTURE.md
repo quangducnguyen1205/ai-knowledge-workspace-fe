@@ -44,6 +44,10 @@ Transcript, Ask, and Details stay keyboard-operable tabs. Upload Assets render n
 because no authorized upload streaming URL exists. Add video and workspace deletion use
 contained dialogs with Escape, focus trapping, and focus restoration.
 
+During YouTube playback, the timestamped active row is marked independently from a
+search/citation-selected row. The transcript follows only while follow mode is enabled;
+manual reading suspends it and a visible Resume following action restores alignment.
+
 ## Preserved behavior
 
 The refinement changes presentation and information hierarchy, not product contracts. Authentication, workspace provisioning and switching, upload validation, lifecycle polling, deep-link hydration, transcript display, both search scopes, assistant request safety, citation navigation, and deletion behavior continue through the existing feature hooks and Spring API modules.

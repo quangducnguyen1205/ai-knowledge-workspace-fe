@@ -16,7 +16,22 @@ export type MediaPlayerHandle = {
   play(): void;
 };
 
+export type MediaPlaybackState =
+  | 'unstarted'
+  | 'playing'
+  | 'paused'
+  | 'buffering'
+  | 'ended'
+  | 'cued'
+  | 'error';
+
+export type MediaPlaybackSnapshot = {
+  state: MediaPlaybackState;
+  positionMs: number | null;
+};
+
 export type MediaPlayerState = 'idle' | 'loading-api' | 'creating-player' | 'ready' | 'error';
+export const PLAYBACK_POSITION_POLL_INTERVAL_MS = 250;
 
 type PendingPlayerCommand = {
   seekMs: number;
@@ -42,18 +57,47 @@ function configurePlayerIframe(iframe: HTMLIFrameElement, title: string) {
   iframe.setAttribute('allowfullscreen', '');
 }
 
+export function mapYouTubePlaybackState(state: number): MediaPlaybackState {
+  if (state === 1) return 'playing';
+  if (state === 2) return 'paused';
+  if (state === 3) return 'buffering';
+  if (state === 0) return 'ended';
+  if (state === 5) return 'cued';
+  return 'unstarted';
+}
+
+export function readYouTubePositionMs(player: YouTubePlayerInstance): number | null {
+  const seconds = player.getCurrentTime();
+  return Number.isFinite(seconds) && seconds >= 0
+    ? Math.floor(seconds * 1_000)
+    : null;
+}
+
 export const YouTubePlayer = forwardRef<MediaPlayerHandle, {
   videoId: string;
   title: string;
   sourceUrl: string | null;
-}>(function YouTubePlayer({ videoId, title, sourceUrl }, ref) {
+  playbackObservationEnabled?: boolean;
+  onPlaybackSnapshot?: (snapshot: MediaPlaybackSnapshot) => void;
+}>(function YouTubePlayer({
+  videoId,
+  title,
+  sourceUrl,
+  playbackObservationEnabled = false,
+  onPlaybackSnapshot,
+}, ref) {
   const hostRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YouTubePlayerInstance | null>(null);
   const playerReadyRef = useRef(false);
   const pendingCommandRef = useRef<PendingPlayerCommand | null>(null);
   const titleRef = useRef(title);
+  const observationEnabledRef = useRef(playbackObservationEnabled);
+  const snapshotListenerRef = useRef(onPlaybackSnapshot);
+  const refreshObservationRef = useRef<() => void>(() => undefined);
   const [playerState, setPlayerState] = useState<MediaPlayerState>('idle');
   titleRef.current = title;
+  observationEnabledRef.current = playbackObservationEnabled;
+  snapshotListenerRef.current = onPlaybackSnapshot;
 
   useImperativeHandle(ref, () => ({
     seekToMs(timeMs) {
@@ -84,12 +128,76 @@ export const YouTubePlayer = forwardRef<MediaPlayerHandle, {
   useEffect(() => {
     let disposed = false;
     let ownedPlayer: YouTubePlayerInstance | null = null;
+    let playbackState: MediaPlaybackState = 'unstarted';
+    let pollingIntervalId: number | null = null;
     const host = hostRef.current;
+
+    function stopPolling() {
+      if (pollingIntervalId === null) return;
+      window.clearInterval(pollingIntervalId);
+      pollingIntervalId = null;
+    }
+
+    function emitSnapshot(positionMs: number | null) {
+      if (!observationEnabledRef.current) return;
+      snapshotListenerRef.current?.({ state: playbackState, positionMs });
+    }
+
+    function samplePosition() {
+      if (!ownedPlayer || disposed || !playerReadyRef.current) return;
+      emitSnapshot(readYouTubePositionMs(ownedPlayer));
+    }
+
+    function playbackNeedsPolling() {
+      return playbackState === 'playing' || playbackState === 'buffering';
+    }
+
+    function refreshObservation() {
+      stopPolling();
+      if (
+        !observationEnabledRef.current ||
+        !playerReadyRef.current ||
+        !ownedPlayer ||
+        !playbackNeedsPolling() ||
+        document.visibilityState !== 'visible'
+      ) {
+        return;
+      }
+
+      samplePosition();
+      pollingIntervalId = window.setInterval(
+        samplePosition,
+        PLAYBACK_POSITION_POLL_INTERVAL_MS,
+      );
+    }
+
+    function destroyOwnedPlayer() {
+      const player = ownedPlayer;
+      if (!player) return;
+      ownedPlayer = null;
+      if (playerRef.current === player) playerRef.current = null;
+      try {
+        player.destroy();
+      } catch {
+        // Provider cleanup failures must not break the surrounding Study UI.
+      }
+      host?.replaceChildren();
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'hidden') {
+        stopPolling();
+        return;
+      }
+      refreshObservation();
+    }
 
     playerReadyRef.current = false;
     pendingCommandRef.current = null;
     playerRef.current = null;
     setPlayerState('loading-api');
+    refreshObservationRef.current = refreshObservation;
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     void loadYouTubeIframeApi()
       .then((api) => {
@@ -124,6 +232,11 @@ export const YouTubePlayer = forwardRef<MediaPlayerHandle, {
               playerRef.current = event.target;
               playerReadyRef.current = true;
               setPlayerState('ready');
+              playbackState = mapYouTubePlaybackState(event.target.getPlayerState());
+              if (observationEnabledRef.current) {
+                emitSnapshot(readYouTubePositionMs(event.target));
+              }
+              refreshObservation();
 
               const pendingCommand = pendingCommandRef.current;
               pendingCommandRef.current = null;
@@ -132,11 +245,24 @@ export const YouTubePlayer = forwardRef<MediaPlayerHandle, {
               event.target.seekTo(pendingCommand.seekMs / 1_000, true);
               if (pendingCommand.shouldPlay) event.target.playVideo();
             },
+            onStateChange: (event) => {
+              if (disposed || event.target !== ownedPlayer) return;
+              playbackState = mapYouTubePlaybackState(event.data);
+              if (!playerReadyRef.current) return;
+              if (observationEnabledRef.current) {
+                emitSnapshot(readYouTubePositionMs(event.target));
+              }
+              refreshObservation();
+            },
             onError: () => {
               if (disposed) return;
               playerReadyRef.current = false;
               pendingCommandRef.current = null;
+              playbackState = 'error';
+              stopPolling();
+              snapshotListenerRef.current?.({ state: 'error', positionMs: null });
               setPlayerState('error');
+              destroyOwnedPlayer();
             },
           },
         });
@@ -144,18 +270,31 @@ export const YouTubePlayer = forwardRef<MediaPlayerHandle, {
         configurePlayerIframe(ownedPlayer.getIframe(), titleRef.current);
       })
       .catch(() => {
-        if (!disposed) setPlayerState('error');
+        if (disposed) return;
+        playerReadyRef.current = false;
+        pendingCommandRef.current = null;
+        playbackState = 'error';
+        stopPolling();
+        snapshotListenerRef.current?.({ state: 'error', positionMs: null });
+        setPlayerState('error');
+        destroyOwnedPlayer();
       });
 
     return () => {
       disposed = true;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      stopPolling();
+      refreshObservationRef.current = () => undefined;
       playerReadyRef.current = false;
       pendingCommandRef.current = null;
       playerRef.current = null;
-      ownedPlayer?.destroy();
-      host?.replaceChildren();
+      destroyOwnedPlayer();
     };
   }, [videoId]);
+
+  useEffect(() => {
+    refreshObservationRef.current();
+  }, [playbackObservationEnabled]);
 
   useEffect(() => {
     if (!playerReadyRef.current || !playerRef.current) return;

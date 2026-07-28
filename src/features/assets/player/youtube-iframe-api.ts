@@ -4,12 +4,18 @@ export const YOUTUBE_IFRAME_API_SCRIPT_SRC = 'https://www.youtube.com/iframe_api
 export type YouTubePlayerInstance = {
   seekTo(seconds: number, allowSeekAhead: boolean): void;
   playVideo(): void;
+  getCurrentTime(): number;
+  getPlayerState(): number;
   destroy(): void;
   getIframe(): HTMLIFrameElement;
 };
 
 export type YouTubePlayerEvent = {
   target: YouTubePlayerInstance;
+};
+
+export type YouTubePlayerStateEvent = YouTubePlayerEvent & {
+  data: number;
 };
 
 export type YouTubePlayerOptions = {
@@ -27,6 +33,7 @@ export type YouTubePlayerOptions = {
   };
   events: {
     onReady(event: YouTubePlayerEvent): void;
+    onStateChange(event: YouTubePlayerStateEvent): void;
     onError(): void;
   };
 };
@@ -45,6 +52,7 @@ declare global {
 let apiLoadPromise: Promise<YouTubeIframeApi> | null = null;
 let installedReadyCallback: (() => void) | null = null;
 let previousReadyCallback: (() => void) | undefined;
+let failedExternalScripts = new WeakSet<HTMLScriptElement>();
 
 function getLoadedApi(): YouTubeIframeApi | null {
   return typeof window.YT?.Player === 'function' ? window.YT : null;
@@ -68,13 +76,21 @@ export function loadYouTubeIframeApi(): Promise<YouTubeIframeApi> {
   if (apiLoadPromise) return apiLoadPromise;
 
   apiLoadPromise = new Promise<YouTubeIframeApi>((resolve, reject) => {
-    const existingScript = document.getElementById(YOUTUBE_IFRAME_API_SCRIPT_ID)
-      ?? Array.from(document.scripts).find(
-        (candidate) => candidate.src === YOUTUBE_IFRAME_API_SCRIPT_SRC,
-      );
+    const scriptWithLoaderId = document.getElementById(YOUTUBE_IFRAME_API_SCRIPT_ID);
+    const existingScript = (
+      scriptWithLoaderId instanceof HTMLScriptElement &&
+      !failedExternalScripts.has(scriptWithLoaderId)
+        ? scriptWithLoaderId
+        : null
+    ) ?? Array.from(document.scripts).find(
+      (candidate) =>
+        candidate.src === YOUTUBE_IFRAME_API_SCRIPT_SRC &&
+        !failedExternalScripts.has(candidate),
+    );
     const script = existingScript instanceof HTMLScriptElement
       ? existingScript
       : document.createElement('script');
+    const scriptOwnedByLoader = !existingScript;
     let settled = false;
 
     function finishWithApi() {
@@ -95,7 +111,10 @@ export function loadYouTubeIframeApi(): Promise<YouTubeIframeApi> {
       if (settled) return;
       settled = true;
       script.removeEventListener('error', finishWithError);
+      if (scriptOwnedByLoader) script.remove();
+      else failedExternalScripts.add(script);
       restoreReadyCallback();
+      apiLoadPromise = null;
       reject(new Error('YouTube IFrame API unavailable'));
     }
 
@@ -111,8 +130,10 @@ export function loadYouTubeIframeApi(): Promise<YouTubeIframeApi> {
     window.onYouTubeIframeAPIReady = installedReadyCallback;
     script.addEventListener('error', finishWithError, { once: true });
 
-    if (!existingScript) {
-      script.id = YOUTUBE_IFRAME_API_SCRIPT_ID;
+    if (scriptOwnedByLoader) {
+      script.id = document.getElementById(YOUTUBE_IFRAME_API_SCRIPT_ID)
+        ? `${YOUTUBE_IFRAME_API_SCRIPT_ID}-retry`
+        : YOUTUBE_IFRAME_API_SCRIPT_ID;
       script.src = YOUTUBE_IFRAME_API_SCRIPT_SRC;
       script.async = true;
       script.referrerPolicy = 'strict-origin-when-cross-origin';
@@ -128,4 +149,5 @@ export function resetYouTubeIframeApiLoaderForTests() {
   apiLoadPromise = null;
   installedReadyCallback = null;
   previousReadyCallback = undefined;
+  failedExternalScripts = new WeakSet<HTMLScriptElement>();
 }
