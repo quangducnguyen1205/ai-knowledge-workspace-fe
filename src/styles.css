@@ -1415,6 +1415,70 @@ summary:focus-visible {
   border-top: 1px solid var(--border);
 }
 
+.youtube-player {
+  min-width: 0;
+  width: min(100%, 760px);
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.youtube-player__header,
+.youtube-player__identity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.youtube-player__identity {
+  justify-content: flex-start;
+}
+
+.youtube-player__state {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  font-weight: 750;
+}
+
+.youtube-player__viewport {
+  position: relative;
+  width: 100%;
+  min-height: 220px;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-md);
+  background: #111827;
+}
+
+.youtube-player__host,
+.youtube-player__host iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.youtube-player__message {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  color: #fff;
+  text-align: center;
+  background: #111827;
+}
+
+.youtube-player__message span {
+  color: #d1d5db;
+}
+
 .study-tabs {
   display: none;
 }
@@ -1519,6 +1583,30 @@ summary:focus-visible {
   color: var(--text-soft);
   font-size: 0.74rem;
   font-weight: 700;
+}
+
+.transcript-seek-action {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid rgba(23, 111, 100, 0.3);
+  border-radius: 999px;
+  color: var(--primary-strong);
+  background: var(--primary-soft);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+}
+
+.transcript-seek-action:hover {
+  border-color: var(--primary);
+}
+
+.transcript-seek-action:focus-visible {
+  outline: 3px solid rgba(23, 111, 100, 0.28);
+  outline-offset: 2px;
 }
 
 .transcript-list__item p {
@@ -2066,6 +2154,7 @@ summary:focus-visible {
   }
 
   .panel,
+  .youtube-player,
   .search-panel--asset,
   .transcript-panel,
   .selected-context,
@@ -2073,6 +2162,15 @@ summary:focus-visible {
   .study-pane--details {
     padding: var(--space-4);
     border-radius: var(--radius-md);
+  }
+
+  .youtube-player {
+    width: 100%;
+    padding: var(--space-3);
+  }
+
+  .youtube-player__viewport {
+    min-height: 0;
   }
 
   .recent-video-grid {

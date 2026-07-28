@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { buildTranscriptDisplayRows, matchesTranscriptReference } from '../../../entities/transcript/model/transcript-display';
+import { formatTranscriptTimestamp } from '../../../entities/transcript/model/transcript-time';
 import type { TranscriptRow } from '../../../entities/transcript/model/types';
 import { EmptyState, ErrorBanner, InfoBanner, LoadingBlock, Section } from '../../../lib/ui';
 import { getTranscriptConflictCopy } from '../model/error-copy';
@@ -15,6 +16,7 @@ export function SelectedAssetTranscriptPanel({
   transcriptLoading,
   focusedTranscriptRowId,
   focusedTranscriptSource,
+  onPlaySegment,
   embedded = false,
 }: {
   asset: AssetSummary | null;
@@ -26,6 +28,7 @@ export function SelectedAssetTranscriptPanel({
   transcriptLoading: boolean;
   focusedTranscriptRowId?: string | null;
   focusedTranscriptSource?: 'search' | 'assistant' | null;
+  onPlaySegment?: (startMs: number) => void;
   embedded?: boolean;
 }) {
   const transcriptConflictCopy = getTranscriptConflictCopy(transcriptError, resolvedAssetStatus, statusResponse?.processingJobStatus);
@@ -96,6 +99,14 @@ export function SelectedAssetTranscriptPanel({
           <ol className="transcript-list">
             {displayTranscriptRows.map(({ row, displayText }) => {
               const isFocusedRow = Boolean(focusedTranscriptRowId && matchesTranscriptReference(row, focusedTranscriptRowId));
+              const rowIsSeekable = Boolean(
+                onPlaySegment &&
+                row.startMs !== null &&
+                row.endMs !== null,
+              );
+              const formattedStartTime = row.startMs !== null
+                ? formatTranscriptTimestamp(row.startMs)
+                : null;
               return (
                 <li
                   key={row.id ?? `segment-${row.segmentIndex ?? 'missing'}`}
@@ -107,6 +118,19 @@ export function SelectedAssetTranscriptPanel({
                 >
                   <div className="transcript-list__meta">
                     <span>Moment {row.segmentIndex ?? '—'}</span>
+                    {rowIsSeekable && formattedStartTime ? (
+                      <button
+                        type="button"
+                        className="transcript-seek-action"
+                        aria-label={`Play transcript segment from ${formattedStartTime}`}
+                        onClick={() => {
+                          if (row.startMs !== null) onPlaySegment?.(row.startMs);
+                        }}
+                      >
+                        <span aria-hidden="true">▶</span>
+                        <span>{formattedStartTime}</span>
+                      </button>
+                    ) : null}
                     {isFocusedRow ? <span className="hit-pill">{focusedRowLabel}</span> : null}
                   </div>
                   <p>{displayText}</p>

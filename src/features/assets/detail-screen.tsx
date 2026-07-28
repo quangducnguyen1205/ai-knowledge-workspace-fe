@@ -17,6 +17,7 @@ import { AssetProcessingRetryAction } from './components/asset-processing-retry-
 import { AssetSourceDetails } from './components/asset-source-details';
 import { SelectedAssetTranscriptPanel } from './components/selected-asset-transcript-panel';
 import { StatusBadge } from './components/status-badge';
+import { YouTubePlayer, type MediaPlayerHandle } from './player/youtube-player';
 import { AssetAssistantPanel } from '../assistant/components/asset-assistant-panel';
 import { SearchPanel } from '../search/search';
 
@@ -123,10 +124,14 @@ export function AssetDetailScreen({
   const [draftTitle, setDraftTitle] = useState('');
   const actionMenuRef = useRef<HTMLDivElement>(null);
   const actionButtonRef = useRef<HTMLButtonElement>(null);
+  const playerRef = useRef<MediaPlayerHandle>(null);
   const isMobileStudyLayout = useMobileStudyLayout();
   const assistantWorkspaceId = workspaceId ?? asset?.workspaceId ?? null;
   const renameErrorCopy = getFriendlyRenameErrorCopy(renameError);
   const transcriptRowCount = transcriptRows?.length ?? 0;
+  const youtubeVideoId = asset?.sourceType === 'YOUTUBE'
+    ? asset.youtubeVideoId
+    : null;
 
   useEffect(() => {
     setActiveTab('transcript');
@@ -292,6 +297,16 @@ export function AssetDetailScreen({
         ) : null}
       </header>
 
+      {youtubeVideoId ? (
+        <YouTubePlayer
+          key={`${asset.assetId}:${youtubeVideoId}`}
+          ref={playerRef}
+          videoId={youtubeVideoId}
+          title={asset.title}
+          sourceUrl={asset.sourceUrl}
+        />
+      ) : null}
+
       <div className="study-tabs" role="tablist" aria-label="Study views">
         {(['transcript', 'ask', 'details'] as const).map((tab) => (
           <button
@@ -351,6 +366,12 @@ export function AssetDetailScreen({
             transcriptLoading={transcriptLoading}
             focusedTranscriptRowId={focusedTranscriptRowId}
             focusedTranscriptSource={focusedTranscriptSource}
+            onPlaySegment={youtubeVideoId
+              ? (startMs) => {
+                  playerRef.current?.seekToMs(startMs);
+                  playerRef.current?.play();
+                }
+              : undefined}
           />
         </section>
 

@@ -12,7 +12,8 @@ The authenticated learning workspace contains:
 
 - Home for Add video/search actions and recent learning
 - Library for video filtering, upload or YouTube URL entry, source display, rename, open, and delete
-- Study for transcript reading, transcript-local search, grounded questions, citations, and disclosed details
+- Study for source-aware YouTube playback, transcript reading and explicit segment seek,
+  transcript-local search, grounded questions, citations, and disclosed details
 - Workspace Search for cross-video results and direct Study navigation
 - Settings for workspace management and account actions
 
@@ -37,7 +38,11 @@ Authenticated access to Login or Register returns to Home. Signed-out protected 
 
 Desktop primary navigation contains only Home, Library, and Search. Workspace selection and Add video remain global; identity, workspace settings, and sign out live in the account menu.
 
-Study uses a transcript-first desktop layout with the assistant on the right when space permits. At mobile widths, Transcript, Ask, and Details become keyboard-operable tabs instead of one long stack. Add video and workspace deletion use contained dialogs with Escape, focus trapping, and focus restoration.
+Study keeps its transcript-first desktop layout, adding a bounded YouTube source surface above
+the transcript/assistant composition. At mobile widths the player remains visible while
+Transcript, Ask, and Details stay keyboard-operable tabs. Upload Assets render no media surface
+because no authorized upload streaming URL exists. Add video and workspace deletion use
+contained dialogs with Escape, focus trapping, and focus restoration.
 
 ## Preserved behavior
 

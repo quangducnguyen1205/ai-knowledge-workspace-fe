@@ -59,7 +59,7 @@ describe('source-aware asset rendering', () => {
     expect(screen.getByText('YouTube lecture').closest('.video-row__open')).toHaveTextContent('YouTube');
   });
 
-  it('shows canonical YouTube source fields as a safe external link without upload metadata or an embed', () => {
+  it('shows canonical YouTube source fields as a safe external link without upload metadata', () => {
     const youtubeRecord: AssetRecordResponse = {
       id: youtubeAsset.assetId,
       originalFilename: null,

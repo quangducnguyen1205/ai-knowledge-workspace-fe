@@ -7,6 +7,7 @@ This repo implements the focused learning-workspace frontend for AI Knowledge Wo
 - auth
 - workspace selection and management
 - source-explicit video entry through upload file or YouTube URL
+- official YouTube iframe playback with explicit timestamped transcript seek actions
 - processing and transcript review
 - automatic search preparation with explicit indexing retained only as recovery
 - workspace-scoped search
@@ -72,6 +73,7 @@ This refactor preserves existing routes, API request shapes, auth defaults, toke
 - Rename and delete assets
 - Poll processing state until terminal
 - Retry authorized failed processing on the same upload or YouTube Asset and resume the existing polling lifecycle
+- Play Spring-identified YouTube Assets in Study and seek from fully timestamped transcript rows
 - Load transcript rows only when the backend says they are ready
 - Explicitly index transcript rows to unlock search
 - Open a dedicated workspace search screen
@@ -121,6 +123,12 @@ Asset list/detail/create/retry responses preserve the authoritative `sourceType`
 diagnostics. Upload remains multipart and YouTube creation remains JSON. Spring owns URL
 normalization, duplicate detection, authorization, and canonical product state. Internal
 FastAPI V2 performs temporary YouTube acquisition; the browser calls Spring only.
+
+YouTube Study playback uses the official IFrame Player API through a feature-owned adapter.
+The adapter loads one HTTPS script, constructs the player from `youtubeVideoId` on the
+privacy-enhanced host, exposes a minimal millisecond seek/play handle, destroys owned
+instances, and retains only the latest pre-ready seek. The browser connects to YouTube only
+for this iframe and continues to use Spring for transcript and product state.
 
 ## 7. Project 3 Auth Foundation
 
@@ -172,17 +180,18 @@ FastAPI V2 performs temporary YouTube acquisition; the browser calls Spring only
 - Study exposes the same transcript-hit/context behavior as Find in transcript, scoped to the current video
 - No general-purpose chat history, provider controls or fake AI affordances were added.
   The supported asset-scoped grounded answer and citation UI calls Spring only.
-- Unsupported media seek behavior, provider inference in the browser and persisted chat state
-  remain out of scope.
-- Runtime YouTube success has not yet been accepted. This slice does not mark Phase 2 complete.
+- Upload playback, provider inference from source URLs, persisted playback state and active
+  transcript synchronization remain out of scope.
+- Browser/runtime iframe acceptance remains pending. Slice 3A does not mark all of Phase 3 complete.
 
 ## 11. Intentionally Deferred
 
 - Chat or assistant flows
-- Timestamp seek or media playback controls
-- YouTube embedding, playback, click-to-seek, active transcript synchronization, timeline
-  state, auto-scroll, playlist/channel ingestion, and source metadata editing
-- Cross-repository runtime acceptance and successful live YouTube acquisition
+- Active transcript highlighting, playback-position polling, controlled auto-scroll and
+  synchronization drift handling
+- Upload playback until an authorized Spring media URL contract exists
+- Playlist/channel ingestion and source metadata editing
+- Browser/runtime player acceptance and production CSP/deployment hardening
 - Collaboration features
 - Cross-workspace asset movement
 - Advanced search filters

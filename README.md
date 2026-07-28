@@ -11,6 +11,7 @@ for cross-repository ownership and evidence.
 - workspace selection and creation
 - workspace-scoped `Add video` entry for either a validated upload file or a public YouTube URL
 - source-aware library/detail presentation and authorized failed-processing retry
+- privacy-conscious YouTube playback in Study with explicit transcript segment seek controls
 - processing status polling
 - transcript retrieval
 - automatic indexing as the normal lifecycle, with explicit indexing retained as a fallback
@@ -52,6 +53,27 @@ Both sources enter the existing Asset lifecycle. The frontend preserves Spring-r
 codes. Upload-only filename, content type, and size fields are rendered only when applicable.
 Internal FastAPI V2 performs temporary YouTube acquisition as part of processing; that
 internal boundary is not browser-accessible.
+
+## YouTube Player And Transcript Seek
+
+Study renders the official YouTube IFrame Player API only when the authoritative Asset
+source is `YOUTUBE` and Spring supplies `youtubeVideoId`. A small feature-owned adapter
+loads the API script once, uses the privacy-enhanced `youtube-nocookie.com` host, owns
+player readiness/error/destruction, and exposes only millisecond seek and play behavior to
+Study. It never parses `sourceUrl` to recover provider identity.
+
+Transcript rows with both `startMs` and `endMs` expose an explicit, keyboard-operable
+`Play transcript segment from …` control. Activation seeks to the exact `startMs` and
+starts playback; conversion from milliseconds to YouTube seconds occurs only inside the
+adapter. If the player is not ready, only the latest pending seek is applied once on
+readiness. Upload Assets remain transcript-first because Spring exposes no authorized
+upload streaming contract.
+
+The browser continues to use Spring for product data and connects to YouTube only for the
+official iframe player. It never calls FastAPI. This repository currently sets no
+production Content Security Policy; a deployment CSP must intentionally allow the official
+YouTube API script and `youtube-nocookie.com` frame host without broadly weakening other
+directives.
 
 ## Asset Processing And Indexing Lifecycle
 
@@ -124,16 +146,18 @@ Dockerized frontend build has also passed successfully, and the Docker local-dev
 - no production Keycloak deployment or auth-default cutover claimed
 - no token refresh, silent SSO, global Keycloak logout propagation, account-management wiring, or production deployment cutover yet
 - no full accessibility certification; P3-C4 was a targeted local browser smoke with keyboard/focus/error-state checks
-- no collaboration, chat history, provider/model controls, or browser-to-provider access
-- no media player or timestamp-seek UI
-- no YouTube embed, video playback, click-to-seek, active transcript synchronization,
-  timeline state, auto-scroll, playlist/channel ingestion, or source metadata editing
+- no collaboration, chat history, provider/model controls, browser-to-FastAPI calls, or
+  browser provider access beyond the official YouTube iframe
+- no upload playback because there is no authorized browser media URL contract
+- no active transcript highlighting, playback-position polling, synchronization drift
+  handling, timeline state, controlled auto-scroll, playlist/channel ingestion, or source
+  metadata editing
 - no transcript timestamps invented on the frontend
 - no heavy design system or production-grade docs set
 
-Phase 2 is not marked complete by this frontend slice. Successful live YouTube acquisition
-still requires cross-repository runtime acceptance. Player, seek, and transcript
-synchronization remain explicitly deferred to Phase 3.
+This Slice 3A foundation does not mark all of Phase 3 complete. Active transcript
+synchronization remains deferred to Slice 3B, and browser/runtime player acceptance plus
+production CSP hardening remain separate validation work.
 
 ## Optional Host-Node Path
 

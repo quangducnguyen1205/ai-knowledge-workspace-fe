@@ -67,13 +67,16 @@ The baseline was `0c4797436c9e7106146388a09322e2d32782fceb`. `AppShell.tsx` was 
 Transcript rows, search results, transcript-context rows, and assistant citations preserve
 nullable `startMs`/`endMs` integer-millisecond metadata. Feature API adapters normalize legacy
 payloads with missing timing fields to the single internal representation `null`; `0` remains a
-valid value. This phase adds no display, seek, player, or synchronization behavior.
+valid value. Study now renders an explicit seek action only for a YouTube Asset row with both
+timing bounds; the transcript passes exact milliseconds to a feature-owned player handle and
+does not import or manipulate `window.YT`.
 
 ## Asset, upload, lifecycle, and search ownership
 
 - `useAssetSelection` owns the workspace list query, deep-link/preferred selection reconciliation, selected ID refs, and selection continuity across list refreshes.
 - `useAssetUpload` owns upload mutation state, workspace request mapping, list invalidation, scope reset, and a narrow post-success callback. `AssetUploadForm` owns only title/file validation and file-input reset behavior.
 - `useAssetLifecycle` is the sole status/transcript polling owner. It keeps the existing 3,000 ms interval, polls only `PROCESSING` and `TRANSCRIPT_READY`, passes `AbortSignal` to status/transcript reads, refreshes list/search caches after automatic progress, stops at terminal/searchable status, and exposes semantic capability flags.
+- `features/assets/player` owns the singleton official YouTube IFrame API loader, privacy-enhanced player construction, bounded readiness/error state, provider cleanup, and one latest pending seek command. Playback state is local ephemeral UI state and never enters React Query or product lifecycle state.
 - `AssetIndexingRecoveryAction` renders explicit indexing only from lifecycle-derived recovery state. It retains the secondary button, current recovery explanation, existing POST endpoint, mutation errors, and post-success list/search refresh.
 - `useAssetManagement` owns rename/delete mutation state, cache reconciliation, success notices, and stale 404 cleanup. `AssetList`, `SelectedAssetPanel`, `AssetLifecyclePanel`, and `SelectedAssetTranscriptPanel` own their focused presentation boundaries.
 - `useSearchController` owns submitted query, workspace/optional-asset scope, abortable search/context queries, selected result, stale-result cleanup, and reset rules. Search presentation does not own assistant answers.
