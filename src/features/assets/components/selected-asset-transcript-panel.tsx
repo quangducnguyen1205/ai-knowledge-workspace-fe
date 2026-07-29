@@ -9,6 +9,79 @@ import type { AssetStatus, AssetStatusResponse, AssetSummary } from '../model/ty
 
 export type TranscriptFollowMode = 'following' | 'suspended-by-user';
 
+type TranscriptRowGeometry = Pick<DOMRect, 'top' | 'bottom' | 'height'>;
+
+type TranscriptViewportMetrics = {
+  scrollTop: number;
+  scrollHeight: number;
+  clientHeight: number;
+};
+
+/**
+ * Resolves the transcript viewport `scrollTop` that centers a row, or `null` when no scroll is
+ * warranted.
+ *
+ * Native `scrollIntoView` may scroll every scrollable ancestor including the document, which
+ * repositions the whole Study page while playback advances. Transcript following therefore
+ * computes a clamped viewport-only target instead.
+ */
+export function resolveTranscriptScrollTop(
+  rowRect: TranscriptRowGeometry,
+  viewportRect: TranscriptRowGeometry,
+  viewport: TranscriptViewportMetrics,
+  force: boolean,
+): number | null {
+  const edgeThreshold = Math.min(48, Math.max(0, viewportRect.height * 0.15));
+  const rowNearEdge =
+    rowRect.top < viewportRect.top + edgeThreshold ||
+    rowRect.bottom > viewportRect.bottom - edgeThreshold;
+  if (!force && !rowNearEdge) return null;
+
+  const rowOffsetInContent = rowRect.top - viewportRect.top + viewport.scrollTop;
+  const centeredScrollTop = rowOffsetInContent - (viewport.clientHeight - rowRect.height) / 2;
+  const maxScrollTop = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
+  const targetScrollTop = Math.round(
+    Math.min(Math.max(centeredScrollTop, 0), maxScrollTop),
+  );
+
+  return targetScrollTop === Math.round(viewport.scrollTop) ? null : targetScrollTop;
+}
+
+function prefersReducedMotion(): boolean {
+  return typeof window.matchMedia === 'function'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+/** Scrolls only the transcript viewport; never the window or any other ancestor. */
+function scrollTranscriptViewportTo(viewport: HTMLElement, scrollTop: number) {
+  const behavior: ScrollBehavior = prefersReducedMotion() ? 'auto' : 'smooth';
+
+  if (typeof viewport.scrollTo === 'function') {
+    viewport.scrollTo({ top: scrollTop, behavior });
+    return;
+  }
+
+  viewport.scrollTop = scrollTop;
+}
+
+function alignTranscriptRow(
+  row: HTMLElement | null,
+  viewport: HTMLElement | null,
+  force: boolean,
+) {
+  if (!row || !viewport) return;
+
+  const target = resolveTranscriptScrollTop(
+    row.getBoundingClientRect(),
+    viewport.getBoundingClientRect(),
+    viewport,
+    force,
+  );
+  if (target === null) return;
+
+  scrollTranscriptViewportTo(viewport, target);
+}
+
 export function SelectedAssetTranscriptPanel({
   asset,
   workspaceName,
@@ -67,25 +140,8 @@ export function SelectedAssetTranscriptPanel({
       };
 
   const scrollToActivePlaybackRow = useCallback((force: boolean) => {
-    const row = activePlaybackRowRef.current;
-    const viewport = transcriptListRef.current;
-    if (!row || !viewport || !transcriptViewVisible) return;
-
-    const rowRect = row.getBoundingClientRect();
-    const viewportRect = viewport.getBoundingClientRect();
-    const edgeThreshold = Math.min(48, Math.max(0, viewportRect.height * 0.15));
-    const rowNearEdge =
-      rowRect.top < viewportRect.top + edgeThreshold ||
-      rowRect.bottom > viewportRect.bottom - edgeThreshold;
-    if (!force && !rowNearEdge) return;
-
-    const reduceMotion = typeof window.matchMedia === 'function'
-      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    row.scrollIntoView({
-      behavior: reduceMotion ? 'auto' : 'smooth',
-      block: 'center',
-      inline: 'nearest',
-    });
+    if (!transcriptViewVisible) return;
+    alignTranscriptRow(activePlaybackRowRef.current, transcriptListRef.current, force);
   }, [transcriptViewVisible]);
 
   useEffect(() => {
@@ -99,15 +155,7 @@ export function SelectedAssetTranscriptPanel({
     const frameId = window.requestAnimationFrame(() => {
       const focusedRow = focusedRowRef.current;
       if (!focusedRow) return;
-      const reduceMotion = typeof window.matchMedia === 'function'
-        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      if (typeof focusedRow.scrollIntoView === 'function') {
-        focusedRow.scrollIntoView({
-          behavior: reduceMotion ? 'auto' : 'smooth',
-          block: 'center',
-          inline: 'nearest',
-        });
-      }
+      alignTranscriptRow(focusedRow, transcriptListRef.current, true);
       focusedRow.focus({ preventScroll: true });
     });
 

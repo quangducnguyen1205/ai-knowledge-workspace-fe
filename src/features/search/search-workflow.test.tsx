@@ -317,12 +317,14 @@ describe('search-to-study workflow', () => {
     expect(onClearStudyContext).toHaveBeenCalledTimes(1);
   });
 
-  it('focuses and scrolls the exact rendered transcript row when the target changes on the same asset', async () => {
+  it('focuses the exact rendered transcript row when the target changes without moving the document', async () => {
     const scrollIntoView = vi.fn();
     Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
       configurable: true,
       value: scrollIntoView,
     });
+    const windowScrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
+    const documentScrollTop = document.documentElement.scrollTop;
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
       callback(0);
       return 1;
@@ -333,13 +335,14 @@ describe('search-to-study workflow', () => {
 
     await waitFor(() => expect(screen.getByLabelText('Selected transcript moment')).toHaveFocus());
     expect(screen.getByLabelText('Selected transcript moment')).toHaveTextContent(/vector clocks preserve/i);
-    expect(scrollIntoView).toHaveBeenLastCalledWith({ behavior: 'smooth', block: 'center', inline: 'nearest' });
 
     view.rerender(<AssetDetailScreen {...view.props} focusedTranscriptRowId="row-1" />);
 
     await waitFor(() => expect(screen.getByLabelText('Selected transcript moment')).toHaveFocus());
     expect(screen.getByLabelText('Selected transcript moment')).toHaveTextContent(/first we define/i);
-    expect(scrollIntoView).toHaveBeenCalledTimes(2);
+    expect(scrollIntoView).not.toHaveBeenCalled();
+    expect(windowScrollTo).not.toHaveBeenCalled();
+    expect(document.documentElement.scrollTop).toBe(documentScrollTop);
   });
 
   it('keeps manual search preparation as a disclosed fallback only while the transcript is ready', async () => {

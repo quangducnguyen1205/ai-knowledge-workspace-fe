@@ -239,7 +239,7 @@ describe('Search route query flow', () => {
 
   it('opens a workspace result excerpt and focuses the exact transcript row', async () => {
     const user = userEvent.setup();
-    const scrollIntoView = mockTranscriptScrolling();
+    const scrolling = mockTranscriptScrolling();
     renderAppAt('#/search?q=vector%20clocks');
 
     await user.click(await screen.findByRole(
@@ -252,7 +252,7 @@ describe('Search route query flow', () => {
       .toBe('#/assets/asset-1?row=row-2&from=search&q=vector+clocks'));
     await waitFor(() => expect(screen.getByLabelText('Selected transcript moment')).toHaveFocus());
     expect(screen.getByLabelText('Selected transcript moment')).toHaveTextContent(/vector clocks preserve/i);
-    expect(scrollIntoView).toHaveBeenCalled();
+    scrolling.expectDocumentUnmoved();
 
     const contextRegions = await screen.findAllByRole('region', { name: 'Selected context' }, routeFlowTimeout);
     expect(contextRegions).toHaveLength(1);
@@ -312,10 +312,19 @@ function mockTranscriptScrolling() {
     configurable: true,
     value: scrollIntoView,
   });
+  const windowScrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
+  const documentScrollTop = document.documentElement.scrollTop;
   vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
     callback(0);
     return 1;
   });
   vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
-  return scrollIntoView;
+
+  return {
+    expectDocumentUnmoved() {
+      expect(scrollIntoView).not.toHaveBeenCalled();
+      expect(windowScrollTo).not.toHaveBeenCalled();
+      expect(document.documentElement.scrollTop).toBe(documentScrollTop);
+    },
+  };
 }

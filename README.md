@@ -137,9 +137,10 @@ greatest eligible start, then lowest segment index, then stable input order. Pla
 and search/citation-focused markers are separate and may coexist.
 
 Transcript auto-follow begins enabled, scrolls only when the active row is near or outside
-the dedicated transcript viewport, and respects reduced-motion preferences. Wheel, touch,
-keyboard scrolling, scrollbar interaction, text selection, and search/citation navigation
-suspend following. `Resume following` or an explicit Play segment action restores it without
+the dedicated transcript viewport, and respects reduced-motion preferences. Transcript
+following scrolls only the dedicated transcript viewport and does not reposition the page.
+Wheel, touch, keyboard scrolling, scrollbar interaction, text selection, and search/citation
+navigation suspend following. `Resume following` or an explicit Play segment action restores it without
 moving focus as playback advances. The paused-follow live status text is separate from the
 `Resume following` control so the status region stays non-interactive. Player errors stop
 observation and clear playback-active state while preserving transcript reading and, for

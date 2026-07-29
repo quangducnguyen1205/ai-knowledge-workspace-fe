@@ -134,17 +134,11 @@ function stubUploadMedia(): { video: HTMLVideoElement; media: MediaElementStub }
 
 beforeEach(() => {
   vi.stubEnv('VITE_AUTHENTICATION_MODE', 'legacy_session');
-  // jsdom has no layout engine; Study follow behavior is verified in transcript-following.
-  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
-    configurable: true,
-    value: () => undefined,
-  });
 });
 
 afterEach(() => {
   cleanup();
   vi.unstubAllEnvs();
-  Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
 });
 
 describe('Study Upload playback source selection', () => {
