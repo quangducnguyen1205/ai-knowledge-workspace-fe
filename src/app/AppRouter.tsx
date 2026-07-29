@@ -21,6 +21,8 @@ import { useAuth } from '../features/auth/auth-provider';
 import { assetKeys, useAssetRouteQuery } from '../features/assets/hooks/asset-queries';
 import { useAssetSelection } from '../features/assets/hooks/use-asset-selection';
 import { useAssetLifecycle } from '../features/assets/hooks/use-asset-lifecycle';
+import { useAssetPlaybackProgress } from '../features/assets/hooks/use-asset-playback-progress';
+import { resolveMediaPlaybackAvailability } from '../features/assets/player/media-playback-availability';
 import { useAssetManagement } from '../features/assets/hooks/use-asset-management';
 import { AssetLibraryScreen } from '../features/assets/library-screen';
 import { AssetDetailScreen } from '../features/assets/detail-screen';
@@ -97,6 +99,10 @@ export function AppRouter() {
     clearSelection,
   } = useAssetSelection({ workspaceId: selectedWorkspaceId, routedAssetId, startTransition });
   const lifecycle = useAssetLifecycle({ asset: selectedAsset, workspaceId: selectedWorkspaceId });
+  const playbackProgress = useAssetPlaybackProgress({
+    assetId: selectedAsset?.assetId ?? null,
+    enabled: resolveMediaPlaybackAvailability(selectedAsset).available,
+  });
 
   const displayAssets = useMemo(() => {
     const assets = assetsQuery.data ?? [];
@@ -673,6 +679,9 @@ export function AppRouter() {
             studyContextError={routedStudyContextQuery.error}
             isStudyContextLoading={routedStudyContextQuery.isLoading || routedStudyContextQuery.isFetching}
             searchResetToken={assetSearch.resetToken}
+            playbackProgress={playbackProgress.progress}
+            playbackProgressSaveFailed={playbackProgress.saveFailed}
+            onObservePlayback={playbackProgress.observePlayback}
             onIndex={lifecycle.runRecoveryIndexing}
             onRetryProcessing={lifecycle.runProcessingRetry}
             onRename={assetManagement.handleRenameAsset}

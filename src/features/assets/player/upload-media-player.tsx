@@ -5,6 +5,7 @@ import {
   useImperativeHandle,
   useRef,
   useState,
+  type Ref,
 } from 'react';
 import { resolveAuthMode, type AuthMode } from '../../../lib/auth-config';
 import { buildAssetMediaUrl } from '../api/assets-api';
@@ -123,11 +124,13 @@ export const UploadMediaPlayer = forwardRef<MediaPlayerHandle, {
   assetId: string;
   title: string;
   playbackObservationEnabled?: boolean;
+  regionRef?: Ref<HTMLElement>;
   onPlaybackSnapshot?: (snapshot: MediaPlaybackSnapshot) => void;
 }>(function UploadMediaPlayer({
   assetId,
   title,
   playbackObservationEnabled = false,
+  regionRef,
   onPlaybackSnapshot,
 }, ref) {
   const nativePlaybackSupported = supportsNativeMediaPlayback();
@@ -236,6 +239,8 @@ export const UploadMediaPlayer = forwardRef<MediaPlayerHandle, {
   if (!nativePlaybackSupported) {
     return (
       <section
+        ref={regionRef}
+        tabIndex={-1}
         className="upload-media-player upload-media-player--unsupported"
         aria-label={`Uploaded video player for ${title}`}
         data-player-state="unsupported-auth"
@@ -260,6 +265,8 @@ export const UploadMediaPlayer = forwardRef<MediaPlayerHandle, {
 
   return (
     <section
+      ref={regionRef}
+      tabIndex={-1}
       className={`upload-media-player upload-media-player--${surfaceState}`}
       aria-label={`Uploaded video player for ${title}`}
       data-player-state={surfaceState}

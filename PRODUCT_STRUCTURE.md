@@ -48,6 +48,10 @@ a native media request, the Upload surface shows bounded copy instead of a broke
 video and workspace deletion use contained dialogs with Escape, focus trapping, and focus
 restoration.
 
+When a saved position exists for the open Asset, Study offers an explicit Continue watching
+choice above the transcript instead of seeking on its own: resume from the saved timestamp, or
+start from the beginning. Progress is saved quietly in the background and is never announced.
+
 During playback, the timestamped active row is marked independently from a
 search/citation-selected row. The transcript follows only while follow mode is enabled;
 manual reading suspends it and a visible Resume following action restores alignment.

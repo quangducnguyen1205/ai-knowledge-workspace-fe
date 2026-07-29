@@ -53,3 +53,16 @@ export type UpdateAssetTitleInput = {
   assetId: string;
   title: string;
 };
+
+/** Per-user, per-Asset playback position owned by Spring. */
+export type AssetPlaybackProgress = {
+  assetId: string;
+  positionMs: number;
+  completed: boolean;
+  updatedAt: string | null;
+};
+
+export type SaveAssetPlaybackProgressRequest = {
+  positionMs: number;
+  completed: boolean;
+};

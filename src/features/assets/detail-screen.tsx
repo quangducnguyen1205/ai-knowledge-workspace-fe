@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import type {
   AssetIndexResponse,
+  AssetPlaybackProgress,
   AssetRecordResponse,
   AssetStatus,
   AssetStatusResponse,
@@ -19,6 +20,7 @@ import { getFriendlyRenameErrorCopy } from './model/error-copy';
 import { AssetIndexingRecoveryAction } from './components/asset-indexing-recovery-action';
 import { AssetProcessingRetryAction } from './components/asset-processing-retry-action';
 import { AssetSourceDetails } from './components/asset-source-details';
+import { PlaybackResumeOffer } from './components/playback-resume-offer';
 import {
   SelectedAssetTranscriptPanel,
   type TranscriptFollowMode,
@@ -28,10 +30,8 @@ import type {
   MediaPlaybackSnapshot,
   MediaPlayerHandle,
 } from './player/media-player';
-import {
-  supportsNativeMediaPlayback,
-  UploadMediaPlayer,
-} from './player/upload-media-player';
+import { resolveMediaPlaybackAvailability } from './player/media-playback-availability';
+import { UploadMediaPlayer } from './player/upload-media-player';
 import { YouTubePlayer } from './player/youtube-player';
 import { AssetAssistantPanel } from '../assistant/components/asset-assistant-panel';
 import { SearchPanel } from '../search/search';
@@ -72,6 +72,9 @@ type AssetDetailScreenProps = {
   studyContextError: unknown;
   isStudyContextLoading: boolean;
   searchResetToken: number;
+  playbackProgress?: AssetPlaybackProgress;
+  playbackProgressSaveFailed?: boolean;
+  onObservePlayback?: (snapshot: MediaPlaybackSnapshot) => void;
   onIndex: () => void;
   onRetryProcessing: () => void;
   onRename: (title: string) => void;
@@ -120,6 +123,9 @@ export function AssetDetailScreen({
   studyContextError,
   isStudyContextLoading,
   searchResetToken,
+  playbackProgress,
+  playbackProgressSaveFailed = false,
+  onObservePlayback,
   onIndex,
   onRetryProcessing,
   onRename,
@@ -140,31 +146,52 @@ export function AssetDetailScreen({
   const [activePlaybackRowId, setActivePlaybackRowId] = useState<string | null>(null);
   const [followMode, setFollowMode] = useState<TranscriptFollowMode>('following');
   const [acknowledgedFocusedRowId, setAcknowledgedFocusedRowId] = useState<string | null>(null);
+  const [isResumeOfferDismissed, setIsResumeOfferDismissed] = useState(false);
+  const [hasPlayerError, setHasPlayerError] = useState(false);
   const actionMenuRef = useRef<HTMLDivElement>(null);
   const actionButtonRef = useRef<HTMLButtonElement>(null);
   const playerRef = useRef<MediaPlayerHandle>(null);
+  const playerRegionRef = useRef<HTMLElement>(null);
   const isMobileStudyLayout = useMobileStudyLayout();
   const assistantWorkspaceId = workspaceId ?? asset?.workspaceId ?? null;
   const renameErrorCopy = getFriendlyRenameErrorCopy(renameError);
   const transcriptRowCount = transcriptRows?.length ?? 0;
-  const youtubeVideoId = asset?.sourceType === 'YOUTUBE'
-    ? asset.youtubeVideoId
-    : null;
-  const uploadMediaAssetId = asset?.sourceType === 'UPLOAD' ? asset.assetId : null;
-  const uploadPlaybackAvailable = uploadMediaAssetId !== null && supportsNativeMediaPlayback();
-  const mediaPlaybackAvailable = Boolean(youtubeVideoId) || uploadPlaybackAvailable;
+  const {
+    youtubeVideoId,
+    uploadMediaAssetId,
+    available: mediaPlaybackAvailable,
+  } = resolveMediaPlaybackAvailability(asset);
   const timestampedRowCount = useMemo(
     () => (transcriptRows ?? []).filter(
       (row) => row.startMs !== null && row.endMs !== null,
     ).length,
     [transcriptRows],
   );
+  // Progress tracking needs position snapshots even when no transcript timing exists.
+  const playbackObservationEnabled = timestampedRowCount > 0 || Boolean(onObservePlayback);
+  const resumableProgress =
+    playbackProgress &&
+    asset &&
+    playbackProgress.assetId === asset.assetId &&
+    playbackProgress.positionMs > 0 &&
+    !playbackProgress.completed
+      ? playbackProgress
+      : null;
+  const showResumeOffer = Boolean(resumableProgress)
+    && mediaPlaybackAvailable
+    && !hasPlayerError
+    && !isResumeOfferDismissed;
   const effectiveFollowMode: TranscriptFollowMode =
     focusedTranscriptRowId && focusedTranscriptRowId !== acknowledgedFocusedRowId
       ? 'suspended-by-user'
       : followMode;
 
   const handlePlaybackSnapshot = useCallback((snapshot: MediaPlaybackSnapshot) => {
+    onObservePlayback?.(snapshot);
+    if (snapshot.state === 'error') setHasPlayerError(true);
+    // Playback the learner started themselves makes a stale resume offer irrelevant.
+    if (snapshot.state === 'playing') setIsResumeOfferDismissed(true);
+
     if (
       snapshot.state === 'error' ||
       snapshot.state === 'unstarted' ||
@@ -179,7 +206,20 @@ export function AssetDetailScreen({
       const next = activeRow?.identity ?? null;
       return current === next ? current : next;
     });
-  }, [transcriptRows]);
+  }, [onObservePlayback, transcriptRows]);
+
+  const startPlaybackAt = useCallback((positionMs: number) => {
+    setIsResumeOfferDismissed(true);
+    setFollowMode('following');
+    setAcknowledgedFocusedRowId(focusedTranscriptRowId ?? null);
+    setActivePlaybackRowId(
+      resolveActiveTranscriptRow(transcriptRows ?? [], positionMs)?.identity ?? null,
+    );
+    playerRef.current?.seekToMs(positionMs);
+    playerRef.current?.play();
+    // Keep focus in the media region without letting focus reposition the page.
+    playerRegionRef.current?.focus({ preventScroll: true });
+  }, [focusedTranscriptRowId, transcriptRows]);
 
   useEffect(() => {
     setActiveTab('transcript');
@@ -196,6 +236,8 @@ export function AssetDetailScreen({
     setActivePlaybackRowId(null);
     setFollowMode('following');
     setAcknowledgedFocusedRowId(null);
+    setIsResumeOfferDismissed(false);
+    setHasPlayerError(false);
   }, [asset?.assetId, youtubeVideoId, uploadMediaAssetId]);
 
   useEffect(() => {
@@ -373,10 +415,11 @@ export function AssetDetailScreen({
         <YouTubePlayer
           key={`${asset.assetId}:${youtubeVideoId}`}
           ref={playerRef}
+          regionRef={playerRegionRef}
           videoId={youtubeVideoId}
           title={asset.title}
           sourceUrl={asset.sourceUrl}
-          playbackObservationEnabled={timestampedRowCount > 0}
+          playbackObservationEnabled={playbackObservationEnabled}
           onPlaybackSnapshot={handlePlaybackSnapshot}
         />
       ) : null}
@@ -385,11 +428,24 @@ export function AssetDetailScreen({
         <UploadMediaPlayer
           key={`${uploadMediaAssetId}:upload`}
           ref={playerRef}
+          regionRef={playerRegionRef}
           assetId={uploadMediaAssetId}
           title={asset.title}
-          playbackObservationEnabled={timestampedRowCount > 0}
+          playbackObservationEnabled={playbackObservationEnabled}
           onPlaybackSnapshot={handlePlaybackSnapshot}
         />
+      ) : null}
+
+      {showResumeOffer && resumableProgress ? (
+        <PlaybackResumeOffer
+          positionMs={resumableProgress.positionMs}
+          onResume={() => startPlaybackAt(resumableProgress.positionMs)}
+          onStartFromBeginning={() => startPlaybackAt(0)}
+        />
+      ) : null}
+
+      {playbackProgressSaveFailed ? (
+        <p className="playback-progress-note">Your playback position could not be saved.</p>
       ) : null}
 
       <div className="study-tabs" role="tablist" aria-label="Study views">

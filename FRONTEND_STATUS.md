@@ -77,6 +77,7 @@ This refactor preserves existing routes, API request shapes, auth defaults, toke
 - Retry authorized failed processing on the same upload or YouTube Asset and resume the existing polling lifecycle
 - Play Spring-identified YouTube Assets in Study and seek from fully timestamped transcript rows
 - Play authorized Upload Assets in Study through `GET /api/assets/{assetId}/media` with the same seek, active-row, and follow behavior
+- Explicitly resume a YouTube or Upload Asset from the saved per-user position, or start it from the beginning
 - Follow the active timestamped transcript row while preserving manual reading and selected context
 - Load transcript rows only when the backend says they are ready
 - Explicitly index transcript rows to unlock search
@@ -113,6 +114,8 @@ This refactor preserves existing routes, API request shapes, auth defaults, toke
 - `GET /api/assets/{assetId}/status`
 - `GET /api/assets/{assetId}/transcript`
 - `GET /api/assets/{assetId}/media`
+- `GET /api/assets/{assetId}/playback-progress`
+- `PUT /api/assets/{assetId}/playback-progress`
 - `POST /api/assets/{assetId}/index`
 - `GET /api/search`
 - `GET /api/assets/{assetId}/transcript/context`
@@ -161,6 +164,19 @@ A rejected play promise becomes bounded non-fatal feedback. Media errors show bo
 clear the playback marker and stop synchronization while transcript, search, assistant, retry
 and details remain usable. Raw media codes, HTTP bodies and storage errors are never rendered,
 and a media failure is never presented as Asset processing failure.
+
+Playback progress is source-neutral and per user and Asset. Study reads
+`GET /api/assets/{assetId}/playback-progress` through the shared client and offers an explicit
+`Continue watching` surface only for a non-completed, non-zero position on the open Asset with
+a usable player; it never seeks automatically. Resume and Start from beginning reuse the shared
+`MediaPlayerHandle`, the existing latest-pending-command behavior, the canonical active-row
+resolver and controlled follow. Saving is bounded: immediate at playback start, then at most
+once every five seconds while playing, plus immediate saves on pause, end and explicit seeks.
+Ending records `completed: true` and replaying clears it. Nothing is saved before playback
+begins, invalid positions and duplicates are dropped, every write carries its own Asset id, and
+progress never invalidates Asset, transcript or search queries. Nothing is stored in
+`localStorage`, and a read or save failure never blocks playback, transcript or retry. There is
+no watch-history UI and no cross-device conflict resolution.
 
 Because a native media request cannot attach an in-memory bearer token, Upload playback is
 supported in `legacy_session` mode only, where the existing authenticated session credential
@@ -229,7 +245,8 @@ Browser Range behavior and runtime Upload playback acceptance are verified in Sl
 
 - Chat or assistant flows
 - Native Upload media delivery in bearer/Keycloak authentication mode
-- Persisted watch progress
+- Watch-history and completion-percentage dashboards
+- Cross-device playback-progress conflict resolution
 - Production CDN or dedicated media-delivery design
 - Playlist/channel ingestion and source metadata editing
 - Browser/runtime player acceptance including Slice 4C Upload playback, production

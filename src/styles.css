@@ -1552,6 +1552,44 @@ summary:focus-visible {
   font-size: 0.86rem;
 }
 
+.playback-resume {
+  min-width: 0;
+  width: min(100%, 760px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.playback-resume__copy h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.playback-resume__copy p {
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.playback-resume__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.playback-progress-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.86rem;
+}
+
 .study-tabs {
   display: none;
 }
@@ -2291,9 +2329,14 @@ summary:focus-visible {
   }
 
   .youtube-player,
-  .upload-media-player {
+  .upload-media-player,
+  .playback-resume {
     width: 100%;
     padding: var(--space-3);
+  }
+
+  .playback-resume__actions .button {
+    flex: 1;
   }
 
   .youtube-player__viewport,

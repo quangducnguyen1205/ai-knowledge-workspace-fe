@@ -8,6 +8,7 @@ export const assetKeys = {
   detail: (assetId: string) => ['assets', 'detail', assetId] as const,
   status: (assetId: string) => ['assets', 'status', assetId] as const,
   transcript: (assetId: string) => ['assets', 'transcript', assetId] as const,
+  playbackProgress: (assetId: string) => ['assets', 'playback-progress', assetId] as const,
 };
 
 export type DeleteAssetInput = { assetId: string; workspaceId: string };

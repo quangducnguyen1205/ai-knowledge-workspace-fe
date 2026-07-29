@@ -4,6 +4,7 @@ import {
   useImperativeHandle,
   useRef,
   useState,
+  type Ref,
 } from 'react';
 import { SourceBadge } from '../components/source-badge';
 import {
@@ -62,12 +63,14 @@ export const YouTubePlayer = forwardRef<MediaPlayerHandle, {
   title: string;
   sourceUrl: string | null;
   playbackObservationEnabled?: boolean;
+  regionRef?: Ref<HTMLElement>;
   onPlaybackSnapshot?: (snapshot: MediaPlaybackSnapshot) => void;
 }>(function YouTubePlayer({
   videoId,
   title,
   sourceUrl,
   playbackObservationEnabled = false,
+  regionRef,
   onPlaybackSnapshot,
 }, ref) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -291,6 +294,8 @@ export const YouTubePlayer = forwardRef<MediaPlayerHandle, {
 
   return (
     <section
+      ref={regionRef}
+      tabIndex={-1}
       className={`youtube-player youtube-player--${playerState}`}
       aria-label={`YouTube player for ${title}`}
       data-player-state={playerState}

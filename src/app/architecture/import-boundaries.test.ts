@@ -119,6 +119,22 @@ describe('frontend import boundaries', () => {
     expect(uploadPlayer).not.toMatch(/minio|bucket|objectKey|object_key|presigned|originalFilename/i);
   });
 
+  it('keeps playback progress on the shared HTTP boundary with feature-owned state', () => {
+    const assetsApi = readSource('features/assets/api/assets-api.ts');
+    const progressHook = readSource('features/assets/hooks/use-asset-playback-progress.ts');
+    const queryKeys = readSource('features/assets/hooks/asset-queries.ts');
+    const resumeOffer = readSource('features/assets/components/playback-resume-offer.tsx');
+
+    expect(assetsApi).toMatch(/\/api\/assets\/\$\{[^}]+\}\/playback-progress/);
+    expect(queryKeys).toMatch(/playbackProgress:/);
+    expect(progressHook).toMatch(/assetKeys\.playbackProgress/);
+    expect(progressHook).not.toMatch(/['"`]\/api\//);
+    expect(progressHook).not.toMatch(/fetch\s*\(|localStorage|sessionStorage|sendBeacon|indexedDB/i);
+    // Playback saves must never invalidate Asset, transcript or search caches.
+    expect(progressHook).not.toMatch(/invalidateQueries|removeQueries|setQueryData/);
+    expect(resumeOffer).not.toMatch(/fetch\s*\(|\brequest\s*\(|['"`]\/api\/|useQuery|useMutation/);
+  });
+
   it('keeps Study playback orchestration free of provider and media-element details', () => {
     const study = readSource('features/assets/detail-screen.tsx');
     const transcriptPanel = readSource('features/assets/components/selected-asset-transcript-panel.tsx');

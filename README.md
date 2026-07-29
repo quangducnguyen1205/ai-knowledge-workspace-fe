@@ -148,7 +148,42 @@ YouTube, the external fallback.
 
 Upload and YouTube share this synchronization entirely. There is no Upload-specific active
 row resolver, follow mode, or presentation, and playback position is never stored in React
-Query or sent to Spring. Watch progress is not persisted.
+Query or sent to Spring.
+
+## Save And Resume Playback Progress
+
+Spring owns one playback position per signed-in user and Asset through
+`GET`/`PUT /api/assets/{assetId}/playback-progress`. Both requests go through the shared HTTP
+client, so authentication works exactly as it does for every other product call; the URL is
+derived from the Asset id alone and carries no token, source, storage or filename identity.
+
+Resume is always explicit. Loading progress never seeks. Study offers a bounded
+`Continue watching` surface only when the saved position is greater than zero, the record is
+not completed, the record belongs to the open Asset, and a usable player is mounted.
+`Resume from {timestamp}` seeks to the exact saved millisecond and starts playback;
+`Start from beginning` seeks to `0`. Both enable transcript following, mark the active row
+optimistically until real snapshots arrive, and move focus to the media region without
+repositioning the page. A resume requested before the player is ready reuses the existing
+latest-pending-command behavior rather than a second queue. The offer is withdrawn on a
+player error, on Asset change, and as soon as the learner starts playback themselves.
+
+Saving is source-neutral and bounded. The first snapshot of a playback session saves
+immediately; afterwards continuous playback saves at most once every five seconds. Pausing
+and ending save immediately, and a position jump larger than the elapsed time plus a small
+tolerance is treated as an explicit seek and saved at once. Ending saves `completed: true`,
+and playing again clears completion on the next save. Positions must be finite, non-negative
+integers; identical consecutive snapshots are suppressed; nothing is saved for loaded
+metadata, cueing, or a position of zero before playback has begun. A best-effort final save
+runs when the document becomes hidden and when Study unmounts or the Asset changes.
+
+Every write carries the Asset id it was recorded for, so a late or final save can never
+target a different Asset, and switching Assets clears tracking, throttling and pending state.
+Playback progress lives in its own React Query key and never invalidates Asset, transcript or
+search queries. Nothing is written to `localStorage`, no `sendBeacon` workaround is used, and
+failures are not retried without bounds. A progress read failure simply hides the resume
+offer; a save failure shows restrained, non-announcing copy and never pauses playback,
+changes Asset status, or clears transcript focus. There is no watch-history UI and no
+cross-device conflict resolution.
 
 ## Asset Processing And Indexing Lifecycle
 
@@ -227,7 +262,8 @@ Dockerized frontend build has also passed successfully, and the Docker local-dev
   for a bearer token yet
 - no full-file Blob buffering, object URLs, manual Range handling, media caching, service
   worker, or MediaSource implementation for Upload playback
-- no persisted watch progress
+- no watch-history or completion-percentage dashboard, and no cross-device conflict resolution
+  for playback progress
 - no production CDN or dedicated media-delivery design
 - no synchronization telemetry or drift correction beyond deterministic provider-position
   sampling, and no timeline state, playlist/channel ingestion, or source metadata editing
