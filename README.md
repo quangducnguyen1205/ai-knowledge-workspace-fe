@@ -176,6 +176,13 @@ integers; identical consecutive snapshots are suppressed; nothing is saved for l
 metadata, cueing, or a position of zero before playback has begun. A best-effort final save
 runs when the document becomes hidden and when Study unmounts or the Asset changes.
 
+Only snapshots that describe playback the learner performed update the position that a final
+save persists: playing always, and paused, buffering or ended once playback has begun. Provider
+lifecycle states — unstarted, cued and error, including the reset a media element reports while
+it is being torn down — are ignored for that tracking. The rule keys on playback state and
+session context rather than on the position being zero, so starting from the beginning,
+replaying after completion, seeking to zero and backward seeks all still persist normally.
+
 Every write carries the Asset id it was recorded for, so a late or final save can never
 target a different Asset, and switching Assets clears tracking, throttling and pending state.
 Playback progress lives in its own React Query key and never invalidates Asset, transcript or

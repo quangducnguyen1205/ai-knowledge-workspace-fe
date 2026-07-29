@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MediaPlaybackSnapshot } from '../player/media-player';
 import {
   PLAYBACK_PROGRESS_SAVE_INTERVAL_MS,
+  shouldTrackPlaybackPosition,
   useAssetPlaybackProgress,
 } from './use-asset-playback-progress';
 
@@ -319,5 +320,229 @@ describe('useAssetPlaybackProgress Asset switching', () => {
 
     expect(savedRequests()[2]).toEqual({ assetId: 'asset-1', positionMs: 4_000, completed: false });
     expect(savedRequests().every((request) => request.assetId === 'asset-1')).toBe(true);
+  });
+});
+
+describe('playback position tracking policy', () => {
+  it.each([
+    // state, hasPlaybackStarted, may update the tracked position
+    ['playing', false, true],
+    ['playing', true, true],
+    ['paused', false, false],
+    ['paused', true, true],
+    ['buffering', false, false],
+    ['buffering', true, true],
+    ['ended', false, false],
+    ['ended', true, true],
+    ['unstarted', false, false],
+    ['unstarted', true, false],
+    ['cued', false, false],
+    ['cued', true, false],
+    ['error', false, false],
+    ['error', true, false],
+  ] as const)(
+    'state %s with playbackStarted=%s may update the tracked position: %s',
+    (state, hasPlaybackStarted, expected) => {
+      expect(shouldTrackPlaybackPosition(state, hasPlaybackStarted)).toBe(expected);
+    },
+  );
+});
+
+describe('provider teardown cannot overwrite playback progress', () => {
+  /** The exact sequence reproduced during Phase 5 integration acceptance. */
+  async function playThenTearDownAndSwitch(view: ProgressHook & { rerender: (p: never) => void }) {
+    await observe(view, playing(0));
+    vi.advanceTimersByTime(PLAYBACK_PROGRESS_SAVE_INTERVAL_MS);
+    await observe(view, playing(35_000));
+    vi.advanceTimersByTime(1_800);
+    await observe(view, playing(36_800));
+    // Removing the playing media element emits loadstart, mapped to unstarted at position zero.
+    await observe(view, { state: 'unstarted', positionMs: 0 });
+    act(() => view.rerender({ assetId: 'asset-b' } as never));
+    await flushSaves();
+  }
+
+  it('flushes the real position, not the teardown reset, when Study switches Asset', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const { wrapper } = createHarness();
+    const view = renderHook(
+      ({ assetId }) => useAssetPlaybackProgress({ assetId, enabled: true }),
+      { wrapper, initialProps: { assetId: 'asset-a' as string | null } },
+    );
+
+    await playThenTearDownAndSwitch(view as never);
+
+    const requests = savedRequests();
+    expect(requests[requests.length - 1]).toEqual({
+      assetId: 'asset-a',
+      positionMs: 36_800,
+      completed: false,
+    });
+    expect(requests.some((r) => r.assetId === 'asset-a' && r.positionMs === 0 && r !== requests[0]))
+      .toBe(false);
+    expect(requests.filter((r) => r.assetId === 'asset-b')).toEqual([]);
+  });
+
+  it('produces the same result on every repetition rather than depending on timing', async () => {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      api.putAssetPlaybackProgress.mockClear();
+      const { wrapper } = createHarness();
+      const view = renderHook(
+        ({ assetId }) => useAssetPlaybackProgress({ assetId, enabled: true }),
+        { wrapper, initialProps: { assetId: 'asset-a' as string | null } },
+      );
+
+      await playThenTearDownAndSwitch(view as never);
+
+      const requests = savedRequests();
+      expect(requests[requests.length - 1], `attempt ${attempt}`).toEqual({
+        assetId: 'asset-a',
+        positionMs: 36_800,
+        completed: false,
+      });
+      cleanup();
+      vi.useRealTimers();
+    }
+  });
+
+  it('ignores a teardown reset before an unmount flush and before a hidden-document flush', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const { wrapper } = createHarness();
+    const view = renderHook(() => useAssetPlaybackProgress({ assetId: 'asset-1', enabled: true }), {
+      wrapper,
+    });
+
+    await observe(view, playing(1_000));
+    vi.advanceTimersByTime(1_000);
+    await observe(view, playing(21_500), { state: 'unstarted', positionMs: 0 });
+
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+    act(() => document.dispatchEvent(new Event('visibilitychange')));
+    await flushSaves();
+    expect(savedRequests()[1]).toEqual({
+      assetId: 'asset-1',
+      positionMs: 21_500,
+      completed: false,
+    });
+
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+    vi.advanceTimersByTime(1_000);
+    await observe(view, playing(26_400), { state: 'cued', positionMs: 0 });
+    act(() => view.unmount());
+    await flushSaves();
+
+    expect(savedRequests()[2]).toEqual({
+      assetId: 'asset-1',
+      positionMs: 26_400,
+      completed: false,
+    });
+  });
+
+  it('keeps the incoming Asset clean when a dying player reports a teardown snapshot', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const { wrapper } = createHarness();
+    const view = renderHook(
+      ({ assetId }) => useAssetPlaybackProgress({ assetId, enabled: true }),
+      { wrapper, initialProps: { assetId: 'asset-a' as string | null } },
+    );
+
+    await observe(view, playing(1_000));
+    vi.advanceTimersByTime(1_000);
+    await observe(view, playing(48_000));
+    act(() => view.rerender({ assetId: 'asset-b' }));
+    await flushSaves();
+
+    // The outgoing player is still attached to the current callback while it tears down.
+    await observe(view, { state: 'unstarted', positionMs: 0 }, { state: 'cued', positionMs: 0 });
+    expect(savedRequests().filter((r) => r.assetId === 'asset-b')).toEqual([]);
+
+    // Asset B then tracks only its own playback.
+    await observe(view, playing(2_500));
+    expect(savedRequests().filter((r) => r.assetId === 'asset-b')).toEqual([
+      { assetId: 'asset-b', positionMs: 2_500, completed: false },
+    ]);
+    expect(savedRequests().filter((r) => r.assetId === 'asset-a').at(-1)).toEqual({
+      assetId: 'asset-a',
+      positionMs: 48_000,
+      completed: false,
+    });
+  });
+});
+
+describe('legitimate zero and backward positions remain persistable', () => {
+  it('persists a Start-from-beginning session that begins at zero', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const { wrapper } = createHarness();
+    const view = renderHook(() => useAssetPlaybackProgress({ assetId: 'asset-1', enabled: true }), {
+      wrapper,
+    });
+
+    await observe(view, { state: 'buffering', positionMs: 0 }, playing(0));
+
+    expect(savedRequests()).toEqual([{ assetId: 'asset-1', positionMs: 0, completed: false }]);
+  });
+
+  it('persists an explicit seek back to zero during playback', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const { wrapper } = createHarness();
+    const view = renderHook(() => useAssetPlaybackProgress({ assetId: 'asset-1', enabled: true }), {
+      wrapper,
+    });
+
+    await observe(view, playing(30_000));
+    vi.advanceTimersByTime(1_000);
+    await observe(view, { state: 'buffering', positionMs: 0 }, playing(0));
+
+    expect(savedRequests().at(-1)).toEqual({
+      assetId: 'asset-1',
+      positionMs: 0,
+      completed: false,
+    });
+  });
+
+  it('persists a replay from zero that clears completion', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const { wrapper } = createHarness();
+    const view = renderHook(() => useAssetPlaybackProgress({ assetId: 'asset-1', enabled: true }), {
+      wrapper,
+    });
+
+    await observe(view, playing(1_000));
+    vi.advanceTimersByTime(1_000);
+    await observe(view, { state: 'ended', positionMs: 90_000 });
+    expect(savedRequests().at(-1)).toEqual({
+      assetId: 'asset-1',
+      positionMs: 90_000,
+      completed: true,
+    });
+
+    vi.advanceTimersByTime(500);
+    await observe(view, playing(0));
+    expect(savedRequests().at(-1)).toEqual({
+      assetId: 'asset-1',
+      positionMs: 0,
+      completed: false,
+    });
+  });
+
+  it('persists a backward seek to a lower non-zero position without monotonic saving', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    const { wrapper } = createHarness();
+    const view = renderHook(() => useAssetPlaybackProgress({ assetId: 'asset-1', enabled: true }), {
+      wrapper,
+    });
+
+    await observe(view, playing(60_000));
+    vi.advanceTimersByTime(1_000);
+    await observe(view, playing(10_000));
+    vi.advanceTimersByTime(1_000);
+    await observe(view, { state: 'paused', positionMs: 8_250 });
+
+    expect(savedRequests()).toEqual([
+      { assetId: 'asset-1', positionMs: 60_000, completed: false },
+      { assetId: 'asset-1', positionMs: 10_000, completed: false },
+      { assetId: 'asset-1', positionMs: 8_250, completed: false },
+    ]);
   });
 });

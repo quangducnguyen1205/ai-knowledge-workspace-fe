@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { getAssetPlaybackProgress, putAssetPlaybackProgress } from '../api/assets-api';
 import { normalizePlaybackPositionMs } from '../model/playback-progress';
-import type { MediaPlaybackSnapshot } from '../player/media-player';
+import type { MediaPlaybackSnapshot, MediaPlaybackState } from '../player/media-player';
 import { assetKeys } from './asset-queries';
 
 /** Longest gap between two saves while playback continues normally. */
@@ -23,10 +23,46 @@ type SavePlaybackProgressInput = {
 type PlaybackTracking = {
   assetId: string | null;
   hasPlaybackStarted: boolean;
+  /** Latest position observed from meaningful playback; the value a final flush persists. */
   latestPositionMs: number | null;
   lastSaved: { positionMs: number; completed: boolean } | null;
   lastSaveAt: number;
 };
+
+/**
+ * Decides whether a snapshot's position describes playback the learner performed.
+ *
+ * A player that is being created, cued, reset or torn down also reports a position — usually a
+ * reset `0`. Removing a playing media element, for example, emits a `loadstart` that the Upload
+ * adapter maps to `unstarted` at position `0`. Letting such a snapshot replace the tracked
+ * position would make the final flush persist `0` and destroy real progress when Study switches
+ * directly from one Asset to another.
+ *
+ * This deliberately keys on playback state plus session context rather than on `positionMs === 0`,
+ * so starting from the beginning, replaying after completion, seeking to zero and backward seeks
+ * all remain persistable.
+ */
+export function shouldTrackPlaybackPosition(
+  state: MediaPlaybackState,
+  hasPlaybackStarted: boolean,
+): boolean {
+  switch (state) {
+    // Playback is happening, including a legitimate start or replay at position zero.
+    case 'playing':
+      return true;
+    // Meaningful only once playback has actually begun in this session.
+    case 'paused':
+    case 'buffering':
+    case 'ended':
+      return hasPlaybackStarted;
+    // Provider lifecycle, cueing, reset and teardown states never describe playback.
+    case 'unstarted':
+    case 'cued':
+    case 'error':
+    default:
+      return false;
+  }
+}
 
 function emptyTracking(assetId: string | null): PlaybackTracking {
   return {
@@ -86,7 +122,12 @@ export function useAssetPlaybackProgress({
     saveRef.current({ assetId: targetAssetId, positionMs, completed });
   }, []);
 
-  /** Best-effort save of the latest observed position for one specific Asset. */
+  /**
+   * Best-effort save of the latest meaningful playback position for one specific Asset.
+   *
+   * The Asset identity is checked against the tracking record rather than assumed from effect
+   * ordering, so a flush can only ever persist the position it actually tracked for that Asset.
+   */
   const flush = useCallback((targetAssetId: string) => {
     const tracking = trackingRef.current;
     if (tracking.assetId !== targetAssetId || !tracking.hasPlaybackStarted) return;
@@ -99,11 +140,17 @@ export function useAssetPlaybackProgress({
     const tracking = trackingRef.current;
     if (!assetId || tracking.assetId !== assetId || snapshot.state === 'error') return;
 
-    const observedPositionMs = normalizePlaybackPositionMs(snapshot.positionMs);
-    if (observedPositionMs !== null) tracking.latestPositionMs = observedPositionMs;
     if (snapshot.state === 'playing') tracking.hasPlaybackStarted = true;
 
-    // Loading metadata or cueing a player is not playback interaction and must not save.
+    const observedPositionMs = normalizePlaybackPositionMs(snapshot.positionMs);
+    if (
+      observedPositionMs !== null &&
+      shouldTrackPlaybackPosition(snapshot.state, tracking.hasPlaybackStarted)
+    ) {
+      tracking.latestPositionMs = observedPositionMs;
+    }
+
+    // Loading metadata, cueing or tearing down a player is not playback interaction.
     if (!tracking.hasPlaybackStarted) return;
 
     const positionMs = tracking.latestPositionMs;
@@ -141,6 +188,8 @@ export function useAssetPlaybackProgress({
     trackingRef.current = emptyTracking(enabled ? assetId : null);
     resetSaveRef.current();
 
+    // Cleanup determines the outgoing Asset's final save from its own tracking record, and only
+    // then discards it. The incoming Asset starts from a cleared record above.
     return () => {
       if (assetId) flush(assetId);
       trackingRef.current = emptyTracking(null);
