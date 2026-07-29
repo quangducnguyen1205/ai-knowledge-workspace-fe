@@ -28,10 +28,10 @@ export function PublicLanding({ navigate }: { navigate: (route: AppRoute) => voi
       <main>
         <section className="landing-hero" aria-labelledby="landing-title">
           <div className="landing-hero__copy">
-            <p className="hero__eyebrow">Learn from every video</p>
+            <p className="hero__eyebrow">Search every video in your workspace</p>
             <h1 id="landing-title">Turn long videos into knowledge you can find and trust.</h1>
             <p>
-              Keep transcripts, exact moments, and cited answers together in one focused learning workspace.
+              Keep transcripts, exact moments, and cited answers together in one video knowledge workspace.
             </p>
             <div className="landing-hero__actions">
               <a className="button button--primary" {...publicLink({ name: 'register' })}>Get started</a>
@@ -63,7 +63,7 @@ export function PublicLanding({ navigate }: { navigate: (route: AppRoute) => voi
 
         <section className="landing-capabilities" aria-labelledby="capabilities-title">
           <div className="landing-section-heading">
-            <p className="hero__eyebrow">One learning flow</p>
+            <p className="hero__eyebrow">One knowledge workflow</p>
             <h2 id="capabilities-title">From video to a grounded answer</h2>
           </div>
           <div className="capability-grid">
@@ -91,7 +91,7 @@ export function PublicLanding({ navigate }: { navigate: (route: AppRoute) => voi
             <h2 id="workflow-title">Upload. Find. Understand.</h2>
           </div>
           <ol>
-            <li><span>1</span>Choose a learning video.</li>
+            <li><span>1</span>Choose a video.</li>
             <li><span>2</span>Search or read its transcript.</li>
             <li><span>3</span>Ask a question and follow the citations.</li>
           </ol>

@@ -33,7 +33,7 @@ export function WorkspaceHomeScreen({
         <div className="page-header__copy">
           <p className="hero__eyebrow">{workspaceName}</p>
           <h1>Welcome back</h1>
-          <p>Continue with a recent video, or add something new to learn from.</p>
+          <p>Continue watching a recent video, or add something new to this workspace.</p>
           <div className="page-header__summary" aria-label="Workspace video summary">
             <span>{assets.length} {assets.length === 1 ? 'video' : 'videos'}</span>
             {searchableAssetCount > 0 ? <span>{searchableAssetCount} ready</span> : null}
@@ -41,15 +41,15 @@ export function WorkspaceHomeScreen({
           </div>
         </div>
         <div className="page-header__actions">
-          <Button type="button" onClick={onUploadVideo}>Add video</Button>
-          <Button type="button" tone="ghost" onClick={onOpenSearch} disabled={searchableAssetCount === 0}>
-            Search workspace
+          <Button type="button" onClick={onOpenSearch} disabled={searchableAssetCount === 0}>
+            Explore workspace
           </Button>
+          <Button type="button" tone="ghost" onClick={onUploadVideo}>Add video</Button>
         </div>
       </header>
 
       <Section
-        title="Continue learning"
+        title="Continue watching"
         actions={recentAssets.length ? <span className="panel-pill">Recent videos</span> : undefined}
         className="continue-learning"
       >

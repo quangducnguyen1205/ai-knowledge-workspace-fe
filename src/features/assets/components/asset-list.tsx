@@ -112,7 +112,7 @@ export function AssetList({
       ) : null}
 
       {!assetsLoading && !assetsError && assets.length === 0 ? (
-        <EmptyState title="No videos found" description={emptyDescription ?? 'Add a file or YouTube URL to begin learning in this workspace.'} />
+        <EmptyState title="No videos found" description={emptyDescription ?? 'Add a file or YouTube URL to build this workspace.'} />
       ) : null}
 
       {!assetsLoading && !assetsError && assets.length > 0 ? (

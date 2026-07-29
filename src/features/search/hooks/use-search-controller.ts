@@ -5,6 +5,7 @@ import { resolveTranscriptLookupId } from '../model/search-result-reference';
 
 export type SearchParams = { query: string; workspaceId: string; assetId?: string | null };
 export type TranscriptContextParams = { assetId: string; transcriptRowId: string; window: number };
+type SubmittedSearchState = { query: string; scopeKey: string };
 
 export const searchKeys = {
   all: ['search'] as const,
@@ -29,18 +30,20 @@ export function useSearchController({
   workspaceId: string | null;
   assetId?: string | null;
 }) {
-  const [submittedSearch, setSubmittedSearch] = useState<string | null>(null);
+  const [submittedSearchState, setSubmittedSearchState] = useState<SubmittedSearchState | null>(null);
   const [selectedResult, setSelectedResult] = useState<SearchResult | null>(null);
   const [resetToken, setResetToken] = useState(0);
   const selectedResultRef = useRef<SearchResult | null>(null);
   const scopeKey = `${workspaceId ?? 'no-workspace'}:${assetId ?? 'all-assets'}`;
+  const submittedSearch =
+    submittedSearchState?.scopeKey === scopeKey ? submittedSearchState.query : null;
 
   useEffect(() => {
     selectedResultRef.current = selectedResult;
   }, [selectedResult]);
 
   const reset = useCallback(() => {
-    setSubmittedSearch(null);
+    setSubmittedSearchState(null);
     setSelectedResult(null);
     setResetToken((current) => current + 1);
   }, []);
@@ -74,9 +77,14 @@ export function useSearchController({
   );
 
   const submit = useCallback((query: string) => {
-    setSubmittedSearch(query.trim());
+    const normalizedQuery = query.trim();
+    setSubmittedSearchState((current) => {
+      if (!normalizedQuery) return null;
+      if (current?.scopeKey === scopeKey && current.query === normalizedQuery) return current;
+      return { query: normalizedQuery, scopeKey };
+    });
     setSelectedResult(null);
-  }, []);
+  }, [scopeKey]);
 
   const updateAssetTitle = useCallback((targetAssetId: string, title: string) => {
     setSelectedResult((current) => current?.assetId === targetAssetId ? { ...current, assetTitle: title } : current);

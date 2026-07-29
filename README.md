@@ -5,22 +5,26 @@ narrow, depends only on the Spring product API, and does not call the internal F
 directly. See the [Project3 v1 final baseline](https://github.com/quangducnguyen1205/ai-knowledge-workspace/blob/project3-submission-v1/docs/submission/project3-final-baseline.md)
 for cross-repository ownership and evidence.
 
+The product is a video knowledge workspace: users search across a workspace of videos and
+open the exact timestamped moments that matter. Learning remains a supported use case, not
+the product's core domain boundary.
+
 ## Current Product Scope
 
 - concise public landing page plus dedicated Login and Register routes
 - workspace selection and creation
 - workspace-scoped `Add video` entry for either a validated upload file or a public YouTube URL
 - source-aware library/detail presentation and authorized failed-processing retry
-- privacy-conscious YouTube playback in Study with explicit transcript segment seek controls
+- privacy-conscious YouTube playback in the video viewer with explicit transcript segment seek controls
 - processing status polling
 - transcript retrieval
 - automatic indexing as the normal lifecycle, with explicit indexing retained as a fallback
-- Workspace Search with result-to-video study context
-- Find in transcript on the current Study screen
-- desktop transcript/assistant study layout with deliberate Transcript, Ask, and Details mobile views
+- workspace-wide search with grouped, timestamped video moments and exact-row navigation
+- Find in transcript in the current video
+- desktop transcript/assistant layout with deliberate Transcript, Ask, and Details mobile views
 - search/context state kept in sync across workspace switch, upload completion, indexing completion, and refreshed results
-- responsive product shell with Home, Library, and Search primary navigation
-- workspace selector, Add video action, and compact account menu with Settings and sign out
+- responsive product shell with Home, Library, and Explore primary navigation
+- workspace selector, Add video action, and compact account menu with Workspace tools and sign out
 - grounded Ask-this-video answers with insufficient-context handling, actionable citations, and transcript navigation
 - incremental frontend module boundaries documented in `FRONTEND_STATUS.md`
 
@@ -34,11 +38,17 @@ Signed-out routes use the existing hash deployment model:
 
 Authenticated product screens use a compact top navigation model:
 
-- `Home` for immediate actions and recent learning
+- `Home` for immediate actions and recent videos
 - `Library` for upload, filtering, and video management
-- `Search` for workspace-wide transcript search and opening relevant moments
+- `Explore` for workspace-wide transcript search and opening relevant moments
 
-Settings remains available from the account menu at `#/settings`. Study remains a compatible deep route at `#/assets/:assetId`, with existing compact query state for search and citation focus. The shell includes a skip-to-content link, active state with `aria-current`, keyboard-operable mobile and account menus, and a shell-level Add video action that opens `#/library?upload=1`. The Add video dialog explicitly selects `Upload file` or `YouTube URL`; source forms stay separate, preserve upload validation, and prevent stale or duplicate submission.
+Workspace tools remains available from the account menu at `#/settings`. The video viewer
+keeps the compatible deep route at `#/assets/:assetId`, with existing compact query state for
+search and citation focus. The shell includes a skip-to-content link, active state with
+`aria-current`, keyboard-operable mobile and account menus, and a shell-level Add video action
+that opens `#/library?upload=1`. The Add video dialog explicitly selects `Upload file` or
+`YouTube URL`; source forms stay separate, preserve upload validation, and prevent stale or
+duplicate submission.
 
 ## Source Entry And Ownership
 
@@ -54,13 +64,13 @@ codes. Upload-only filename, content type, and size fields are rendered only whe
 Internal FastAPI V2 performs temporary YouTube acquisition as part of processing; that
 internal boundary is not browser-accessible.
 
-## Source-Aware Study Playback
+## Source-Aware Video Playback
 
-Study mounts exactly one media adapter per Asset. Both adapters implement the same
+The video viewer mounts exactly one media adapter per Asset. Both adapters implement the same
 provider-neutral contract in `features/assets/player/media-player.ts`: millisecond seek,
 play, and `{ state, positionMs }` playback snapshots. Provider constants stay in the YouTube
 adapter and media-element details stay in the Upload adapter, so transcript synchronization
-and Study orchestration consume neutral snapshots only.
+and viewer orchestration consume neutral snapshots only.
 
 ## YouTube Player And Transcript Seek
 
@@ -201,20 +211,32 @@ validation also passed upload through automatic indexing, SEARCHABLE, search, gr
 assistant answer, citation navigation and desktop/mobile checks. This does not claim
 production-scale capacity, security certification or unrestricted chatbot behavior.
 
-## Search And Study Flow
+## Workspace Moment Search
 
-Workspace Search now supports the real learner flow:
+Workspace search returns timestamped video moments from the selected Workspace:
 
 ```text
-Search workspace
--> review ranked results with asset title, excerpt, and transcript moment metadata
--> Open in video
--> Study opens with the selected transcript row carried in the hash route
+Search within the selected Workspace
+-> review Asset groups while preserving first appearance and relative moment order
+-> open a timestamped video moment
+-> the existing Asset route focuses the exact transcript row
 -> nearby transcript context loads from the existing transcript context API
 -> the transcript remains available with the selected moment marked when visible
 ```
 
-The route carries only compact state: asset id, transcript-row reference, and optional source query. It does not serialize transcript text, credentials, raw API payloads, user email, tokens, or private data into the URL. Study keeps a return action back to Search when the route originated there, including the safe original query as `#/search?q=<query>` when present. Returning to Search reloads results through the existing product search API; result rows are not cached, fabricated, or serialized into the URL. Library remains the canonical place for upload and video management.
+Frontend grouping preserves the first backend appearance of each Asset and the relative order
+of its moments; it does not rerank by score or timestamp. The route reuses the existing compact
+Asset id, transcript-row reference, and optional source query state. It does not serialize
+transcript text, credentials, raw API payloads, user email, tokens, or private data into the
+URL. Returning from an Asset retains the scoped query and React Query results when safe, while
+workspace changes reset incompatible state and query keys prevent stale responses from
+replacing the current results. Direct returns reload through the same Spring search API when
+needed.
+
+The browser calls Spring for product search, transcript context, Asset data, and authorization;
+it never calls Elasticsearch or FastAPI directly. Saved moments and a search-ranking redesign
+are not implemented in this phase. Library remains the canonical place for upload and video
+management.
 
 ## Local Setup
 

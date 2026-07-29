@@ -1,8 +1,15 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import type { SearchResponse, SearchResult } from './api/search-api';
 import type { TranscriptContextResponse } from '../../entities/transcript/model/types';
 import { buildTranscriptDisplayRows, matchesTranscriptReference } from '../../entities/transcript/model/transcript-display';
+import { formatTranscriptTimestamp } from '../../entities/transcript/model/transcript-time';
 import { Button, EmptyState, ErrorBanner, LoadingBlock, Section } from '../../lib/ui';
+import { SourceBadge } from '../assets/components/source-badge';
+import type { AssetSourceType } from '../assets/model/types';
+import {
+  getSearchMomentAssetTitle,
+  groupSearchMomentsByAsset,
+} from './model/group-search-moments';
 import { resolveTranscriptLookupId } from './model/search-result-reference';
 
 type SearchPanelScope = {
@@ -10,8 +17,14 @@ type SearchPanelScope = {
   assetTitle?: string;
 };
 
+export type SearchAssetSource = {
+  assetId: string;
+  sourceType: AssetSourceType;
+};
+
 export function SearchPanel({
   workspaceName,
+  assetSources = [],
   searchableAssetCount,
   resetToken,
   activeQuery,
@@ -33,6 +46,7 @@ export function SearchPanel({
   onClearContext,
 }: {
   workspaceName: string;
+  assetSources?: readonly SearchAssetSource[];
   searchableAssetCount: number;
   resetToken: number;
   activeQuery: string | null;
@@ -54,6 +68,7 @@ export function SearchPanel({
   onClearContext?: () => void;
 }) {
   const [searchInput, setSearchInput] = useState('');
+  const resultsHeadingId = useId();
   const routeQueryDraft = routeQuery?.trim() || null;
   const isAssetScoped = scope?.mode === 'asset';
   const selectedResultRowId = selectedResult ? resolveTranscriptLookupId(selectedResult) : null;
@@ -64,16 +79,14 @@ export function SearchPanel({
     () => (contextResponse?.rows.length ? buildTranscriptDisplayRows(contextResponse.rows) : []),
     [contextResponse?.rows],
   );
-  const resultGroups = useMemo(() => {
-    if (isAssetScoped) return [];
-    const groups = new Map<string, { assetTitle: string; results: SearchResult[] }>();
-    for (const result of searchResponse?.results ?? []) {
-      const group = groups.get(result.assetId) ?? { assetTitle: result.assetTitle, results: [] };
-      group.results.push(result);
-      groups.set(result.assetId, group);
-    }
-    return Array.from(groups.entries()).map(([assetId, group]) => ({ assetId, ...group }));
-  }, [isAssetScoped, searchResponse?.results]);
+  const resultGroups = useMemo(
+    () => isAssetScoped ? [] : groupSearchMomentsByAsset(searchResponse?.results ?? []),
+    [isAssetScoped, searchResponse?.results],
+  );
+  const sourceTypeByAssetId = useMemo(
+    () => new Map(assetSources.map((asset) => [asset.assetId, asset.sourceType])),
+    [assetSources],
+  );
 
   useEffect(() => {
     setSearchInput(routeQueryDraft ?? '');
@@ -85,16 +98,24 @@ export function SearchPanel({
     if (trimmedQuery && searchEnabled) onSearch(trimmedQuery);
   }
 
-  function renderResult(result: SearchResult, index: number): ReactNode {
+  function renderResult(result: SearchResult): ReactNode {
     const lookupId = resolveTranscriptLookupId(result);
     const hasContextAction = Boolean(lookupId);
+    const assetTitle = getSearchMomentAssetTitle(result);
+    const sourceType = sourceTypeByAssetId.get(result.assetId) ?? null;
+    const timestamp = result.startMs !== null && Number.isFinite(result.startMs) && result.startMs >= 0
+      ? formatTranscriptTimestamp(result.startMs)
+      : null;
+    const timestampLabel = timestamp ?? 'Time unavailable';
     const isSelected =
       selectedResult?.assetId === result.assetId &&
       selectedResult?.transcriptRowId === result.transcriptRowId &&
       selectedResult?.segmentIndex === result.segmentIndex;
-    const actionLabel = onOpenResultContext
-      ? `Open moment ${index + 1} in ${result.assetTitle}`
-      : `Show transcript context for moment ${index + 1} in ${result.assetTitle}`;
+    const actionLabel = !hasContextAction
+      ? `Video moment unavailable in ${assetTitle} at ${timestampLabel.toLowerCase()}`
+      : onOpenResultContext
+        ? `Open moment in ${assetTitle} at ${timestampLabel.toLowerCase()}`
+        : `Show transcript context for moment in ${assetTitle} at ${timestampLabel.toLowerCase()}`;
 
     return (
       <article
@@ -109,9 +130,22 @@ export function SearchPanel({
           aria-label={actionLabel}
         >
           <span className="search-result__header">
-            <span className="search-result__rank">Transcript moment</span>
+            <span className="search-result__identity">
+              <span className="search-result__asset-title">{assetTitle}</span>
+              {sourceType ? (
+                <SourceBadge sourceType={sourceType} />
+              ) : (
+                <span className="source-badge source-badge--unknown">Source unavailable</span>
+              )}
+            </span>
+            <span className="search-result__timestamp">
+              <span>Video moment</span>
+              <span className="search-result__timestamp-value">{timestampLabel}</span>
+            </span>
           </span>
-          <span className="search-result__excerpt">{result.text}</span>
+          <span className="search-result__excerpt">
+            {result.text?.trim() || 'Transcript snippet unavailable.'}
+          </span>
           <span className="search-result__open-label">
             {!hasContextAction ? 'Unavailable' : onOpenResultContext ? 'Open moment' : isSelected ? 'Context shown' : 'Show context'}
           </span>
@@ -134,14 +168,16 @@ export function SearchPanel({
 
       <form className="search-form" onSubmit={handleSubmit} role="search">
         <label className="field field--grow">
-          <span className="field__label">{isAssetScoped ? 'Find in transcript' : 'Search workspace'}</span>
+          <span className="field__label">
+            {isAssetScoped ? 'Find in transcript' : `Search within ${workspaceName}`}
+          </span>
           <input
             className="field__input search-form__input"
             type="search"
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
             placeholder={searchEnabled
-              ? isAssetScoped ? 'Find a word or phrase' : 'Search across video transcripts'
+              ? isAssetScoped ? 'Find a word or phrase' : 'Search by topic, phrase, or idea'
               : isAssetScoped ? 'Available when this video is ready' : 'Upload a video to begin searching'}
             disabled={!searchEnabled}
           />
@@ -158,61 +194,91 @@ export function SearchPanel({
       ) : null}
 
       {searchError ? <ErrorBanner error={searchError} /> : null}
-      {isSearching ? <LoadingBlock label={isAssetScoped ? 'Searching this transcript...' : 'Searching your workspace...'} compact /> : null}
+      {isSearching ? (
+        <div className="search-loading-status" role="status" aria-live="polite" aria-atomic="true">
+          <LoadingBlock label={isAssetScoped ? 'Searching this transcript...' : `Searching within ${workspaceName}...`} compact />
+        </div>
+      ) : null}
 
       {!activeQuery && !isSearching ? (
-        <EmptyState
-          title={isAssetScoped ? 'Find an exact moment' : 'Search your learning workspace'}
-          description={isAssetScoped ? 'Enter a word or phrase from this video.' : 'Enter a topic or phrase to find it across your videos.'}
-        />
+        <div role="status">
+          <EmptyState
+            title={isAssetScoped ? 'Find an exact moment' : 'Search this workspace'}
+            description={isAssetScoped ? 'Enter a word or phrase from this video.' : 'Enter a natural content query to find exact moments across your videos.'}
+          />
+        </div>
       ) : null}
 
       {!isSearching && activeQuery && !searchError && !hasSearchResults ? (
-        <EmptyState
-          title="No matches found"
-          description={isAssetScoped ? 'Try a broader phrase from this transcript.' : 'Try a broader phrase or a different topic.'}
-        />
+        <div role="status">
+          <EmptyState
+            title="No video moments found"
+            description={isAssetScoped ? 'Try a broader phrase from this transcript.' : 'Try a broader phrase or a different topic in this workspace.'}
+          />
+        </div>
       ) : null}
 
-      {activeQuery && hasSearchResults ? (
+      {isAssetScoped && !isSearching && !searchError && activeQuery && hasSearchResults ? (
         <p className="search-summary" role="status">
-          {isAssetScoped ? (
-            <><strong>{searchResponse?.resultCount ?? searchResponse?.results.length ?? 0}</strong>{' '}
-              {(searchResponse?.resultCount ?? 0) === 1 ? 'match' : 'matches'} for “{activeQuery}”</>
-          ) : (
-            <>Top relevant moments for “{activeQuery}” · <strong>{searchResponse?.results.length ?? 0} shown</strong></>
-          )}
+          <strong>{searchResponse?.resultCount ?? searchResponse?.results.length ?? 0}</strong>{' '}
+          {(searchResponse?.resultCount ?? 0) === 1 ? 'match' : 'matches'} for “{activeQuery}”
         </p>
       ) : null}
 
-      {isAssetScoped && searchResponse?.results.length ? (
+      {isAssetScoped && !isSearching && !searchError && activeQuery && searchResponse?.results.length ? (
         <ol className="search-results search-results--compact">
           {searchResponse.results.map((result, index) => (
             <li key={`${result.assetId}-${resolveTranscriptLookupId(result) ?? 'no-row'}-${result.segmentIndex ?? index}`}>
-              {renderResult(result, index)}
+              {renderResult(result)}
             </li>
           ))}
         </ol>
       ) : null}
 
-      {!isAssetScoped && resultGroups.length ? (
-        <div className="search-result-groups">
-          {resultGroups.map((group, groupIndex) => (
-            <section key={group.assetId} className="search-result-group" aria-labelledby={`search-group-${groupIndex}`}>
-              <header>
-                <h2 id={`search-group-${groupIndex}`}>{group.assetTitle}</h2>
-                <span>{group.results.length} {group.results.length === 1 ? 'moment' : 'moments'}</span>
-              </header>
-              <ol className="search-results">
-                {group.results.map((result, index) => (
-                  <li key={`${result.assetId}-${resolveTranscriptLookupId(result) ?? 'no-row'}-${result.segmentIndex ?? index}`}>
-                    {renderResult(result, index)}
-                  </li>
-                ))}
-              </ol>
-            </section>
-          ))}
-        </div>
+      {!isAssetScoped && !isSearching && !searchError && activeQuery && resultGroups.length ? (
+        <section className="workspace-moment-results" aria-labelledby={resultsHeadingId}>
+          <div className="workspace-moment-results__heading">
+            <div>
+              <p className="panel__eyebrow">Explore</p>
+              <h2 id={resultsHeadingId}>Video moments</h2>
+            </div>
+            <p className="search-summary" role="status" aria-live="polite">
+              <strong>{searchResponse?.resultCount ?? searchResponse?.results.length ?? 0}</strong>{' '}
+              {(searchResponse?.resultCount ?? 0) === 1 ? 'matching moment' : 'matching moments'}
+              {' · '}
+              {searchResponse?.results.length ?? 0} shown across {resultGroups.length}{' '}
+              {resultGroups.length === 1 ? 'video' : 'videos'}
+            </p>
+          </div>
+          <div className="search-result-groups">
+            {resultGroups.map((group, groupIndex) => (
+              <section
+                key={group.assetId}
+                className="search-result-group"
+                aria-labelledby={`${resultsHeadingId}-group-${groupIndex}`}
+              >
+                <header>
+                  <div className="search-result-group__identity">
+                    <h3 id={`${resultsHeadingId}-group-${groupIndex}`}>{group.assetTitle}</h3>
+                    {sourceTypeByAssetId.get(group.assetId) ? (
+                      <SourceBadge sourceType={sourceTypeByAssetId.get(group.assetId) as AssetSourceType} />
+                    ) : (
+                      <span className="source-badge source-badge--unknown">Source unavailable</span>
+                    )}
+                  </div>
+                  <span>{group.momentCount} matching {group.momentCount === 1 ? 'moment' : 'moments'}</span>
+                </header>
+                <ol className="search-results">
+                  {group.results.map((result, index) => (
+                    <li key={`${result.assetId}-${resolveTranscriptLookupId(result) ?? 'no-row'}-${result.segmentIndex ?? index}`}>
+                      {renderResult(result)}
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            ))}
+          </div>
+        </section>
       ) : null}
 
       {isAssetScoped && contextRowId ? (
@@ -254,5 +320,5 @@ export function SearchPanel({
   );
 
   if (embedded) return content;
-  return <Section title={isAssetScoped ? 'Find in transcript' : 'Workspace Search'} eyebrow={isAssetScoped ? scope?.assetTitle : workspaceName}>{content}</Section>;
+  return <Section title={isAssetScoped ? 'Find in transcript' : 'Explore'} eyebrow={isAssetScoped ? scope?.assetTitle : workspaceName}>{content}</Section>;
 }

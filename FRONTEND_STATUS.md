@@ -2,7 +2,10 @@
 
 ## 1. Purpose
 
-This repo implements the focused learning-workspace frontend for AI Knowledge Workspace. The frontend stays grounded in the real Spring-owned backend contract and covers both concise public entry and the authenticated learning flow:
+This repo implements the video knowledge workspace frontend for AI Knowledge Workspace. The
+frontend stays grounded in the real Spring-owned backend contract. Users can search across a
+Workspace of videos and open the exact timestamped moments that matter; learning is one
+supported use case, not the core domain boundary.
 
 - auth
 - workspace selection and management
@@ -12,9 +15,9 @@ This repo implements the focused learning-workspace frontend for AI Knowledge Wo
 - visibility-aware playback sampling, active transcript indication, and user-controlled follow
 - processing and transcript review
 - automatic search preparation with explicit indexing retained only as recovery
-- workspace-scoped search
-- transcript-local search from Study
-- search-to-asset study context
+- workspace-scoped, timestamped moment search
+- transcript-local search in the current video
+- search-to-Asset exact-row context
 - transcript context around selected hits
 
 It is not a general-purpose chatbot or chat-history product. It does include the current
@@ -33,16 +36,20 @@ asset-scoped grounded assistant answer and citation-navigation experience.
 
 ## 3. Current Product IA
 
-The frontend behaves like a routed learning product:
+The frontend behaves like a routed video knowledge product:
 
 - Public Landing, Login, and Register
-- Home for immediate actions and recent learning
+- Home for immediate actions and recent videos
 - Library with controlled Add video source entry, filtering, source indicators, and video actions
-- Study with transcript, selected context, assistant, and disclosed details
-- Workspace Search
-- Settings for workspace management and account
+- Video viewer with transcript, selected context, assistant, and disclosed details
+- Explore for Workspace moment search
+- Workspace tools for workspace management and account
 
-Authenticated primary navigation contains only `Home`, `Library`, and `Search`. The shell also owns the workspace selector, Add video action, and account menu; Settings and sign out live in that menu. Add video opens a controlled Library dialog through `#/library?upload=1` and explicitly selects either Upload file or YouTube URL. Study keeps the compatible `#/assets/:assetId` deep route and compact focus query parameters.
+Authenticated primary navigation contains only `Home`, `Library`, and `Explore`. The shell also
+owns the workspace selector, Add video action, and account menu; Workspace tools and sign out
+live in that menu. Add video opens a controlled Library dialog through `#/library?upload=1`
+and explicitly selects either Upload file or YouTube URL. The viewer keeps the compatible
+`#/assets/:assetId` deep route and compact focus query parameters.
 
 ## 4. Frontend Modular Boundaries
 
@@ -64,12 +71,12 @@ This refactor preserves existing routes, API request shapes, auth defaults, toke
 - Load the visible owned workspace scope
 - Switch workspaces from the persistent app shell
 - Create, rename, and conservatively delete workspaces through Settings
-- Land on Home with upload/search actions and recent learning
+- Land on Home with upload/search actions and recent videos
 - Open a dedicated asset library screen
-- Upload learning videos or submit a public YouTube URL through one focus-managed Add video dialog
+- Upload videos or submit a public YouTube URL through one focus-managed Add video dialog
 - Preserve Spring-owned source type, YouTube video identity, canonical source URL, and nullable upload metadata
 - Filter the video library and use stable overflow actions for open, rename, and delete
-- Open Study with transcript and assistant side by side on desktop
+- Open a video with transcript and assistant side by side on desktop
 - Use Transcript, Ask, and Details views on mobile
 - Find within the current transcript once the video is ready
 - Rename and delete assets
@@ -81,11 +88,11 @@ This refactor preserves existing routes, API request shapes, auth defaults, toke
 - Follow the active timestamped transcript row while preserving manual reading and selected context
 - Load transcript rows only when the backend says they are ready
 - Explicitly index transcript rows to unlock search
-- Open a dedicated workspace search screen
+- Open a dedicated Workspace moment-search screen
 - Search only within the active workspace
-- Review ranked search results with a distinct asset title, transcript excerpt, and transcript moment metadata
-- Open a result into the existing Study route with the asset id, selected transcript-row reference, and optional source query preserved in the hash route
-- Read nearby transcript rows from the existing transcript context API in Study
+- Review Spring-ranked, frontend-grouped video moments with Asset title, source, timestamp, and transcript excerpt
+- Open a result through the existing Asset route with the Asset id, selected transcript-row reference, and optional source query preserved in the hash route
+- Read nearby transcript rows from the existing transcript context API in the viewer
 - Preserve nullable integer-millisecond transcript timing through API mapping, React Query
   cache/state, search selection, transcript context, and assistant citations
 - Return to Search from a detail page that originated from a workspace result, preserving the safe query as `#/search?q=<query>` when available
@@ -93,7 +100,7 @@ This refactor preserves existing routes, API request shapes, auth defaults, toke
 - Open transcript context around a selected result
 - Ask a grounded question about the selected asset through Spring and render validated
   citations with transcript navigation
-- Keep orientation through active navigation, concise page headings, workspace selector, Study breadcrumb, and progressively disclosed account/details menus
+- Keep orientation through active navigation, concise page headings, workspace selector, Video breadcrumb, and progressively disclosed account/details menus
 
 ## 6. Backend API Surface Used
 
@@ -215,7 +222,7 @@ Browser Range behavior and runtime Upload playback acceptance are verified in Sl
 - P3-C4 local browser smoke passed for the opt-in Keycloak JWT flow. Evidence covered the legacy password auth entry, JWT Keycloak-only entry, empty Keycloak login form, authenticated product shell from Spring `/api/me`, local frontend logout return, and focused primary Keycloak action.
 - Component tests cover signed-out routing, authenticated Home, the simplified navigation, account/mobile menu Escape behavior, upload dialog focus handling, Library overflow actions, mobile Study tabs, and workspace deletion focus trapping.
 - P3-FE1 browser checks are Vite-only by design. They do not claim authenticated backend/browser integration when Spring/auth services are not running.
-- Search/Study component tests cover labelled Workspace Search versus Find in transcript, grouped result readability, route/state produced by opening a result, loading/empty/error states, selected context, transcript display, missing-moment feedback, Search return behavior, and keyboard activation.
+- Search/viewer component tests cover labelled `Search within <workspace>` versus Find in transcript, grouped result readability, route/state produced by opening a result, loading/empty/error states, selected context, transcript display, missing-moment feedback, Search return behavior, and keyboard activation.
 - P3-FE2 browser checks are public/auth-surface only when no real authenticated backend session is available; search and asset study behavior are validated through frontend component tests without fake backend sessions.
 - P3-FE2.2 modularized app routing/bootstrap, Search route hydration, study route interpretation, and transcript display ownership without changing routes, API calls, auth defaults, or visible UX.
 - P3-S5.B4.R1 passed the bounded browser flow from upload through automatic indexing,
@@ -224,14 +231,16 @@ Browser Range behavior and runtime Upload playback acceptance are verified in Sl
 
 ## 10. Design / Product Notes
 
-- The UI uses a concise public landing experience and a persistent authenticated learning shell
+- The UI uses a concise public landing experience and a persistent authenticated video knowledge shell
 - Routing is hash-based to stay compatible with the current frontend setup and avoid new backend/server route assumptions
 - Upload copy and accepted file input remain lecture-video-first to match the current real product path
 - YouTube entry performs only small nonblank/HTTPS UX checks and leaves full normalization to Spring
 - Search stays disabled until automatic search preparation produces ready videos
-- Workspace Search opens relevant results into Study so the learner can continue reading nearby transcript context without losing the source Search orientation
-- Search return links carry only compact route state and reuse the existing product search path; result rows are not cached, fabricated, or serialized into the URL
-- Study exposes the same transcript-hit/context behavior as Find in transcript, scoped to the current video
+- Workspace search groups timestamped moments by Asset without changing Spring result relevance
+- Opening a moment reuses the existing Asset/row route and keeps selected search context distinct from playback-active state
+- Search return links carry only compact route state; scoped query/results are retained when safe, incompatible Workspace state is reset, and result rows are never serialized into the URL
+- The viewer exposes the same transcript-hit/context behavior as Find in transcript, scoped to the current video
+- The browser uses Spring for search and product APIs and never calls Elasticsearch or FastAPI directly
 - No general-purpose chat history, provider controls or fake AI affordances were added.
   The supported asset-scoped grounded answer and citation UI calls Spring only.
 - Provider inference from source URLs, persisted playback state and optional synchronization
@@ -254,6 +263,8 @@ Browser Range behavior and runtime Upload playback acceptance are verified in Sl
 - Collaboration features
 - Cross-workspace asset movement
 - Advanced search filters
+- Saved moments
+- Search-ranking redesign
 - Analytics dashboards
 - Broader auth-platform features beyond the current supported backend path
 

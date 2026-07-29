@@ -157,6 +157,25 @@ describe('frontend import boundaries', () => {
     }
   });
 
+  it('keeps Workspace moment grouping relevance-neutral and responsive presentation bounded', () => {
+    const grouping = readSource('features/search/model/group-search-moments.ts');
+    const searchPanel = readSource('features/search/search.tsx');
+    const styles = readSource('styles.css');
+    const mobileStyles = styles.slice(
+      styles.indexOf('@media (max-width: 760px)'),
+      styles.indexOf('@media (max-width: 430px)'),
+    );
+
+    expect(grouping).toMatch(/new Map/);
+    expect(grouping).not.toMatch(/\.sort\s*\(/);
+    expect(searchPanel).not.toMatch(/fetch\s*\(|\brequest\s*\(|elasticsearch|fastapi/i);
+    expect(styles).toMatch(/\.search-result__excerpt[\s\S]*?overflow-wrap:\s*anywhere/);
+    expect(mobileStyles).toMatch(/\.search-form\s*\{[\s\S]*?flex-direction:\s*column/);
+    expect(mobileStyles).toMatch(
+      /\.workspace-moment-results__heading,[\s\S]*?\.search-result-group > header[\s\S]*?flex-direction:\s*column/,
+    );
+  });
+
   it('contains no circular production imports', () => {
     const sources = productionSources();
     const sourceSet = new Set(sources);

@@ -92,7 +92,17 @@ Asset id alone.
 - `AssetIndexingRecoveryAction` renders explicit indexing only from lifecycle-derived recovery state. It retains the secondary button, current recovery explanation, existing POST endpoint, mutation errors, and post-success list/search refresh.
 - `useAssetManagement` owns rename/delete mutation state, cache reconciliation, success notices, and stale 404 cleanup. `AssetList`, `SelectedAssetPanel`, `AssetLifecyclePanel`, and `SelectedAssetTranscriptPanel` own their focused presentation boundaries.
 - `useSearchController` owns submitted query, workspace/optional-asset scope, abortable search/context queries, selected result, stale-result cleanup, and reset rules. Search presentation does not own assistant answers.
+- Workspace moment grouping is frontend presentation logic: it preserves the first backend
+  appearance of each Asset and relative moment order inside that Asset, so grouping never
+  changes Spring relevance or reranks by score or timestamp.
+- Exact-moment opening reuses the existing compact Asset/row route. Search state remains scoped
+  by Workspace and normalized query in React Query; scope changes reset incompatible visible
+  state, and aborted or old-key responses cannot replace current results.
 - `useWorkspaceManagement` now owns workspace mutation notices and 404 reconciliation; bootstrap selection remains isolated in `useWorkspaceBootstrap`.
+
+Spring remains the only browser-facing product API for search, transcript context,
+authorization, and Asset data. The frontend does not call Elasticsearch or FastAPI directly.
+Saved moments and search-ranking redesign are intentionally outside this boundary.
 
 Static assertions protect the neutral HTTP direction, shell/API separation, lifecycle/assistant separation, upload/polling separation, infrastructure URL ban, the provider-neutral player contract, Upload media URL ownership inside the asset feature API, media-element details staying inside the Upload adapter, and absence of circular production imports.
 

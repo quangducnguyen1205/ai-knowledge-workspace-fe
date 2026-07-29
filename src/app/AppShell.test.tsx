@@ -35,7 +35,7 @@ describe('AppShell layout boundary', () => {
     );
 
     expect(screen.getByRole('link', { name: 'Library' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getAllByRole('link', { name: /Home|Library|Search/ })).toHaveLength(3);
+    expect(screen.getAllByRole('link', { name: /Home|Library|Explore/ })).toHaveLength(3);
     expect(screen.queryByRole('link', { name: 'Settings' })).not.toBeInTheDocument();
     expect(screen.getByRole('main')).toHaveAttribute('id', 'main-content');
     expect(screen.getByRole('heading', { name: 'Library' })).toBeInTheDocument();
@@ -44,12 +44,12 @@ describe('AppShell layout boundary', () => {
     const accountMenuButton = screen.getByRole('button', { name: 'Open account menu' });
     await user.click(accountMenuButton);
     expect(screen.getByLabelText('Account menu')).toHaveTextContent('learner@example.com');
-    expect(screen.getByRole('link', { name: 'Workspace settings' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Workspace tools' })).toBeInTheDocument();
     await user.keyboard('{Escape}');
     expect(accountMenuButton).toHaveAttribute('aria-expanded', 'false');
     expect(accountMenuButton).toHaveFocus();
 
-    await user.click(screen.getByRole('link', { name: 'Search' }));
+    await user.click(screen.getByRole('link', { name: 'Explore' }));
     expect(navigate).toHaveBeenCalledWith({ name: 'search' });
   });
 

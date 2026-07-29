@@ -193,7 +193,7 @@ export function AuthEntrySurface({
               <p>
                 {mode === 'register'
                   ? 'Create a workspace for your videos, transcripts, and cited answers.'
-                  : 'Continue learning where you left off.'}
+                  : 'Continue where you left off.'}
               </p>
             </div>
           </div>
@@ -288,7 +288,7 @@ export function KeycloakAuthEntrySurface({
             <div className="auth-card__intro">
               <p className="hero__eyebrow">Welcome back</p>
               <h1>Continue to your workspace</h1>
-              <p>Use your organization account to continue learning.</p>
+              <p>Use your organization account to continue to your workspace.</p>
             </div>
           </div>
 

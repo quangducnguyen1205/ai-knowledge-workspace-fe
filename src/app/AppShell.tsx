@@ -60,10 +60,10 @@ export function AppShell({
       isActive: route.name === 'library' || route.name === 'asset',
     },
     {
-      label: 'Search',
+      label: 'Explore',
       route: { name: 'search' },
       disabled: !selectedWorkspace,
-      disabledReason: 'Create or select a workspace before searching.',
+      disabledReason: 'Create or select a workspace before exploring video moments.',
       isActive: route.name === 'search',
     },
   ];
@@ -131,7 +131,7 @@ export function AppShell({
               <span className="product-brand__mark" aria-hidden="true">AK</span>
               <span className="product-brand__copy">
                 <strong>AI Knowledge Workspace</strong>
-                <small>Learning workspace</small>
+                <small>Video knowledge workspace</small>
               </span>
             </a>
 
@@ -234,7 +234,7 @@ export function AppShell({
                         navigateFromShell({ name: 'settings' });
                       }}
                     >
-                      Workspace settings
+                      Workspace tools
                     </a>
                     <button type="button" onClick={() => void onLogout()} disabled={isLogoutPending}>
                       {isLogoutPending ? 'Signing out...' : 'Sign out'}

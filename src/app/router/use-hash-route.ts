@@ -25,8 +25,10 @@ export function useHashRoute(): [AppRoute, (route: AppRoute) => void] {
       return;
     }
 
+    // Keep route-dependent effects aligned with the hash change in the same navigation turn.
+    setRoute(nextRoute);
+
     if (window.location.hash === nextHash) {
-      setRoute(nextRoute);
       return;
     }
 

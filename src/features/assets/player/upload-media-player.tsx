@@ -63,7 +63,7 @@ export const UPLOAD_MEDIA_ERROR_COPY = {
 
 export const UPLOAD_MEDIA_UNSUPPORTED_AUTH_COPY = {
   title: 'Upload playback is not available in this authentication mode yet.',
-  message: 'The transcript and other Study tools remain available.',
+  message: 'The transcript and other video tools remain available.',
 };
 
 export const UPLOAD_MEDIA_PLAYBACK_BLOCKED_COPY =

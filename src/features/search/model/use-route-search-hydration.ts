@@ -28,6 +28,9 @@ export function useRouteSearchHydration({
 
     if (!routeSearchQuery) {
       lastRouteSearchSubmissionRef.current = null;
+      if (submittedSearch) {
+        onRouteSearchSubmit('');
+      }
       return;
     }
 
@@ -36,7 +39,10 @@ export function useRouteSearchHydration({
     }
 
     const routeSearchKey = `${selectedWorkspaceId}:${routeSearchQuery}`;
-    if (lastRouteSearchSubmissionRef.current === routeSearchKey && submittedSearch === routeSearchQuery) {
+    if (
+      lastRouteSearchSubmissionRef.current === routeSearchKey &&
+      submittedSearch === routeSearchQuery
+    ) {
       return;
     }
 

@@ -147,7 +147,7 @@ describe('Upload native media authentication support', () => {
 
     expect(screen.getByText('Upload playback is not available in this authentication mode yet.'))
       .toBeInTheDocument();
-    expect(screen.getByText('The transcript and other Study tools remain available.'))
+    expect(screen.getByText('The transcript and other video tools remain available.'))
       .toBeInTheDocument();
     expect(container.querySelector('video')).toBeNull();
     expect(container.innerHTML).not.toMatch(/\/api\/assets|Bearer|token/i);

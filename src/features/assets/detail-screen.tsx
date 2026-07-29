@@ -311,7 +311,7 @@ export function AssetDetailScreen({
         <nav className="product-breadcrumb" aria-label="Breadcrumb">
           <button type="button" onClick={onOpenLibrary}>Library</button>
           <span aria-hidden="true">/</span>
-          <span aria-current="page">Study</span>
+          <span aria-current="page">Video</span>
         </nav>
         <div className="study-header__main">
           <div className="study-header__copy">
@@ -448,7 +448,7 @@ export function AssetDetailScreen({
         <p className="playback-progress-note">Your playback position could not be saved.</p>
       ) : null}
 
-      <div className="study-tabs" role="tablist" aria-label="Study views">
+      <div className="study-tabs" role="tablist" aria-label="Video tools">
         {(['transcript', 'ask', 'details'] as const).map((tab) => (
           <button
             key={tab}
@@ -477,6 +477,7 @@ export function AssetDetailScreen({
           <SearchPanel
             embedded
             workspaceName={workspaceName}
+            assetSources={[asset]}
             searchableAssetCount={resolvedAssetStatus === 'SEARCHABLE' ? 1 : 0}
             resetToken={searchResetToken}
             activeQuery={activeQuery}

@@ -28,6 +28,8 @@ const transcriptRows = [
     id: 'row-1',
     videoId: 'asset-1',
     segmentIndex: 1,
+    startMs: 0,
+    endMs: 999,
     text: 'First we define happens-before relationships.',
     createdAt: '2026-06-26T10:01:00Z',
   },
@@ -35,6 +37,8 @@ const transcriptRows = [
     id: 'row-2',
     videoId: 'asset-1',
     segmentIndex: 2,
+    startMs: 1_000,
+    endMs: 2_000,
     text: 'Vector clocks preserve causal relationships between events in distributed systems.',
     createdAt: '2026-06-26T10:02:00Z',
   },
@@ -141,6 +145,8 @@ function createFetchMock() {
             assetTitle: 'Vector Clocks Lecture',
             transcriptRowId: resultRow.id,
             segmentIndex: resultRow.segmentIndex,
+            startMs: resultRow.startMs,
+            endMs: resultRow.endMs,
             text: resultRow.text,
             createdAt: resultRow.createdAt,
             score: 3.21,
@@ -195,7 +201,7 @@ describe('Search route query flow', () => {
     expect(
       await screen.findByRole(
         'button',
-        { name: 'Open moment 1 in Vector Clocks Lecture' },
+        { name: 'Open moment in Vector Clocks Lecture at 00:01' },
         routeFlowTimeout,
       ),
     ).toBeInTheDocument();
@@ -211,7 +217,7 @@ describe('Search route query flow', () => {
     await waitFor(() => {
       expect(window.location.hash).toBe('#/search');
     });
-    expect(await screen.findByLabelText(/search workspace/i)).toHaveValue('');
+    expect(await screen.findByLabelText(/search within distributed systems/i)).toHaveValue('');
     expect(searchCalls(fetchMock)).toHaveLength(0);
   });
 
@@ -222,7 +228,7 @@ describe('Search route query flow', () => {
     expect(
       await screen.findByRole(
         'button',
-        { name: 'Open moment 1 in Vector Clocks Lecture' },
+        { name: 'Open moment in Vector Clocks Lecture at 00:01' },
         routeFlowTimeout,
       ),
     ).toBeInTheDocument();
@@ -232,9 +238,132 @@ describe('Search route query flow', () => {
   it('does not auto-submit Search when the route has no q', async () => {
     const fetchMock = renderAppAt('#/search');
 
-    expect(await screen.findByLabelText(/search workspace/i)).toHaveValue('');
-    expect(screen.getByText(/search your learning workspace/i)).toBeInTheDocument();
+    expect(await screen.findByLabelText(/search within distributed systems/i)).toHaveValue('');
+    expect(screen.getByText(/search this workspace/i)).toBeInTheDocument();
     expect(searchCalls(fetchMock)).toHaveLength(0);
+  });
+
+  it('clears incompatible results on Workspace change and opens only the new Workspace moment', async () => {
+    const user = userEvent.setup();
+    const baseFetch = createFetchMock();
+    const workspaceTwoAsset = {
+      ...asset,
+      assetId: 'asset-2',
+      title: 'Incident Review',
+      workspaceId: 'workspace-2',
+      sourceType: 'YOUTUBE',
+      youtubeVideoId: 'incident_123',
+      sourceUrl: 'https://www.youtube.com/watch?v=incident_123',
+    };
+    const workspaceTwoRow = {
+      id: 'row-incident',
+      videoId: 'asset-2',
+      segmentIndex: 4,
+      startMs: 3_000,
+      endMs: 5_000,
+      text: 'The incident timeline starts with the first alert.',
+      createdAt: '2026-06-27T10:02:00Z',
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/workspaces') {
+        return jsonResponse([
+          { id: 'workspace-1', name: 'Distributed Systems', createdAt: '2026-06-26T00:00:00Z' },
+          { id: 'workspace-2', name: 'Operations', createdAt: '2026-06-27T00:00:00Z' },
+        ]);
+      }
+      if (url === '/api/assets?workspaceId=workspace-2') return jsonResponse([workspaceTwoAsset]);
+      if (url === '/api/assets/asset-2') {
+        return jsonResponse({
+          id: workspaceTwoAsset.assetId,
+          title: workspaceTwoAsset.title,
+          status: workspaceTwoAsset.assetStatus,
+          workspaceId: workspaceTwoAsset.workspaceId,
+          sourceType: workspaceTwoAsset.sourceType,
+          youtubeVideoId: workspaceTwoAsset.youtubeVideoId,
+          sourceUrl: workspaceTwoAsset.sourceUrl,
+          originalFilename: null,
+          contentType: null,
+          sizeBytes: null,
+          createdAt: workspaceTwoAsset.createdAt,
+          updatedAt: workspaceTwoAsset.createdAt,
+        });
+      }
+      if (url === '/api/assets/asset-2/status') {
+        return jsonResponse({
+          assetId: 'asset-2',
+          processingJobId: 'job-2',
+          assetStatus: 'SEARCHABLE',
+          processingJobStatus: 'SUCCEEDED',
+        });
+      }
+      if (url === '/api/assets/asset-2/transcript') return jsonResponse([workspaceTwoRow]);
+      if (url.startsWith('/api/assets/asset-2/transcript/context')) {
+        return jsonResponse({
+          assetId: 'asset-2',
+          transcriptRowId: 'row-incident',
+          hitSegmentIndex: 4,
+          window: 2,
+          rows: [workspaceTwoRow],
+        });
+      }
+      if (url.startsWith('/api/search?') && url.includes('workspaceId=workspace-2')) {
+        return jsonResponse({
+          query: 'incident timeline',
+          workspaceIdFilter: 'workspace-2',
+          assetIdFilter: null,
+          resultCount: 1,
+          results: [{
+            assetId: 'asset-2',
+            assetTitle: 'Incident Review',
+            transcriptRowId: 'row-incident',
+            segmentIndex: 4,
+            startMs: 3_000,
+            endMs: 5_000,
+            text: workspaceTwoRow.text,
+            createdAt: workspaceTwoRow.createdAt,
+            score: 8.4,
+          }],
+        });
+      }
+      return baseFetch(input);
+    });
+    renderAppAt('#/search?q=vector%20clocks', fetchMock);
+
+    expect(await screen.findByRole(
+      'button',
+      { name: 'Open moment in Vector Clocks Lecture at 00:01' },
+      routeFlowTimeout,
+    )).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText('Workspace'), 'workspace-2');
+
+    await waitFor(() => expect(window.location.hash).toBe('#/search'));
+    expect(await screen.findByLabelText('Search within Operations')).toHaveValue('');
+    expect(screen.queryByText('Vector Clocks Lecture')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', {
+      name: 'Open moment in Vector Clocks Lecture at 00:01',
+    })).not.toBeInTheDocument();
+
+    const input = screen.getByLabelText('Search within Operations');
+    await user.type(input, 'incident timeline');
+    await user.keyboard('{Enter}');
+    const operationsMoment = await screen.findByRole(
+      'button',
+      { name: 'Open moment in Incident Review at 00:03' },
+      routeFlowTimeout,
+    );
+    await user.click(operationsMoment);
+
+    await waitFor(() => expect(window.location.hash)
+      .toBe('#/assets/asset-2?row=row-incident&from=search&q=incident+timeline'));
+    expect(screen.getByLabelText('Workspace')).toHaveValue('workspace-2');
+    await waitFor(() => expect(screen.getByLabelText('Selected transcript moment')).toHaveFocus());
+    expect(screen.getByLabelText('Selected transcript moment')).toHaveTextContent(/first alert/i);
+    expect(searchCalls(fetchMock).map(([input]) => String(input))).toEqual([
+      expect.stringMatching(/q=vector\+clocks.*workspaceId=workspace-1/),
+      expect.stringMatching(/q=incident\+timeline.*workspaceId=workspace-2/),
+    ]);
   });
 
   it('opens a workspace result excerpt and focuses the exact transcript row', async () => {
@@ -244,7 +373,7 @@ describe('Search route query flow', () => {
 
     await user.click(await screen.findByRole(
       'button',
-      { name: 'Open moment 1 in Vector Clocks Lecture' },
+      { name: 'Open moment in Vector Clocks Lecture at 00:01' },
       routeFlowTimeout,
     ));
 
@@ -266,6 +395,30 @@ describe('Search route query flow', () => {
     expect(screen.queryByLabelText('Selected transcript moment')).not.toBeInTheDocument();
   });
 
+  it('returns to the same scoped results without issuing the Search request again', async () => {
+    const user = userEvent.setup();
+    mockTranscriptScrolling();
+    const fetchMock = renderAppAt('#/search?q=vector%20clocks');
+    const momentAction = await screen.findByRole(
+      'button',
+      { name: 'Open moment in Vector Clocks Lecture at 00:01' },
+      routeFlowTimeout,
+    );
+
+    await user.click(momentAction);
+    await waitFor(() => expect(window.location.hash)
+      .toBe('#/assets/asset-1?row=row-2&from=search&q=vector+clocks'));
+    await user.click(await screen.findByRole('button', { name: 'Back to search' }, routeFlowTimeout));
+
+    await waitFor(() => expect(window.location.hash).toBe('#/search?q=vector+clocks'));
+    expect(await screen.findByRole(
+      'button',
+      { name: 'Open moment in Vector Clocks Lecture at 00:01' },
+      routeFlowTimeout,
+    )).toBeInTheDocument();
+    expect(searchCalls(fetchMock)).toHaveLength(1);
+  });
+
   it('uses the same stable row target for Find in transcript', async () => {
     const user = userEvent.setup();
     mockTranscriptScrolling();
@@ -276,7 +429,7 @@ describe('Search route query flow', () => {
     await user.click(screen.getByRole('button', { name: 'Search' }));
     await user.click(await screen.findByRole(
       'button',
-      { name: 'Open moment 1 in Vector Clocks Lecture' },
+      { name: 'Open moment in Vector Clocks Lecture at 00:00' },
       routeFlowTimeout,
     ));
 

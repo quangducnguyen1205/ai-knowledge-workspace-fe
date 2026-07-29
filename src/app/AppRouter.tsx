@@ -286,6 +286,9 @@ export function AppRouter() {
 
   function handleSelectWorkspace(workspaceId: string) {
     workspaceManagement.clearSuccessNotice();
+    if (route.name === 'search') {
+      navigate({ name: 'search' });
+    }
     setPreferredWorkspaceId(workspaceId);
     clearSelection();
     workspaceSearch.reset();
@@ -595,7 +598,7 @@ export function AppRouter() {
         <div className="workspace-setup-card">
           <EmptyState
             title="No workspace yet"
-            description="Create a workspace to upload your first learning video."
+            description="Create a workspace to add your first video."
           />
           <div className="workspace-setup-card__actions">
             <Button type="button" onClick={() => navigate({ name: 'settings' })}>
@@ -701,6 +704,7 @@ export function AppRouter() {
         screenContent = (
           <WorkspaceSearchScreen
             workspaceName={selectedWorkspace.name}
+            assetSources={displayAssets}
             searchableAssetCount={searchableAssetCount}
             resetToken={workspaceSearch.resetToken}
             activeQuery={workspaceSearch.submittedSearch}

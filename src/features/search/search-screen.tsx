@@ -1,9 +1,10 @@
 import type { TranscriptContextResponse } from '../../entities/transcript/model/types';
 import type { SearchResponse, SearchResult } from './api/search-api';
-import { SearchPanel } from './search';
+import { SearchPanel, type SearchAssetSource } from './search';
 
 type SearchScreenProps = {
   workspaceName: string;
+  assetSources: readonly SearchAssetSource[];
   searchableAssetCount: number;
   resetToken: number;
   activeQuery: string | null;
@@ -22,6 +23,7 @@ type SearchScreenProps = {
 
 export function WorkspaceSearchScreen({
   workspaceName,
+  assetSources,
   searchableAssetCount,
   resetToken,
   activeQuery,
@@ -41,16 +43,20 @@ export function WorkspaceSearchScreen({
     <div className="screen-stack workspace-search-screen">
       <header className="page-header">
         <div className="page-header__copy">
-          <p className="hero__eyebrow">{workspaceName}</p>
-          <h1>Workspace Search</h1>
-          <p>Find exact moments across every ready video in this workspace.</p>
+          <p className="hero__eyebrow">Explore</p>
+          <h1>Search within {workspaceName}</h1>
+          <p>Find relevant video moments and open the exact transcript row that matters.</p>
         </div>
       </header>
 
-      <section className="workspace-search-surface" aria-label="Workspace transcript search">
+      <section
+        className="workspace-search-surface"
+        aria-label={`Workspace moment search for ${workspaceName}`}
+      >
         <SearchPanel
           embedded
           workspaceName={workspaceName}
+          assetSources={assetSources}
           searchableAssetCount={searchableAssetCount}
           resetToken={resetToken}
           activeQuery={activeQuery}
