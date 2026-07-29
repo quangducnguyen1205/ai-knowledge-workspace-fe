@@ -1,7 +1,7 @@
 import type { ComponentProps } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TranscriptRow } from '../../entities/transcript/model/types';
 import { AssetDetailScreen } from './detail-screen';
 import type { AssetSummary } from './model/types';
@@ -131,8 +131,13 @@ function renderStudy(overrides: Partial<ComponentProps<typeof AssetDetailScreen>
   return { ...view, props };
 }
 
+beforeEach(() => {
+  vi.stubEnv('VITE_AUTHENTICATION_MODE', 'legacy_session');
+});
+
 afterEach(() => {
   cleanup();
+  vi.unstubAllEnvs();
   resetYouTubeIframeApiLoaderForTests();
   Reflect.deleteProperty(window, 'YT');
   Reflect.deleteProperty(window, 'onYouTubeIframeAPIReady');
@@ -271,7 +276,7 @@ describe('Study YouTube player and transcript seek', () => {
     expect(playAction).toHaveFocus();
   });
 
-  it('keeps upload Study transcript-first with no player or playback controls', () => {
+  it('renders exactly one source-appropriate player for an upload Asset', () => {
     const { Player } = installPlayerApi();
     renderStudy({
       asset: {
@@ -285,11 +290,12 @@ describe('Study YouTube player and transcript seek', () => {
 
     expect(Player).not.toHaveBeenCalled();
     expect(screen.queryByLabelText(/youtube player for/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /play transcript segment/i })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Uploaded video player for Causal ordering')).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /play transcript segment/i })).toHaveLength(2);
     expect(screen.getByText('The introduction starts at zero.')).toBeInTheDocument();
   });
 
-  it('destroys the YouTube player and removes seek controls when Study switches to an upload Asset', async () => {
+  it('destroys the YouTube player and mounts only the Upload player on source change', async () => {
     const { players } = installPlayerApi();
     const view = renderStudy();
     await waitFor(() => expect(players).toHaveLength(1));
@@ -314,7 +320,7 @@ describe('Study YouTube player and transcript seek', () => {
 
     expect(players[0].destroy).toHaveBeenCalledTimes(1);
     expect(screen.queryByLabelText(/youtube player for/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /play transcript segment/i })).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Uploaded video player for Causal ordering')).toBeInTheDocument();
     expect(screen.queryByLabelText('Currently playing transcript segment')).not.toBeInTheDocument();
     expect(screen.getByText('The introduction starts at zero.')).toBeInTheDocument();
   });

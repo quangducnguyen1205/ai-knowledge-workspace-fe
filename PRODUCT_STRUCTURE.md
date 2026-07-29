@@ -12,7 +12,7 @@ The authenticated learning workspace contains:
 
 - Home for Add video/search actions and recent learning
 - Library for video filtering, upload or YouTube URL entry, source display, rename, open, and delete
-- Study for source-aware YouTube playback, transcript reading and explicit segment seek,
+- Study for source-aware YouTube and Upload playback, transcript reading and explicit segment seek,
   transcript-local search, grounded questions, citations, and disclosed details
 - Workspace Search for cross-video results and direct Study navigation
 - Settings for workspace management and account actions
@@ -38,13 +38,17 @@ Authenticated access to Login or Register returns to Home. Signed-out protected 
 
 Desktop primary navigation contains only Home, Library, and Search. Workspace selection and Add video remain global; identity, workspace settings, and sign out live in the account menu.
 
-Study keeps its transcript-first desktop layout, adding a bounded YouTube source surface above
-the transcript/assistant composition. At mobile widths the player remains visible while
-Transcript, Ask, and Details stay keyboard-operable tabs. Upload Assets render no media surface
-because no authorized upload streaming URL exists. Add video and workspace deletion use
-contained dialogs with Escape, focus trapping, and focus restoration.
+Study keeps its transcript-first desktop layout, adding one bounded source surface above the
+transcript/assistant composition: a YouTube iframe for a `YOUTUBE` Asset, or a native video
+element for an `UPLOAD` Asset served by the authorized Spring media endpoint. Exactly one
+player renders per Asset. At mobile widths the player remains visible and inside the media
+viewport while Transcript, Ask, and Details stay keyboard-operable tabs; playback never forces
+a tab change or scrolls hidden transcript content. Where the authentication mode cannot carry
+a native media request, the Upload surface shows bounded copy instead of a broken player. Add
+video and workspace deletion use contained dialogs with Escape, focus trapping, and focus
+restoration.
 
-During YouTube playback, the timestamped active row is marked independently from a
+During playback, the timestamped active row is marked independently from a
 search/citation-selected row. The transcript follows only while follow mode is enabled;
 manual reading suspends it and a visible Resume following action restores alignment.
 

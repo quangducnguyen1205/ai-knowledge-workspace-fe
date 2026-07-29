@@ -8,13 +8,12 @@ import {
   type YouTubePlayerInstance,
   type YouTubePlayerOptions,
 } from './youtube-iframe-api';
+import type { MediaPlaybackSnapshot, MediaPlayerHandle } from './media-player';
 import {
   mapYouTubePlaybackState,
   PLAYBACK_POSITION_POLL_INTERVAL_MS,
   readYouTubePositionMs,
   YouTubePlayer,
-  type MediaPlaybackSnapshot,
-  type MediaPlayerHandle,
 } from './youtube-player';
 
 type MockPlayer = Omit<YouTubePlayerInstance, 'seekTo' | 'playVideo' | 'destroy'> & {

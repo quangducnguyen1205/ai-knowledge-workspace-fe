@@ -94,6 +94,41 @@ describe('frontend import boundaries', () => {
     }
   });
 
+  it('keeps the shared player contract provider-neutral with adapter-owned details', () => {
+    const mediaContract = readSource('features/assets/player/media-player.ts');
+    const youtubePlayer = readSource('features/assets/player/youtube-player.tsx');
+    const uploadPlayer = readSource('features/assets/player/upload-media-player.tsx');
+
+    expect(mediaContract).not.toMatch(/youtube|iframe|HTMLMediaElement|HTMLVideoElement|currentTime|timeupdate|loadedmetadata/i);
+    expect(mediaContract).not.toMatch(/fetch\s*\(|request\s*\(|\/api\//);
+    for (const adapter of [youtubePlayer, uploadPlayer]) {
+      expect(adapter).toMatch(/from '\.\/media-player'/);
+      expect(adapter).toMatch(/MediaPlayerHandle/);
+    }
+    expect(youtubePlayer).not.toMatch(/HTMLVideoElement|timeupdate|loadedmetadata/i);
+    expect(uploadPlayer).not.toMatch(/window\.YT|iframe_api|youtube/i);
+  });
+
+  it('keeps Upload media URL construction inside the asset API boundary', () => {
+    const assetsApi = readSource('features/assets/api/assets-api.ts');
+    const uploadPlayer = readSource('features/assets/player/upload-media-player.tsx');
+
+    expect(assetsApi).toMatch(/\/api\/assets\/\$\{[^}]+\}\/media/);
+    expect(uploadPlayer).not.toMatch(/['"`]\/api\//);
+    expect(uploadPlayer).not.toMatch(/fetch\s*\(|\brequest\s*\(|createObjectURL|IndexedDB|serviceWorker|MediaSource/);
+    expect(uploadPlayer).not.toMatch(/minio|bucket|objectKey|object_key|presigned|originalFilename/i);
+  });
+
+  it('keeps Study playback orchestration free of provider and media-element details', () => {
+    const study = readSource('features/assets/detail-screen.tsx');
+    const transcriptPanel = readSource('features/assets/components/selected-asset-transcript-panel.tsx');
+
+    expect(study).toMatch(/player\/media-player/);
+    expect(study).not.toMatch(/window\.YT|iframe_api|youtube-nocookie|HTMLVideoElement|currentTime|timeupdate|loadedmetadata/);
+    expect(study).not.toMatch(/['"`]\/api\//);
+    expect(transcriptPanel).not.toMatch(/HTMLVideoElement|currentTime|timeupdate|loadedmetadata|player\//i);
+  });
+
   it('keeps assistant orchestration independent from citation presentation and citations request-free', () => {
     const assistantHook = readSource('features/assistant/hooks/use-asset-assistant.ts');
     const citationList = readSource('features/assistant/components/assistant-citation-list.tsx');

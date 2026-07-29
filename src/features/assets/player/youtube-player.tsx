@@ -7,28 +7,15 @@ import {
 } from 'react';
 import { SourceBadge } from '../components/source-badge';
 import {
+  toPlaybackPositionMs,
+  type MediaPlaybackSnapshot,
+  type MediaPlaybackState,
+  type MediaPlayerHandle,
+} from './media-player';
+import {
   loadYouTubeIframeApi,
   type YouTubePlayerInstance,
 } from './youtube-iframe-api';
-
-export type MediaPlayerHandle = {
-  seekToMs(timeMs: number): void;
-  play(): void;
-};
-
-export type MediaPlaybackState =
-  | 'unstarted'
-  | 'playing'
-  | 'paused'
-  | 'buffering'
-  | 'ended'
-  | 'cued'
-  | 'error';
-
-export type MediaPlaybackSnapshot = {
-  state: MediaPlaybackState;
-  positionMs: number | null;
-};
 
 export type MediaPlayerState = 'idle' | 'loading-api' | 'creating-player' | 'ready' | 'error';
 export const PLAYBACK_POSITION_POLL_INTERVAL_MS = 250;
@@ -67,10 +54,7 @@ export function mapYouTubePlaybackState(state: number): MediaPlaybackState {
 }
 
 export function readYouTubePositionMs(player: YouTubePlayerInstance): number | null {
-  const seconds = player.getCurrentTime();
-  return Number.isFinite(seconds) && seconds >= 0
-    ? Math.floor(seconds * 1_000)
-    : null;
+  return toPlaybackPositionMs(player.getCurrentTime());
 }
 
 export const YouTubePlayer = forwardRef<MediaPlayerHandle, {

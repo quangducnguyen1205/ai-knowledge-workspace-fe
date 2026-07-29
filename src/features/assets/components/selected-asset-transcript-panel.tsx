@@ -189,8 +189,8 @@ export function SelectedAssetTranscriptPanel({
         {displayTranscriptRows.length ? (
           <>
             {followMode === 'suspended-by-user' ? (
-              <div className="transcript-follow-control" role="status">
-                <span>Transcript following is paused.</span>
+              <div className="transcript-follow-control">
+                <span role="status">Transcript following is paused.</span>
                 <button
                   type="button"
                   className="button button--secondary"

@@ -24,11 +24,15 @@ import {
   type TranscriptFollowMode,
 } from './components/selected-asset-transcript-panel';
 import { StatusBadge } from './components/status-badge';
+import type {
+  MediaPlaybackSnapshot,
+  MediaPlayerHandle,
+} from './player/media-player';
 import {
-  YouTubePlayer,
-  type MediaPlaybackSnapshot,
-  type MediaPlayerHandle,
-} from './player/youtube-player';
+  supportsNativeMediaPlayback,
+  UploadMediaPlayer,
+} from './player/upload-media-player';
+import { YouTubePlayer } from './player/youtube-player';
 import { AssetAssistantPanel } from '../assistant/components/asset-assistant-panel';
 import { SearchPanel } from '../search/search';
 
@@ -146,6 +150,9 @@ export function AssetDetailScreen({
   const youtubeVideoId = asset?.sourceType === 'YOUTUBE'
     ? asset.youtubeVideoId
     : null;
+  const uploadMediaAssetId = asset?.sourceType === 'UPLOAD' ? asset.assetId : null;
+  const uploadPlaybackAvailable = uploadMediaAssetId !== null && supportsNativeMediaPlayback();
+  const mediaPlaybackAvailable = Boolean(youtubeVideoId) || uploadPlaybackAvailable;
   const timestampedRowCount = useMemo(
     () => (transcriptRows ?? []).filter(
       (row) => row.startMs !== null && row.endMs !== null,
@@ -189,7 +196,7 @@ export function AssetDetailScreen({
     setActivePlaybackRowId(null);
     setFollowMode('following');
     setAcknowledgedFocusedRowId(null);
-  }, [asset?.assetId, youtubeVideoId]);
+  }, [asset?.assetId, youtubeVideoId, uploadMediaAssetId]);
 
   useEffect(() => {
     if (!focusedTranscriptRowId) return;
@@ -374,6 +381,17 @@ export function AssetDetailScreen({
         />
       ) : null}
 
+      {uploadMediaAssetId ? (
+        <UploadMediaPlayer
+          key={`${uploadMediaAssetId}:upload`}
+          ref={playerRef}
+          assetId={uploadMediaAssetId}
+          title={asset.title}
+          playbackObservationEnabled={timestampedRowCount > 0}
+          onPlaybackSnapshot={handlePlaybackSnapshot}
+        />
+      ) : null}
+
       <div className="study-tabs" role="tablist" aria-label="Study views">
         {(['transcript', 'ask', 'details'] as const).map((tab) => (
           <button
@@ -433,7 +451,7 @@ export function AssetDetailScreen({
             transcriptLoading={transcriptLoading}
             focusedTranscriptRowId={focusedTranscriptRowId}
             focusedTranscriptSource={focusedTranscriptSource}
-            activePlaybackRowId={youtubeVideoId ? activePlaybackRowId : null}
+            activePlaybackRowId={mediaPlaybackAvailable ? activePlaybackRowId : null}
             followMode={effectiveFollowMode}
             transcriptViewVisible={!isMobileStudyLayout || activeTab === 'transcript'}
             onSuspendFollowing={() => {
@@ -444,7 +462,7 @@ export function AssetDetailScreen({
               setFollowMode('following');
               setAcknowledgedFocusedRowId(focusedTranscriptRowId);
             }}
-            onPlaySegment={youtubeVideoId
+            onPlaySegment={mediaPlaybackAvailable
               ? (startMs, rowIdentity) => {
                   setFollowMode('following');
                   setAcknowledgedFocusedRowId(focusedTranscriptRowId);

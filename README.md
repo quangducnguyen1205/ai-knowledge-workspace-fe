@@ -54,6 +54,14 @@ codes. Upload-only filename, content type, and size fields are rendered only whe
 Internal FastAPI V2 performs temporary YouTube acquisition as part of processing; that
 internal boundary is not browser-accessible.
 
+## Source-Aware Study Playback
+
+Study mounts exactly one media adapter per Asset. Both adapters implement the same
+provider-neutral contract in `features/assets/player/media-player.ts`: millisecond seek,
+play, and `{ state, positionMs }` playback snapshots. Provider constants stay in the YouTube
+adapter and media-element details stay in the Upload adapter, so transcript synchronization
+and Study orchestration consume neutral snapshots only.
+
 ## YouTube Player And Transcript Seek
 
 Study renders the official YouTube IFrame Player API only when the authoritative Asset
@@ -66,8 +74,49 @@ Transcript rows with both `startMs` and `endMs` expose an explicit, keyboard-ope
 `Play transcript segment from …` control. Activation seeks to the exact `startMs` and
 starts playback; conversion from milliseconds to YouTube seconds occurs only inside the
 adapter. If the player is not ready, only the latest pending seek is applied once on
-readiness. Upload Assets remain transcript-first because Spring exposes no authorized
-upload streaming contract.
+readiness.
+
+## Upload Playback Through Spring
+
+An `UPLOAD` Asset plays through a native HTML `<video>` element whose source is the
+authorized Spring endpoint `GET /api/assets/{assetId}/media`. The URL is derived from the
+Asset id alone using the same API-base convention as every other product request, so a blank
+`VITE_API_BASE_URL` keeps media same-origin behind the deployment proxy. The browser never
+learns a bucket, object key, storage host, or upload filename, never calls MinIO or FastAPI,
+and never reconstructs a storage path from upload metadata.
+
+The element uses native controls, `preload="metadata"`, `playsInline`, and no autoplay. HTTP
+Range handling is delegated entirely to the browser and Spring: the frontend never fetches
+media as a Blob, never creates an object URL from a full response, never concatenates ranges
+manually, and never caches media bytes in state or IndexedDB. No `crossOrigin` attribute is
+set, because the supported topology is same-origin. Actual browser Range behavior is
+verified separately in Slice 4C.
+
+Upload media renders independently of transcript readiness, including while the Asset is
+`PROCESSING` or `FAILED`. Browser media events (`loadstart`, `loadedmetadata`, `canplay`,
+`playing`, `pause`, `waiting`, `stalled`, `seeking`, `seeked`, `timeupdate`, `ended`,
+`error`) are mapped deterministically to the neutral playback model inside the adapter and
+never leave it; there is no polling loop for Upload. `currentTime` seconds are floored to
+integer milliseconds by the same shared rule the YouTube adapter uses, and non-finite or
+negative positions become `null`. Redundant snapshots are suppressed when state and position
+are unchanged.
+
+A rejected or unavailable `HTMLMediaElement.play()` promise becomes bounded, non-fatal
+interaction feedback rather than an uncaught rejection or raw browser text. A media error
+shows bounded copy, clears playback-active state, and stops synchronization while leaving
+the transcript, search, assistant, retry, and details surfaces intact. Raw media error codes,
+HTTP bodies, and storage errors are never rendered.
+
+### Authentication Delivery Boundary
+
+A native `<video src="…">` request cannot attach an in-memory bearer token. Upload playback
+is therefore offered only in `legacy_session` mode, where the request carries the same
+authenticated session credential the rest of the product already uses. In `keycloak_jwt`
+mode the frontend renders bounded copy — `Upload playback is not available in this
+authentication mode yet.` — and creates no media element and no misleading seek actions. It
+does not buffer the file as a Blob, put a token in the URL or a query parameter, expose a
+presigned storage URL, or add a service worker or MediaSource implementation. Native-media
+delivery for bearer mode is a deferred, separately designed boundary.
 
 The browser continues to use Spring for product data and connects to YouTube only for the
 official iframe player. It never calls FastAPI. This repository currently sets no
@@ -91,8 +140,14 @@ Transcript auto-follow begins enabled, scrolls only when the active row is near 
 the dedicated transcript viewport, and respects reduced-motion preferences. Wheel, touch,
 keyboard scrolling, scrollbar interaction, text selection, and search/citation navigation
 suspend following. `Resume following` or an explicit Play segment action restores it without
-moving focus as playback advances. Provider errors stop sampling and clear playback-active
-state while preserving transcript reading and the external YouTube fallback.
+moving focus as playback advances. The paused-follow live status text is separate from the
+`Resume following` control so the status region stays non-interactive. Player errors stop
+observation and clear playback-active state while preserving transcript reading and, for
+YouTube, the external fallback.
+
+Upload and YouTube share this synchronization entirely. There is no Upload-specific active
+row resolver, follow mode, or presentation, and playback position is never stored in React
+Query or sent to Spring. Watch progress is not persisted.
 
 ## Asset Processing And Indexing Lifecycle
 
@@ -167,15 +222,20 @@ Dockerized frontend build has also passed successfully, and the Docker local-dev
 - no full accessibility certification; P3-C4 was a targeted local browser smoke with keyboard/focus/error-state checks
 - no collaboration, chat history, provider/model controls, browser-to-FastAPI calls, or
   browser provider access beyond the official YouTube iframe
-- no upload playback because there is no authorized browser media URL contract
+- no Upload playback in `keycloak_jwt` mode, because no native-media credential path exists
+  for a bearer token yet
+- no full-file Blob buffering, object URLs, manual Range handling, media caching, service
+  worker, or MediaSource implementation for Upload playback
+- no persisted watch progress
+- no production CDN or dedicated media-delivery design
 - no synchronization telemetry or drift correction beyond deterministic provider-position
   sampling, and no timeline state, playlist/channel ingestion, or source metadata editing
 - no transcript timestamps invented on the frontend
 - no heavy design system or production-grade docs set
 
-Static Slice 3B synchronization does not mark all of Phase 3 complete. Browser/runtime
-YouTube player acceptance, production CSP hardening, and upload playback remain separate
-work.
+Static Slice 4B does not mark all of Phase 4 complete. Browser/runtime Upload playback
+acceptance is Slice 4C, and browser/runtime YouTube player acceptance, production CSP
+hardening, and bearer-mode native-media delivery remain separate work.
 
 ## Optional Host-Node Path
 

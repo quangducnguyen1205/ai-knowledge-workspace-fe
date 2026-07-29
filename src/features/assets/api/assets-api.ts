@@ -3,7 +3,7 @@ import {
   type TranscriptRow,
   type TranscriptRowPayload,
 } from '../../../entities/transcript/model/types';
-import { buildQueryString, request } from '../../../shared/api/http-client';
+import { buildApiUrl, buildQueryString, request } from '../../../shared/api/http-client';
 import type {
   AssetIndexResponse,
   AssetProcessingResponse,
@@ -57,6 +57,16 @@ export async function getAssetTranscript(assetId: string, signal?: AbortSignal):
 
 export async function indexAssetTranscript(assetId: string): Promise<AssetIndexResponse> {
   return request<AssetIndexResponse>(`/api/assets/${assetId}/index`, { method: 'POST' });
+}
+
+/**
+ * Authorized Spring media location for an Asset, derived from the Asset id alone.
+ *
+ * Spring owns object-storage identity, Range handling and authorization. The browser never
+ * learns a bucket, object key, storage host or upload filename from this URL.
+ */
+export function buildAssetMediaUrl(assetId: string): string {
+  return buildApiUrl(`/api/assets/${encodeURIComponent(assetId)}/media`);
 }
 
 export async function retryAssetProcessing(assetId: string): Promise<AssetProcessingResponse> {

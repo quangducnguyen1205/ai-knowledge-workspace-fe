@@ -8,6 +8,7 @@ This repo implements the focused learning-workspace frontend for AI Knowledge Wo
 - workspace selection and management
 - source-explicit video entry through upload file or YouTube URL
 - official YouTube iframe playback with explicit timestamped transcript seek actions
+- authorized Upload playback through the Spring media endpoint using a native HTML video element
 - visibility-aware playback sampling, active transcript indication, and user-controlled follow
 - processing and transcript review
 - automatic search preparation with explicit indexing retained only as recovery
@@ -75,6 +76,7 @@ This refactor preserves existing routes, API request shapes, auth defaults, toke
 - Poll processing state until terminal
 - Retry authorized failed processing on the same upload or YouTube Asset and resume the existing polling lifecycle
 - Play Spring-identified YouTube Assets in Study and seek from fully timestamped transcript rows
+- Play authorized Upload Assets in Study through `GET /api/assets/{assetId}/media` with the same seek, active-row, and follow behavior
 - Follow the active timestamped transcript row while preserving manual reading and selected context
 - Load transcript rows only when the backend says they are ready
 - Explicitly index transcript rows to unlock search
@@ -110,6 +112,7 @@ This refactor preserves existing routes, API request shapes, auth defaults, toke
 - `DELETE /api/assets/{assetId}`
 - `GET /api/assets/{assetId}/status`
 - `GET /api/assets/{assetId}/transcript`
+- `GET /api/assets/{assetId}/media`
 - `POST /api/assets/{assetId}/index`
 - `GET /api/search`
 - `GET /api/assets/{assetId}/transcript/context`
@@ -140,6 +143,30 @@ active is distinct from search/citation focus. Auto-follow uses a dedicated tran
 viewport, respects reduced motion, suspends for manual reading intent, and exposes
 `Resume following`. Provider errors destroy the failed iframe once, stop sampling, clear the
 playback marker, and preserve transcript/fallback behavior.
+
+Upload Study playback uses a native HTML `<video>` element sourced from the authorized Spring
+endpoint `GET /api/assets/{assetId}/media`, derived from the Asset id alone through the same
+API-base convention as every other request. Spring owns authorization, HTTP Range and
+object-storage identity; the browser never sees a bucket, object key, storage host or upload
+filename, never calls MinIO or FastAPI, and never buffers the file as a Blob, creates an
+object URL from a full response, assembles ranges manually, or caches media bytes. The
+element uses native controls, `preload="metadata"`, `playsInline`, no autoplay and no
+`crossOrigin`, and delegates Range strategy to the browser.
+
+The Upload adapter maps browser media events to the same neutral playback model with no
+polling loop, floors `currentTime` seconds to integer milliseconds by the shared rule, treats
+non-finite or negative positions as `null`, suppresses redundant snapshots, retains only the
+latest pre-metadata command, and clears pending commands on Asset change, error and unmount.
+A rejected play promise becomes bounded non-fatal feedback. Media errors show bounded copy,
+clear the playback marker and stop synchronization while transcript, search, assistant, retry
+and details remain usable. Raw media codes, HTTP bodies and storage errors are never rendered,
+and a media failure is never presented as Asset processing failure.
+
+Because a native media request cannot attach an in-memory bearer token, Upload playback is
+supported in `legacy_session` mode only, where the existing authenticated session credential
+applies. In `keycloak_jwt` mode Study renders bounded copy, no media element and no seek
+actions. Native-media delivery for bearer mode is a deferred, separately designed boundary.
+Browser Range behavior and runtime Upload playback acceptance are verified in Slice 4C.
 
 ## 7. Project 3 Auth Foundation
 
@@ -191,17 +218,22 @@ playback marker, and preserve transcript/fallback behavior.
 - Study exposes the same transcript-hit/context behavior as Find in transcript, scoped to the current video
 - No general-purpose chat history, provider controls or fake AI affordances were added.
   The supported asset-scoped grounded answer and citation UI calls Spring only.
-- Upload playback, provider inference from source URLs, persisted playback state and optional
-  synchronization telemetry remain out of scope.
-- Browser/runtime iframe acceptance remains pending. Static Slice 3B does not mark all of Phase 3 complete.
+- Provider inference from source URLs, persisted playback state and optional synchronization
+  telemetry remain out of scope.
+- Upload playback in `keycloak_jwt` mode remains out of scope until a native-media credential
+  path exists.
+- Browser/runtime iframe and Upload media acceptance remain pending. Static Slice 4B does not
+  mark all of Phase 4 complete.
 
 ## 11. Intentionally Deferred
 
 - Chat or assistant flows
-- Upload playback until an authorized Spring media URL contract exists
+- Native Upload media delivery in bearer/Keycloak authentication mode
+- Persisted watch progress
+- Production CDN or dedicated media-delivery design
 - Playlist/channel ingestion and source metadata editing
-- Browser/runtime player acceptance, production CSP/deployment hardening, and optional
-  synchronization telemetry/drift diagnostics
+- Browser/runtime player acceptance including Slice 4C Upload playback, production
+  CSP/deployment hardening, and optional synchronization telemetry/drift diagnostics
 - Collaboration features
 - Cross-workspace asset movement
 - Advanced search filters

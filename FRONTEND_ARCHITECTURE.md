@@ -67,23 +67,33 @@ The baseline was `0c4797436c9e7106146388a09322e2d32782fceb`. `AppShell.tsx` was 
 Transcript rows, search results, transcript-context rows, and assistant citations preserve
 nullable `startMs`/`endMs` integer-millisecond metadata. Feature API adapters normalize legacy
 payloads with missing timing fields to the single internal representation `null`; `0` remains a
-valid value. Study now renders an explicit seek action only for a YouTube Asset row with both
-timing bounds; the transcript passes exact milliseconds to a feature-owned player handle and
-does not import or manipulate `window.YT`.
+valid value. Study renders an explicit seek action only when a usable media player is mounted
+and the row has both timing bounds; the transcript passes exact milliseconds to a
+provider-neutral player handle and does not import or manipulate `window.YT` or any
+`HTMLMediaElement`.
+
+`buildApiUrl` is the single API-base resolution used by both requests and the native Upload
+media source, so an empty `VITE_API_BASE_URL` keeps media same-origin behind the deployment
+proxy. `buildAssetMediaUrl` in the asset feature API is the only place the authorized
+`GET /api/assets/{assetId}/media` path is constructed, and it derives that path from the
+Asset id alone.
 
 ## Asset, upload, lifecycle, and search ownership
 
 - `useAssetSelection` owns the workspace list query, deep-link/preferred selection reconciliation, selected ID refs, and selection continuity across list refreshes.
 - `useAssetUpload` owns upload mutation state, workspace request mapping, list invalidation, scope reset, and a narrow post-success callback. `AssetUploadForm` owns only title/file validation and file-input reset behavior.
 - `useAssetLifecycle` is the sole status/transcript polling owner. It keeps the existing 3,000 ms interval, polls only `PROCESSING` and `TRANSCRIPT_READY`, passes `AbortSignal` to status/transcript reads, refreshes list/search caches after automatic progress, stops at terminal/searchable status, and exposes semantic capability flags.
-- `features/assets/player` owns the retryable singleton official YouTube IFrame API loader, privacy-enhanced player construction, neutral playback-state mapping, visibility-aware 250 ms position sampling, bounded readiness/error cleanup, and one latest pending seek command. Playback state is local ephemeral UI state and never enters React Query or product lifecycle state.
-- `entities/transcript/model/active-transcript-row.ts` owns provider-neutral active-row identity and inclusive-start/exclusive-end resolution. `AssetDetailScreen` connects neutral snapshots to row identity and one explicit follow mode; transcript presentation owns active/focused markers, user suspension and bounded viewport scrolling.
+- `features/assets/player/media-player.ts` owns the provider-neutral contract shared by every adapter: `MediaPlayerHandle`, `MediaPlaybackState`, `MediaPlaybackSnapshot`, and the documented floor-to-milliseconds position rule. It contains no provider constant and no media-element detail.
+- `features/assets/player/youtube-player.tsx` owns the retryable singleton official YouTube IFrame API loader, privacy-enhanced player construction, provider state numbers, visibility-aware 250 ms position sampling, bounded readiness/error cleanup, and one latest pending seek command.
+- `features/assets/player/upload-media-player.tsx` owns native HTML `<video>` playback of the authorized Spring media endpoint, the browser-event to neutral-state mapping, event-driven position observation with no polling loop, bounded loading/error/unsupported-auth presentation, and the same latest-pending-command policy. It also owns the native-media authentication capability check: Upload playback is offered in `legacy_session` mode only, because a media element cannot attach an in-memory bearer token.
+- Study mounts exactly one adapter per Asset. Playback state is local ephemeral UI state and never enters React Query or product lifecycle state; watch progress is not persisted. HTTP Range handling is delegated to the browser and Spring, and no media bytes are buffered, cached, or assembled in the browser.
+- `entities/transcript/model/active-transcript-row.ts` owns provider-neutral active-row identity and inclusive-start/exclusive-end resolution. `AssetDetailScreen` connects neutral snapshots to row identity and one explicit follow mode; transcript presentation owns active/focused markers, user suspension and bounded viewport scrolling. YouTube and Upload share this single implementation; there is no source-specific resolver or follow mode.
 - `AssetIndexingRecoveryAction` renders explicit indexing only from lifecycle-derived recovery state. It retains the secondary button, current recovery explanation, existing POST endpoint, mutation errors, and post-success list/search refresh.
 - `useAssetManagement` owns rename/delete mutation state, cache reconciliation, success notices, and stale 404 cleanup. `AssetList`, `SelectedAssetPanel`, `AssetLifecyclePanel`, and `SelectedAssetTranscriptPanel` own their focused presentation boundaries.
 - `useSearchController` owns submitted query, workspace/optional-asset scope, abortable search/context queries, selected result, stale-result cleanup, and reset rules. Search presentation does not own assistant answers.
 - `useWorkspaceManagement` now owns workspace mutation notices and 404 reconciliation; bootstrap selection remains isolated in `useWorkspaceBootstrap`.
 
-Static assertions protect the neutral HTTP direction, shell/API separation, lifecycle/assistant separation, upload/polling separation, infrastructure URL ban, and absence of circular production imports.
+Static assertions protect the neutral HTTP direction, shell/API separation, lifecycle/assistant separation, upload/polling separation, infrastructure URL ban, the provider-neutral player contract, Upload media URL ownership inside the asset feature API, media-element details staying inside the Upload adapter, and absence of circular production imports.
 
 ## Assistant and citation ownership
 

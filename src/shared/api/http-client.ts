@@ -26,7 +26,12 @@ export const backendDisplayUrl =
 
 export const usingProxy = normalizedApiBaseUrl.length === 0;
 
-function buildUrl(path: string): string {
+/**
+ * Resolves a product API path against the configured API base. An empty base keeps the
+ * request same-origin so the deployment proxy owns backend routing. Non-request browser
+ * consumers, such as a native media element source, must use this same construction.
+ */
+export function buildApiUrl(path: string): string {
   return normalizedApiBaseUrl ? `${normalizedApiBaseUrl}${path}` : path;
 }
 
@@ -104,7 +109,7 @@ export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
 
   try {
-    response = await fetch(buildUrl(path), buildRequestInit(init));
+    response = await fetch(buildApiUrl(path), buildRequestInit(init));
   } catch {
     throw new ApiClientError(0, getSafeTransportErrorMessage(0));
   }
