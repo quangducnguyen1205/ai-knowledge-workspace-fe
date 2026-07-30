@@ -12,9 +12,8 @@ import type { AuthConfigurationIssue } from '../../lib/auth-config';
 import { Button, ErrorBanner } from '../../lib/ui';
 import { useAuth } from './auth-provider';
 
-export const authKeys = {
-  currentUser: ['auth', 'me'] as const,
-};
+export { authKeys } from './auth-keys';
+import { authKeys } from './auth-keys';
 
 export function useCurrentUserQuery() {
   const auth = useAuth();

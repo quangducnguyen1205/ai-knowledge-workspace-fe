@@ -7,13 +7,8 @@ export type SearchParams = { query: string; workspaceId: string; assetId?: strin
 export type TranscriptContextParams = { assetId: string; transcriptRowId: string; window: number };
 type SubmittedSearchState = { query: string; scopeKey: string };
 
-export const searchKeys = {
-  all: ['search'] as const,
-  results: (workspaceId: string, query: string, assetId?: string | null) =>
-    ['search', 'results', workspaceId, assetId ?? 'all-assets', query] as const,
-  context: (assetId: string, transcriptRowId: string, window: number) =>
-    ['search', 'context', assetId, transcriptRowId, window] as const,
-};
+export { searchKeys } from '../model/search-keys';
+import { searchKeys } from '../model/search-keys';
 
 export function useTranscriptContextQuery(params: TranscriptContextParams | null) {
   return useQuery({

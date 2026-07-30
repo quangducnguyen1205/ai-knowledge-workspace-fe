@@ -5,6 +5,7 @@ import { assetKeys, useDeleteAssetMutation, useRenameAssetMutation } from './ass
 import type { AssetSourceType, AssetSummary } from '../model/types';
 import { useEphemeralNotice } from '../../../shared/ui/use-ephemeral-notice';
 import type { SearchResponse } from '../../search/api/search-api';
+import { searchKeys } from '../../search/model/search-keys';
 
 export function useAssetManagement({
   currentUserId,
@@ -47,7 +48,7 @@ export function useAssetManagement({
     queryClient.setQueryData<AssetSummary[] | undefined>(assetKeys.list(assetWorkspaceId), (current) =>
       current?.filter((asset) => asset.assetId !== assetId),
     );
-    queryClient.setQueriesData<SearchResponse>({ queryKey: ['search', 'results'] }, (current) => {
+    queryClient.setQueriesData<SearchResponse>({ queryKey: searchKeys.allResults }, (current) => {
       if (!current?.results.some((result) => result.assetId === assetId)) return current;
       const results = current.results.filter((result) => result.assetId !== assetId);
       return { ...current, results, resultCount: results.length };
@@ -60,7 +61,7 @@ export function useAssetManagement({
     }
     if (preferredAssetIdRef.current === assetId) setPreferredAssetId(null);
     onClearAssetReferences(assetId);
-    queryClient.removeQueries({ queryKey: ['search', 'context', assetId] });
+    queryClient.removeQueries({ queryKey: searchKeys.contextScope(assetId) });
   }
 
   function handleDeleteAsset(asset: AssetSummary) {
@@ -84,7 +85,7 @@ export function useAssetManagement({
           });
           await Promise.all([
             queryClient.invalidateQueries({ queryKey: assetKeys.list(variables.workspaceId) }),
-            queryClient.invalidateQueries({ queryKey: ['search', 'results', variables.workspaceId] }),
+            queryClient.invalidateQueries({ queryKey: searchKeys.resultsScope(variables.workspaceId) }),
           ]);
         },
         onError: async (error, variables) => {
@@ -92,7 +93,7 @@ export function useAssetManagement({
             clearAssetDependentState(variables.assetId, variables.workspaceId);
             await Promise.all([
               queryClient.invalidateQueries({ queryKey: assetKeys.list(variables.workspaceId) }),
-              queryClient.invalidateQueries({ queryKey: ['search', 'results', variables.workspaceId] }),
+              queryClient.invalidateQueries({ queryKey: searchKeys.resultsScope(variables.workspaceId) }),
             ]);
           }
         },
@@ -132,7 +133,7 @@ export function useAssetManagement({
             }
             await Promise.all([
               queryClient.invalidateQueries({ queryKey: assetKeys.list(variables.workspaceId) }),
-              queryClient.invalidateQueries({ queryKey: ['search', 'results', variables.workspaceId] }),
+              queryClient.invalidateQueries({ queryKey: searchKeys.resultsScope(variables.workspaceId) }),
             ]);
           }
         },

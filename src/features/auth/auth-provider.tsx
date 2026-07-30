@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { configureApiAuth } from '../../shared/api/http-client';
+import { authKeys } from './auth-keys';
 import {
   readFrontendAuthConfig,
   type AuthConfigurationIssue,
@@ -101,7 +102,7 @@ export function AuthProvider({
     clearBearerToken();
     setAuthErrorMessage(null);
     setKeycloakPhase('unauthenticated');
-    queryClient.removeQueries({ queryKey: ['auth', 'me'] });
+    queryClient.removeQueries({ queryKey: authKeys.currentUser });
   }, [clearBearerToken, config.mode, queryClient]);
 
   const handleAuthModeUnavailable = useCallback(() => {
@@ -112,7 +113,7 @@ export function AuthProvider({
     clearBearerToken();
     setAuthErrorMessage('The current sign-in method is not available.');
     setKeycloakPhase('auth_mode_unavailable');
-    queryClient.removeQueries({ queryKey: ['auth', 'me'] });
+    queryClient.removeQueries({ queryKey: authKeys.currentUser });
   }, [clearBearerToken, config.mode, queryClient]);
 
   useEffect(() => {
@@ -193,7 +194,7 @@ export function AuthProvider({
     clearBearerToken();
     setAuthErrorMessage(null);
     setKeycloakPhase(config.mode === 'keycloak_jwt' ? 'unauthenticated' : null);
-    queryClient.removeQueries({ queryKey: ['auth'] });
+    queryClient.removeQueries({ queryKey: authKeys.all });
 
     if (oidcClient) {
       await oidcClient.clearLocalSession();

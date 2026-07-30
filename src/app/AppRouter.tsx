@@ -333,7 +333,7 @@ export function AppRouter() {
     }
 
     queryClient.removeQueries({ queryKey: assetKeys.list(workspaceId) });
-    queryClient.removeQueries({ queryKey: ['search', 'results', workspaceId] });
+    queryClient.removeQueries({ queryKey: searchKeys.resultsScope(workspaceId) });
     queryClient.removeQueries({ queryKey: searchKeys.all });
 
     setPreferredWorkspaceId(null);
@@ -472,7 +472,7 @@ export function AppRouter() {
   }
 
   function updateSearchResultTitles(assetId: string, title: string) {
-    queryClient.setQueriesData<SearchResponse>({ queryKey: ['search', 'results'] }, (current) => {
+    queryClient.setQueriesData<SearchResponse>({ queryKey: searchKeys.allResults }, (current) => {
       if (!current?.results?.length) {
         return current;
       }

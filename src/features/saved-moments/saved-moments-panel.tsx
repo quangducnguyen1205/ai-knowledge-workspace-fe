@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { buildMomentPermalink } from '../../entities/moment/model';
 import { formatTranscriptTimestamp } from '../../entities/transcript/model/transcript-time';
-import { Button, EmptyState, ErrorBanner, LoadingBlock, formatDateTime } from '../../lib/ui';
+import { Button, EmptyState, ErrorBanner, LoadingBlock, PanelHeading } from '../../shared/ui';
+import { formatDateTime } from '../../shared/format';
 import { SourceBadge } from '../assets/components/source-badge';
 import type { SavedMoment } from './api/saved-moments-api';
 
@@ -163,20 +164,19 @@ export function SavedMomentsPanel({
 
   return (
     <section className="saved-moments" aria-labelledby="saved-moments-title">
-      <div className="saved-moments__heading">
-        <div>
-          <p className="panel__eyebrow">Saved</p>
-          {/* tabIndex -1 keeps the heading out of normal Tab order while allowing programmatic focus. */}
-          <h2 id="saved-moments-title" ref={headingRef} tabIndex={-1}>Saved moments</h2>
-        </div>
-        {!isLoading && !error && items.length ? (
+      <PanelHeading
+        eyebrow="Saved"
+        trailing={!isLoading && !error && items.length ? (
           <p className="search-summary" role="status">
             <strong>{items.length}</strong> {items.length === 1 ? 'saved moment' : 'saved moments'}
             {' in '}
             {workspaceName}
           </p>
         ) : null}
-      </div>
+      >
+        {/* tabIndex -1 keeps the heading out of normal Tab order while allowing programmatic focus. */}
+        <h2 id="saved-moments-title" ref={headingRef} tabIndex={-1}>Saved moments</h2>
+      </PanelHeading>
 
       {isLoading ? (
         <div className="saved-moments__status" role="status" aria-live="polite" aria-atomic="true">
@@ -209,11 +209,7 @@ export function SavedMomentsPanel({
                 <div className="saved-moment__header">
                   <span className="saved-moment__identity">
                     <span className="saved-moment__asset-title">{moment.assetTitle}</span>
-                    {moment.sourceType ? (
-                      <SourceBadge sourceType={moment.sourceType} />
-                    ) : (
-                      <span className="source-badge source-badge--unknown">Source unavailable</span>
-                    )}
+                    <SourceBadge sourceType={moment.sourceType} />
                   </span>
                   <span className="saved-moment__timestamp">
                     <span>Video moment</span>

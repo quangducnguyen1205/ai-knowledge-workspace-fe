@@ -1,5 +1,6 @@
 import { formatTranscriptTimestamp } from '../../entities/transcript/model/transcript-time';
-import { Button, EmptyState, ErrorBanner, LoadingBlock, formatDateTime } from '../../lib/ui';
+import { Button, EmptyState, ErrorBanner, LoadingBlock, PanelHeading } from '../../shared/ui';
+import { formatDateTime } from '../../shared/format';
 import { SourceBadge } from '../assets/components/source-badge';
 import type { ContinueWatchingItem } from './api/continue-watching-api';
 
@@ -31,17 +32,16 @@ export function ContinueWatchingPanel({
 }: ContinueWatchingPanelProps) {
   return (
     <section className="continue-watching" aria-labelledby="continue-watching-title">
-      <div className="continue-watching__heading">
-        <div>
-          <p className="panel__eyebrow">Playback</p>
-          <h2 id="continue-watching-title">Continue watching</h2>
-        </div>
-        {!isLoading && !error && items.length ? (
+      <PanelHeading
+        eyebrow="Playback"
+        trailing={!isLoading && !error && items.length ? (
           <p className="search-summary" role="status">
             <strong>{items.length}</strong> {items.length === 1 ? 'video' : 'videos'} in progress
           </p>
         ) : null}
-      </div>
+      >
+        <h2 id="continue-watching-title">Continue watching</h2>
+      </PanelHeading>
 
       {isLoading ? (
         <div className="continue-watching__status" role="status" aria-live="polite" aria-atomic="true">
@@ -70,11 +70,7 @@ export function ContinueWatchingPanel({
                 <div className="continue-watching-item__header">
                   <span className="continue-watching-item__identity">
                     <span className="continue-watching-item__title">{item.assetTitle}</span>
-                    {item.sourceType ? (
-                      <SourceBadge sourceType={item.sourceType} />
-                    ) : (
-                      <span className="source-badge source-badge--unknown">Source unavailable</span>
-                    )}
+                    <SourceBadge sourceType={item.sourceType} />
                   </span>
                   <span className="continue-watching-item__position">
                     <span>Stopped at</span>

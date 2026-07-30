@@ -8,6 +8,7 @@ import {
   retryAssetProcessing,
 } from '../api/assets-api';
 import { assetKeys } from './asset-queries';
+import { searchKeys } from '../../search/model/search-keys';
 import {
   canLoadTranscript,
   deriveAssetStatus,
@@ -50,7 +51,7 @@ export function useAssetLifecycle({
     if (asset?.assetStatus !== observedAssetStatus) {
       void Promise.all([
         queryClient.invalidateQueries({ queryKey: assetKeys.list(workspaceId) }),
-        queryClient.invalidateQueries({ queryKey: ['search'] }),
+        queryClient.invalidateQueries({ queryKey: searchKeys.all }),
       ]);
     }
 
@@ -191,7 +192,7 @@ export function useAssetLifecycle({
       onSuccess: async () => {
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: workspaceId ? assetKeys.list(workspaceId) : assetKeys.all }),
-          queryClient.invalidateQueries({ queryKey: ['search'] }),
+          queryClient.invalidateQueries({ queryKey: searchKeys.all }),
         ]);
       },
     });

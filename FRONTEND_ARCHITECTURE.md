@@ -60,6 +60,22 @@ The baseline was `0c4797436c9e7106146388a09322e2d32782fceb`. `AppShell.tsx` was 
 - `AppRouter` owns hash-route composition and currently coordinates the remaining route feature seams.
 - `AppShell` owns only global layout/navigation behavior and renders route content through `children`; it imports no asset, upload, search, or assistant API.
 
+## UI foundation and theme
+
+- `src/shared/ui` (public entrypoint `src/shared/ui/index.ts`) owns the reusable primitives:
+  `Button`, `Section`, `PanelHeading`, banners, `LoadingBlock`, `EmptyState`,
+  `useEphemeralNotice`, `joinClassNames`. `src/shared/format` owns generic formatting.
+  `src/lib/ui.tsx` is a compatibility re-export only.
+- `src/shared/theme/tokens.css` is the single owner of shared design decisions (color,
+  typography stacks, geometry, layers, motion, one `--focus` color). Raw brand palette values are
+  legal only there; component CSS consumes semantic tokens.
+- Dependency direction is downward only — page/screen → feature composition → feature components
+  → shared primitives → tokens. The shared/lib tier never imports app, routing, features,
+  entities or React Query (enforced in `import-boundaries.test.ts`).
+- Query keys live with their owners (`search-keys`, `auth-keys`, `assetKeys`, workspace,
+  saved-moment, continue-watching); no module builds `['search', …]`/`['auth', …]` arrays ad hoc.
+- Full detail, the hard-coding policy and the brand palette live in `UI_FOUNDATION_AND_BRAND.md`.
+
 ## Shared HTTP and feature APIs
 
 `shared/api/http-client.ts` is the only request boundary. It preserves Spring base URL resolution, proxy behavior, cookie credentials, in-memory bearer headers, JSON/multipart handling, `AbortSignal`, error parsing, and JWT boundary callbacks. Endpoint paths and DTOs live with auth, workspaces, assets, upload, search, and assistant features. Shared HTTP never imports a product feature.
@@ -127,7 +143,7 @@ Spring remains the only browser-facing product API for search, transcript contex
 authorization, and Asset data. The frontend does not call Elasticsearch or FastAPI directly.
 Search-ranking redesign is intentionally outside this boundary.
 
-Static assertions protect the neutral HTTP direction, shell/API separation, lifecycle/assistant separation, upload/polling separation, infrastructure URL ban, the provider-neutral player contract, Upload media URL ownership inside the asset feature API, media-element details staying inside the Upload adapter, and absence of circular production imports.
+Static assertions protect the neutral HTTP direction, shell/API separation, lifecycle/assistant separation, upload/polling separation, infrastructure URL ban, the provider-neutral player contract, Upload media URL ownership inside the asset feature API, media-element details staying inside the Upload adapter, the shared/lib foundation tier direction, query-key ownership, theme-token ownership, and absence of circular production imports.
 
 ## Assistant and citation ownership
 

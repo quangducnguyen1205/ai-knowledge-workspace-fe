@@ -3,7 +3,7 @@ import type { SearchResponse, SearchResult } from './api/search-api';
 import type { TranscriptContextResponse } from '../../entities/transcript/model/types';
 import { buildTranscriptDisplayRows, matchesTranscriptReference } from '../../entities/transcript/model/transcript-display';
 import { formatTranscriptTimestamp } from '../../entities/transcript/model/transcript-time';
-import { Button, EmptyState, ErrorBanner, LoadingBlock, Section } from '../../lib/ui';
+import { Button, EmptyState, ErrorBanner, LoadingBlock, PanelHeading, Section } from '../../shared/ui';
 import { SourceBadge } from '../assets/components/source-badge';
 import type { AssetSourceType } from '../assets/model/types';
 import {
@@ -133,11 +133,7 @@ export function SearchPanel({
           <span className="search-result__header">
             <span className="search-result__identity">
               <span className="search-result__asset-title">{assetTitle}</span>
-              {sourceType ? (
-                <SourceBadge sourceType={sourceType} />
-              ) : (
-                <span className="source-badge source-badge--unknown">Source unavailable</span>
-              )}
+              <SourceBadge sourceType={sourceType} />
             </span>
             <span className="search-result__timestamp">
               <span>Video moment</span>
@@ -238,19 +234,21 @@ export function SearchPanel({
 
       {!isAssetScoped && !isSearching && !searchError && activeQuery && resultGroups.length ? (
         <section className="workspace-moment-results" aria-labelledby={resultsHeadingId}>
-          <div className="workspace-moment-results__heading">
-            <div>
-              <p className="panel__eyebrow">Explore</p>
-              <h2 id={resultsHeadingId}>Video moments</h2>
-            </div>
-            <p className="search-summary" role="status" aria-live="polite">
-              <strong>{searchResponse?.resultCount ?? searchResponse?.results.length ?? 0}</strong>{' '}
-              {(searchResponse?.resultCount ?? 0) === 1 ? 'matching moment' : 'matching moments'}
-              {' · '}
-              {searchResponse?.results.length ?? 0} shown across {resultGroups.length}{' '}
-              {resultGroups.length === 1 ? 'video' : 'videos'}
-            </p>
-          </div>
+          <PanelHeading
+            eyebrow="Explore"
+            className="panel-heading--underlined"
+            trailing={(
+              <p className="search-summary" role="status" aria-live="polite">
+                <strong>{searchResponse?.resultCount ?? searchResponse?.results.length ?? 0}</strong>{' '}
+                {(searchResponse?.resultCount ?? 0) === 1 ? 'matching moment' : 'matching moments'}
+                {' · '}
+                {searchResponse?.results.length ?? 0} shown across {resultGroups.length}{' '}
+                {resultGroups.length === 1 ? 'video' : 'videos'}
+              </p>
+            )}
+          >
+            <h2 id={resultsHeadingId}>Video moments</h2>
+          </PanelHeading>
           <div className="search-result-groups">
             {resultGroups.map((group, groupIndex) => (
               <section
@@ -261,11 +259,7 @@ export function SearchPanel({
                 <header>
                   <div className="search-result-group__identity">
                     <h3 id={`${resultsHeadingId}-group-${groupIndex}`}>{group.assetTitle}</h3>
-                    {sourceTypeByAssetId.get(group.assetId) ? (
-                      <SourceBadge sourceType={sourceTypeByAssetId.get(group.assetId) as AssetSourceType} />
-                    ) : (
-                      <span className="source-badge source-badge--unknown">Source unavailable</span>
-                    )}
+                    <SourceBadge sourceType={sourceTypeByAssetId.get(group.assetId) ?? null} />
                   </div>
                   <span>{group.momentCount} matching {group.momentCount === 1 ? 'moment' : 'moments'}</span>
                 </header>

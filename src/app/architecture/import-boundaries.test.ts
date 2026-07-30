@@ -172,7 +172,7 @@ describe('frontend import boundaries', () => {
     expect(styles).toMatch(/\.search-result__excerpt[\s\S]*?overflow-wrap:\s*anywhere/);
     expect(mobileStyles).toMatch(/\.search-form\s*\{[\s\S]*?flex-direction:\s*column/);
     expect(mobileStyles).toMatch(
-      /\.workspace-moment-results__heading,[\s\S]*?\.search-result-group > header[\s\S]*?flex-direction:\s*column/,
+      /\.panel-heading,[\s\S]*?\.search-result-group > header[\s\S]*?flex-direction:\s*column/,
     );
   });
 
@@ -187,6 +187,60 @@ describe('frontend import boundaries', () => {
     expect(searchApi).toMatch(/contextSnippet\?:\s*string\s*\|\s*null/);
     expect(searchPanel).toMatch(/resolveSearchMomentPreview\(result\)/);
     expect(searchPanel).not.toMatch(/dangerouslySetInnerHTML/);
+  });
+
+  it('keeps the shared/lib foundation tier dependent on itself only', () => {
+    // shared/** and lib/** form the neutral foundation tier: they may reach React, third-party
+    // neutral libraries and each other, never the app shell, routing, features, entities or
+    // React Query. Business components consume the foundation, not the reverse.
+    const foundationSources = [
+      ...productionSources(join(sourceRoot, 'shared')),
+      ...productionSources(join(sourceRoot, 'lib')),
+    ];
+    const violations: string[] = [];
+
+    for (const absolutePath of foundationSources) {
+      const source = readFileSync(absolutePath, 'utf8');
+      const file = relative(sourceRoot, absolutePath);
+      const specifiers = Array.from(source.matchAll(/from\s+['"]([^'"]+)['"]/g), (match) => match[1]);
+
+      for (const specifier of specifiers) {
+        const resolved = specifier.startsWith('.')
+          ? relative(sourceRoot, resolve(dirname(absolutePath), specifier))
+          : specifier;
+        const reachesUp = /^(\.\.\/)*(app|features|entities)\b/.test(resolved)
+          || /^(app|features|entities)\//.test(resolved)
+          || specifier.includes('@tanstack');
+        if (reachesUp) violations.push(`${file} -> ${specifier}`);
+      }
+    }
+
+    expect(violations).toEqual([]);
+  });
+
+  it('keeps the legacy lib/ui path as a pure re-export of the shared foundation', () => {
+    const legacyUi = readSource('lib/ui.tsx');
+
+    expect(legacyUi).toMatch(/from '\.\.\/shared\/ui'/);
+    expect(legacyUi).toMatch(/from '\.\.\/shared\/format'/);
+    // No component may live here again — only export statements.
+    expect(legacyUi).not.toMatch(/return\s*\(|<button|<div|function\s+\w+\s*\(/);
+  });
+
+  it('keeps query keys with their owners instead of ad-hoc arrays', () => {
+    const violations = productionSources()
+      .map((absolutePath) => ({
+        file: relative(sourceRoot, absolutePath),
+        source: readFileSync(absolutePath, 'utf8'),
+      }))
+      .filter(({ file }) => !file.includes('search-keys') && !file.includes('auth-keys'))
+      .filter(({ file, source }) => {
+        const owner = /features\/(search\/hooks\/use-search-controller|auth\/auth)\./.test(file);
+        return !owner && /queryKey:\s*\['(search|auth)'/.test(source);
+      })
+      .map(({ file }) => file);
+
+    expect(violations).toEqual([]);
   });
 
   it('contains no circular production imports', () => {
