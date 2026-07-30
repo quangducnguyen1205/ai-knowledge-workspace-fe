@@ -104,7 +104,16 @@ export function useSavedMoments(workspaceId: string | null) {
     savingKey: saveMutation.isPending && saveMutation.variables
       ? buildSavedMomentKey(saveMutation.variables.assetId, saveMutation.variables.transcriptRowId)
       : null,
+    /**
+     * One shared mutation still owns saving, but failure is attributed to the exact moment it was
+     * attempted for, so focusing a different moment never inherits an unrelated failure. A later
+     * attempt — successful or not — replaces the key, and a success clears it.
+     */
+    saveErrorKey: saveMutation.isError && saveMutation.variables
+      ? buildSavedMomentKey(saveMutation.variables.assetId, saveMutation.variables.transcriptRowId)
+      : null,
     remove: removeMutation.mutate,
+    removeAsync: removeMutation.mutateAsync,
     isRemoving: removeMutation.isPending,
     removingId: removeMutation.isPending ? (removeMutation.variables ?? null) : null,
     removeError: removeMutation.error,

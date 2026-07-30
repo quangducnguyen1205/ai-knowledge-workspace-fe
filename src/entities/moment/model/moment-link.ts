@@ -12,13 +12,18 @@ export function buildMomentRouteHash(assetId: string, transcriptRowId: string): 
 }
 
 /**
- * Absolute browser URL for the same moment, suitable for the clipboard. The current origin and
- * path are preserved so the link stays valid behind the deployment's base path.
+ * Absolute browser URL for the same moment, suitable for the clipboard.
+ *
+ * The contract is deliberately `origin + pathname + canonical Asset hash`. Origin and the
+ * deployment pathname are preserved so the link stays valid behind a base path, but the current
+ * page's query string is never copied: it can carry OAuth/OIDC callback values such as `code`,
+ * `state` or `session_state`, or transient search state, none of which belong in a durable
+ * bookmark. No product contract places tenancy in the query string.
  */
 export function buildMomentPermalink(
   assetId: string,
   transcriptRowId: string,
-  location?: { origin: string; pathname: string; search: string },
+  location?: { origin: string; pathname: string },
 ): string {
   const source = location ?? (typeof window === 'undefined' ? undefined : window.location);
   const hash = buildMomentRouteHash(assetId, transcriptRowId);
@@ -27,5 +32,5 @@ export function buildMomentPermalink(
     return hash;
   }
 
-  return `${source.origin}${source.pathname}${source.search}${hash}`;
+  return `${source.origin}${source.pathname}${hash}`;
 }

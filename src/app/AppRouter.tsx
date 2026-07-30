@@ -157,7 +157,7 @@ export function AppRouter() {
         timestampLabel={momentTimestampLabel(focusedSavedMomentRow?.startMs ?? null)}
         isSaved={savedMoments.isSaved(route.assetId, focusedSavedMomentRowId)}
         isSaving={savedMoments.savingKey === buildSavedMomentKey(route.assetId, focusedSavedMomentRowId)}
-        hasFailed={Boolean(savedMoments.saveError)}
+        hasFailed={savedMoments.saveErrorKey === buildSavedMomentKey(route.assetId, focusedSavedMomentRowId)}
         onSave={() => savedMoments.save({
           assetId: route.assetId,
           transcriptRowId: focusedSavedMomentRowId,
@@ -762,7 +762,7 @@ export function AppRouter() {
                   assetId: moment.assetId,
                   transcriptRowId: moment.transcriptRowId,
                 })}
-                onRemoveMoment={savedMoments.remove}
+                onRemoveMoment={savedMoments.removeAsync}
               />
             )}
           />

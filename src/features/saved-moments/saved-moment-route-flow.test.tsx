@@ -292,6 +292,79 @@ describe('saving and reopening a canonical moment', () => {
     expect(await within(savedRegion).findByText('No saved moments yet')).toBeInTheDocument();
   });
 
+  it('copies a permalink without the current page query string', async () => {
+    const user = userEvent.setup();
+    const writeText = vi.fn(async (_text: string) => undefined);
+    const state: FetchState = { saved: [{ ...savedMoment }], playbackProgressWrites: 0 };
+    renderAppAt('/?code=secret&state=temporary#/search', createFetchMock(state));
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+
+    await user.selectOptions(await screen.findByLabelText('Workspace', {}, routeTimeout), 'workspace-2');
+    const savedRegion = await screen.findByRole('region', { name: 'Saved moments in Distributed Systems' }, routeTimeout);
+    expect(window.location.search).toBe('?code=secret&state=temporary');
+
+    await user.click(within(savedRegion).getByRole('button', {
+      name: 'Copy link to moment in Vector Clocks Lecture at 01:01',
+    }));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    const copied = writeText.mock.calls[0][0];
+    expect(copied).toBe(`${window.location.origin}${window.location.pathname}#/assets/asset-1?row=row-2`);
+    for (const excluded of ['code=', 'state=', 'secret', 'temporary', 'from=', 'q=', 'workspaceId=']) {
+      expect(copied).not.toContain(excluded);
+    }
+  });
+
+  it('scopes a save failure to the moment it happened on', async () => {
+    const user = userEvent.setup();
+    const state: FetchState = { saved: [], playbackProgressWrites: 0 };
+    let failRowOne = true;
+    const fetchMock = createFetchMock(state, (url, init) => {
+      if (url === '/api/saved-moments' && init?.method === 'POST' && failRowOne) {
+        const body = JSON.parse(String(init.body)) as { transcriptRowId: string };
+        if (body.transcriptRowId === 'row-1') {
+          return jsonResponse({ code: 'SAVED_MOMENT_TARGET_NOT_FOUND' }, 404);
+        }
+      }
+      return undefined;
+    });
+    renderAppAt('#/assets/asset-1?row=row-1', fetchMock);
+
+    await user.click(await screen.findByRole(
+      'button',
+      { name: 'Save moment in Vector Clocks Lecture at 00:00' },
+      routeTimeout,
+    ));
+    expect(await screen.findByText('Could not save this moment. Try again.', {}, routeTimeout))
+      .toBeInTheDocument();
+
+    // Focusing another canonical moment must not inherit the failure.
+    window.location.hash = '#/assets/asset-1?row=row-2';
+    await screen.findByRole(
+      'button',
+      { name: 'Save moment in Vector Clocks Lecture at 01:01' },
+      routeTimeout,
+    );
+    expect(screen.queryByText('Could not save this moment. Try again.')).not.toBeInTheDocument();
+
+    // Returning to the failed moment still shows its bounded retry feedback.
+    window.location.hash = '#/assets/asset-1?row=row-1';
+    expect(await screen.findByText('Could not save this moment. Try again.', {}, routeTimeout))
+      .toBeInTheDocument();
+
+    failRowOne = false;
+    await user.click(screen.getByRole('button', {
+      name: 'Save moment in Vector Clocks Lecture at 00:00',
+    }));
+
+    await waitFor(() => expect(state.saved).toHaveLength(1), routeTimeout);
+    await waitFor(() =>
+      expect(screen.queryByText('Could not save this moment. Try again.')).not.toBeInTheDocument());
+    expect(await screen.findByRole('button', {
+      name: 'Moment in Vector Clocks Lecture at 00:00 is saved',
+    }, routeTimeout)).toBeDisabled();
+  });
+
   it('never shows saved moments from the previously selected Workspace', async () => {
     const user = userEvent.setup();
     const state: FetchState = { saved: [{ ...savedMoment }], playbackProgressWrites: 0 };

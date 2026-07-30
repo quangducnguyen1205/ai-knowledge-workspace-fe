@@ -34,22 +34,75 @@ describe('canonical moment permalink', () => {
     expect(parseRoute(hash)).toMatchObject({ assetId: 'asset/one', transcriptRowId: 'row two&three' });
   });
 
-  it('builds an absolute browser URL for the clipboard', () => {
+  it('builds an absolute browser URL from origin, pathname and the canonical hash', () => {
     const permalink = buildMomentPermalink('asset-1', 'row-2', {
       origin: 'https://workspace.example',
       pathname: '/app/',
-      search: '',
     });
 
     expect(permalink).toBe('https://workspace.example/app/#/assets/asset-1?row=row-2');
   });
 
-  it('preserves an existing deployment query string', () => {
+  it('preserves a non-root deployment pathname', () => {
     expect(buildMomentPermalink('asset-1', 'row-2', {
       origin: 'https://workspace.example',
-      pathname: '/',
-      search: '?tenant=acme',
-    })).toBe('https://workspace.example/?tenant=acme#/assets/asset-1?row=row-2');
+      pathname: '/team/workspace/app/',
+    })).toBe('https://workspace.example/team/workspace/app/#/assets/asset-1?row=row-2');
+  });
+
+  it('strips the current page query string instead of copying it into the bookmark', () => {
+    const originalWindow = globalThis.window;
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: {
+        location: {
+          origin: 'https://workspace.example',
+          pathname: '/app/',
+          search: '?code=secret&state=temporary',
+          hash: '#/search',
+        },
+      },
+    });
+
+    try {
+      const permalink = buildMomentPermalink('asset-1', 'row-2');
+
+      expect(permalink).toBe('https://workspace.example/app/#/assets/asset-1?row=row-2');
+      for (const leaked of ['code=', 'state=', 'secret', 'temporary', '?code']) {
+        expect(permalink).not.toContain(leaked);
+      }
+    } finally {
+      Object.defineProperty(globalThis, 'window', { configurable: true, value: originalWindow });
+    }
+  });
+
+  it('never copies callback-style or transient parameters from the current page', () => {
+    const permalink = buildMomentPermalink('asset-1', 'row-2', {
+      origin: 'https://workspace.example',
+      // A pathname never carries these; the point is that only origin + pathname are used.
+      pathname: '/app/',
+    });
+
+    for (const excluded of [
+      'code=', 'state=', 'session_state=', 'tenant=', 'workspaceId=', 'from=', 'q=',
+    ]) {
+      expect(permalink).not.toContain(excluded);
+    }
+    expect(permalink.slice(permalink.indexOf('#'))).toBe('#/assets/asset-1?row=row-2');
+  });
+
+  it('keeps encoding and the router round-trip correct in the absolute form', () => {
+    const permalink = buildMomentPermalink('asset/one', 'row two&three', {
+      origin: 'https://workspace.example',
+      pathname: '/app/',
+    });
+
+    expect(permalink).toBe('https://workspace.example/app/#/assets/asset%2Fone?row=row+two%26three');
+    expect(parseRoute(permalink.slice(permalink.indexOf('#')))).toMatchObject({
+      name: 'asset',
+      assetId: 'asset/one',
+      transcriptRowId: 'row two&three',
+    });
   });
 
   it('falls back to the hash when there is no browser location', () => {

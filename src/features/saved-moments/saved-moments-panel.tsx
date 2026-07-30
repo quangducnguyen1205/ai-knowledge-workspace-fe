@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react';
 import { buildMomentPermalink } from '../../entities/moment/model';
 import { formatTranscriptTimestamp } from '../../entities/transcript/model/transcript-time';
 import { Button, EmptyState, ErrorBanner, LoadingBlock, formatDateTime } from '../../lib/ui';
@@ -13,7 +13,23 @@ export type SavedMomentsPanelProps = {
   removingId: string | null;
   removeError: unknown;
   onOpenMoment: (moment: SavedMoment) => void;
-  onRemoveMoment: (savedMomentId: string) => void;
+  /**
+   * Resolves when the removal succeeded and rejects when it failed, so the panel can move focus
+   * only after the item actually disappears.
+   */
+  onRemoveMoment: (savedMomentId: string) => void | Promise<unknown>;
+};
+
+/**
+ * Focus target chosen at click time from the list as the user sees it: the following item, else
+ * the preceding item, else the section heading when the list becomes empty.
+ */
+type PendingRemovalFocus = {
+  removedId: string;
+  followingId: string | null;
+  previousId: string | null;
+  knownIds: ReadonlySet<string>;
+  workspaceName: string;
 };
 
 export function momentTimestampLabel(startMs: number | null): string {
@@ -37,6 +53,87 @@ export function SavedMomentsPanel({
   onRemoveMoment,
 }: SavedMomentsPanelProps) {
   const [copyState, setCopyState] = useState<{ savedMomentId: string; status: 'copied' | 'failed' } | null>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const openButtonRefs = useRef(new Map<string, HTMLButtonElement>());
+  const removeButtonRefs = useRef(new Map<string, HTMLButtonElement>());
+  const pendingRemovalFocus = useRef<PendingRemovalFocus | null>(null);
+  const failedRemovalFocusId = useRef<string | null>(null);
+
+  const registerActionRef = useCallback(
+    (refs: MutableRefObject<Map<string, HTMLButtonElement>>, savedMomentId: string) =>
+      (element: HTMLButtonElement | null) => {
+        if (element) refs.current.set(savedMomentId, element);
+        else refs.current.delete(savedMomentId);
+      },
+    [],
+  );
+
+  /**
+   * Runs only after a successful removal has actually removed the item from the rendered list, so
+   * background refetches, Workspace changes and failed removals never move focus.
+   */
+  useEffect(() => {
+    const pending = pendingRemovalFocus.current;
+    if (!pending) return;
+    if (items.some((item) => item.savedMomentId === pending.removedId)) return;
+
+    pendingRemovalFocus.current = null;
+
+    // A Workspace switch replaces the whole list — including with an empty one — and is not a
+    // removal, so it must never move focus.
+    if (pending.workspaceName !== workspaceName) return;
+    if (!items.every((item) => pending.knownIds.has(item.savedMomentId))) return;
+
+    const followingButton = pending.followingId
+      ? openButtonRefs.current.get(pending.followingId)
+      : undefined;
+    const previousButton = pending.previousId
+      ? openButtonRefs.current.get(pending.previousId)
+      : undefined;
+    const target = followingButton ?? previousButton;
+
+    if (target) target.focus();
+    else if (items.length === 0) headingRef.current?.focus();
+  }, [items]);
+
+  /**
+   * Restores focus to a Remove button that a failed removal left disabled, once it is interactive
+   * again. Driven by rendered state rather than a timer.
+   */
+  useEffect(() => {
+    const failedId = failedRemovalFocusId.current;
+    if (!failedId) return;
+
+    const button = removeButtonRefs.current.get(failedId);
+    if (!button || button.disabled) return;
+
+    failedRemovalFocusId.current = null;
+    button.focus();
+  }, [items, removingId]);
+
+  async function handleRemove(moment: SavedMoment, index: number) {
+    // Recorded before awaiting so the focus decision never depends on whether the list re-renders
+    // before or after the mutation promise settles. The effect applies it only once the item is
+    // actually gone, which only a successful removal can cause.
+    pendingRemovalFocus.current = {
+      removedId: moment.savedMomentId,
+      followingId: items[index + 1]?.savedMomentId ?? null,
+      previousId: items[index - 1]?.savedMomentId ?? null,
+      knownIds: new Set(items.map((item) => item.savedMomentId)),
+      workspaceName,
+    };
+
+    try {
+      await onRemoveMoment(moment.savedMomentId);
+    } catch {
+      // The item is still listed. Disabling the button while in flight blurred it, so put focus
+      // back where the user left it rather than dropping to the document body.
+      pendingRemovalFocus.current = null;
+      const button = removeButtonRefs.current.get(moment.savedMomentId);
+      if (button && !button.disabled) button.focus();
+      else failedRemovalFocusId.current = moment.savedMomentId;
+    }
+  }
 
   async function handleCopy(moment: SavedMoment) {
     const permalink = buildMomentPermalink(moment.assetId, moment.transcriptRowId);
@@ -57,7 +154,8 @@ export function SavedMomentsPanel({
       <div className="saved-moments__heading">
         <div>
           <p className="panel__eyebrow">Saved</p>
-          <h2 id="saved-moments-title">Saved moments</h2>
+          {/* tabIndex -1 keeps the heading out of normal Tab order while allowing programmatic focus. */}
+          <h2 id="saved-moments-title" ref={headingRef} tabIndex={-1}>Saved moments</h2>
         </div>
         {!isLoading && !error && items.length ? (
           <p className="search-summary" role="status">
@@ -88,7 +186,7 @@ export function SavedMomentsPanel({
 
       {!isLoading && !error && items.length ? (
         <ul className="saved-moments__list">
-          {items.map((moment) => {
+          {items.map((moment, index) => {
             const timestampLabel = momentTimestampLabel(moment.startMs);
             const describedBy = `saved-moment-text-${moment.savedMomentId}`;
             const isRemoving = removingId === moment.savedMomentId;
@@ -117,6 +215,7 @@ export function SavedMomentsPanel({
                 <div className="saved-moment__actions">
                   <Button
                     type="button"
+                    ref={registerActionRef(openButtonRefs, moment.savedMomentId)}
                     onClick={() => onOpenMoment(moment)}
                     aria-label={`Open moment in ${moment.assetTitle} at ${timestampLabel.toLowerCase()}`}
                   >
@@ -134,8 +233,9 @@ export function SavedMomentsPanel({
                     type="button"
                     tone="ghost"
                     className="saved-moment__remove"
+                    ref={registerActionRef(removeButtonRefs, moment.savedMomentId)}
                     disabled={isRemoving}
-                    onClick={() => onRemoveMoment(moment.savedMomentId)}
+                    onClick={() => void handleRemove(moment, index)}
                     aria-label={`Remove saved moment in ${moment.assetTitle} at ${timestampLabel.toLowerCase()}`}
                   >
                     {isRemoving ? 'Removing...' : 'Remove'}

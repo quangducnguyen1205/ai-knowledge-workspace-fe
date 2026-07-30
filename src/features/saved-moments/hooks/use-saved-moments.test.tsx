@@ -221,6 +221,99 @@ describe('workspace-scoped saved moment state', () => {
     expect(result.current.items).toHaveLength(1);
   });
 
+  it('attributes a save failure to the exact moment it was attempted for', async () => {
+    const fetchMock = vi.fn(async (_input?: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'POST') {
+        return jsonResponse({ code: 'SAVED_MOMENT_TARGET_NOT_FOUND' }, 404);
+      }
+      return jsonResponse(listPayload('workspace-1', [moment()]));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const { Wrapper } = wrapper();
+
+    const { result } = renderHook(() => useSavedMoments('workspace-1'), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.items).toHaveLength(1));
+    expect(result.current.saveErrorKey).toBeNull();
+
+    await act(async () => {
+      await result.current.saveAsync({ assetId: 'asset-1', transcriptRowId: 'row-gone' })
+        .catch(() => undefined);
+    });
+
+    await waitFor(() => expect(result.current.saveErrorKey).toBe('asset-1::row-gone'));
+    // Another canonical moment must not inherit the failure.
+    expect(result.current.saveErrorKey).not.toBe('asset-1::row-2');
+    expect(result.current.saveErrorKey).not.toBe('asset-2::row-gone');
+    expect(result.current.savingKey).toBeNull();
+  });
+
+  it('clears the failed key when the same moment is retried successfully', async () => {
+    let attempt = 0;
+    const fetchMock = vi.fn(async (_input?: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'POST') {
+        attempt += 1;
+        return attempt === 1
+          ? jsonResponse({ code: 'SAVED_MOMENT_TARGET_NOT_FOUND' }, 503)
+          : jsonResponse(moment({ savedMomentId: 'saved-retry', transcriptRowId: 'row-7' }));
+      }
+      return jsonResponse(listPayload('workspace-1', [moment()]));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const { Wrapper } = wrapper();
+
+    const { result } = renderHook(() => useSavedMoments('workspace-1'), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.items).toHaveLength(1));
+
+    await act(async () => {
+      await result.current.saveAsync({ assetId: 'asset-1', transcriptRowId: 'row-7' })
+        .catch(() => undefined);
+    });
+    await waitFor(() => expect(result.current.saveErrorKey).toBe('asset-1::row-7'));
+
+    // Retrying the failed moment remains possible and a success clears its feedback.
+    await act(async () => {
+      await result.current.saveAsync({ assetId: 'asset-1', transcriptRowId: 'row-7' });
+    });
+
+    await waitFor(() => expect(result.current.saveErrorKey).toBeNull());
+    expect(result.current.isSaved('asset-1', 'row-7')).toBe(true);
+  });
+
+  it('keeps saved and saving keys item-specific while one shared mutation stays in flight', async () => {
+    let releaseSave: (() => void) | null = null;
+    const fetchMock = vi.fn(async (_input?: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'POST') {
+        await new Promise<void>((resolve) => { releaseSave = resolve; });
+        return jsonResponse(moment({ savedMomentId: 'saved-slow', transcriptRowId: 'row-7' }));
+      }
+      return jsonResponse(listPayload('workspace-1', [moment()]));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const { Wrapper } = wrapper();
+
+    const { result } = renderHook(() => useSavedMoments('workspace-1'), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.items).toHaveLength(1));
+
+    let pending: Promise<unknown> | null = null;
+    act(() => {
+      pending = result.current.saveAsync({ assetId: 'asset-1', transcriptRowId: 'row-7' });
+    });
+
+    await waitFor(() => expect(result.current.savingKey).toBe('asset-1::row-7'));
+    expect(result.current.savingKey).not.toBe('asset-1::row-2');
+    expect(result.current.isSaved('asset-1', 'row-2')).toBe(true);
+    expect(result.current.isSaved('asset-1', 'row-7')).toBe(false);
+    expect(result.current.saveErrorKey).toBeNull();
+
+    await act(async () => {
+      releaseSave?.();
+      await pending;
+    });
+
+    await waitFor(() => expect(result.current.savingKey).toBeNull());
+    expect(result.current.isSaved('asset-1', 'row-7')).toBe(true);
+  });
+
   it('does not merge a save that belongs to a different Workspace', async () => {
     const fetchMock = vi.fn(async (_input?: RequestInfo | URL, init?: RequestInit) => {
       if (init?.method === 'POST') {

@@ -1,4 +1,5 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { useState } from 'react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiClientError } from '../../shared/api/api-error';
@@ -243,6 +244,278 @@ describe('saved moments accessibility and layout constraints', () => {
     const text = screen.getByText('B'.repeat(400));
     expect(title).toHaveClass('saved-moment__asset-title');
     expect(text).toHaveClass('saved-moment__text');
+  });
+});
+
+describe('predictable focus after removal', () => {
+  const first = moment;
+  const second: SavedMoment = {
+    ...moment,
+    savedMomentId: 'saved-2',
+    assetTitle: 'Consensus Lecture',
+    transcriptRowId: 'row-3',
+    startMs: 122_000,
+  };
+  const third: SavedMoment = {
+    ...moment,
+    savedMomentId: 'saved-3',
+    assetTitle: 'Incident Review',
+    transcriptRowId: 'row-4',
+    startMs: 183_000,
+  };
+
+  /**
+   * Mirrors the real container: a successful removal drops the item from the rendered list, a
+   * failed one leaves it in place, and the Remove button is disabled while the call is in flight.
+   */
+  function ControlledSavedMoments({
+    initialItems,
+    onRemove,
+    workspaceName = 'Distributed Systems',
+  }: {
+    initialItems: SavedMoment[];
+    onRemove: (savedMomentId: string) => Promise<unknown>;
+    workspaceName?: string;
+  }) {
+    const [items, setItems] = useState(initialItems);
+    const [removingId, setRemovingId] = useState<string | null>(null);
+    const [removeError, setRemoveError] = useState<unknown>(null);
+
+    return (
+      <div>
+        <button type="button">Before the panel</button>
+        <SavedMomentsPanel
+          workspaceName={workspaceName}
+          items={items}
+          isLoading={false}
+          error={null}
+          removingId={removingId}
+          removeError={removeError}
+          onOpenMoment={() => undefined}
+          onRemoveMoment={async (savedMomentId) => {
+            setRemovingId(savedMomentId);
+            try {
+              await onRemove(savedMomentId);
+              setItems((current) => current.filter((item) => item.savedMomentId !== savedMomentId));
+            } catch (error) {
+              setRemoveError(error);
+              throw error;
+            } finally {
+              setRemovingId(null);
+            }
+          }}
+        />
+        <button type="button" onClick={() => setItems([...initialItems])}>
+          Refresh list
+        </button>
+      </div>
+    );
+  }
+
+  function removeButton(assetTitle: string) {
+    return screen.getByRole('button', { name: new RegExp(`^Remove saved moment in ${assetTitle}`) });
+  }
+
+  function openButton(assetTitle: string) {
+    return screen.getByRole('button', { name: new RegExp(`^Open moment in ${assetTitle}`) });
+  }
+
+  it('focuses the following item when a middle item is removed', async () => {
+    const user = userEvent.setup();
+    render(
+      <ControlledSavedMoments
+        initialItems={[first, second, third]}
+        onRemove={async () => undefined}
+      />,
+    );
+
+    await user.click(removeButton('Consensus Lecture'));
+
+    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(2));
+    await waitFor(() => expect(openButton('Incident Review')).toHaveFocus());
+    expect(document.body).not.toHaveFocus();
+  });
+
+  it('focuses the previous item when the last item is removed', async () => {
+    const user = userEvent.setup();
+    render(
+      <ControlledSavedMoments
+        initialItems={[first, second, third]}
+        onRemove={async () => undefined}
+      />,
+    );
+
+    await user.click(removeButton('Incident Review'));
+
+    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(2));
+    await waitFor(() => expect(openButton('Consensus Lecture')).toHaveFocus());
+  });
+
+  it('focuses the Saved moments heading when the only item is removed', async () => {
+    const user = userEvent.setup();
+    render(<ControlledSavedMoments initialItems={[first]} onRemove={async () => undefined} />);
+
+    await user.click(removeButton('Vector Clocks Lecture'));
+
+    await waitFor(() => expect(screen.getByText('No saved moments yet')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Saved moments' })).toHaveFocus());
+  });
+
+  it('keeps focus on the existing Remove button when removal fails', async () => {
+    const user = userEvent.setup();
+    render(
+      <ControlledSavedMoments
+        initialItems={[first, second]}
+        onRemove={async () => {
+          // A real browser blurs a focused control the moment it becomes disabled; jsdom does not,
+          // so reproduce that here or the assertion below would pass without any restoration.
+          (document.activeElement as HTMLElement | null)?.blur();
+          throw new ApiClientError(404, 'The request could not be completed.');
+        }}
+      />,
+    );
+
+    await user.click(removeButton('Vector Clocks Lecture'));
+
+    await waitFor(() => expect(removeButton('Vector Clocks Lecture')).toBeEnabled());
+    await waitFor(() => expect(removeButton('Vector Clocks Lecture')).toHaveFocus());
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    expect(openButton('Consensus Lecture')).not.toHaveFocus();
+  });
+
+  it('does not move focus when a background list refresh replaces the same items', async () => {
+    const user = userEvent.setup();
+    render(
+      <ControlledSavedMoments
+        initialItems={[first, second]}
+        onRemove={async () => undefined}
+      />,
+    );
+
+    const anchor = screen.getByRole('button', { name: 'Before the panel' });
+    anchor.focus();
+    expect(anchor).toHaveFocus();
+
+    await act(async () => {
+      screen.getByRole('button', { name: 'Refresh list' }).click();
+    });
+
+    expect(anchor).toHaveFocus();
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+  });
+
+  it('does not run removal focus behavior when the Workspace list is replaced', async () => {
+    const otherWorkspaceItem: SavedMoment = {
+      ...moment,
+      savedMomentId: 'saved-other',
+      workspaceId: 'workspace-2',
+      assetTitle: 'Operations Handover',
+      transcriptRowId: 'row-9',
+    };
+
+    function panel(workspaceName: string, items: SavedMoment[]) {
+      return (
+        <div>
+          <button type="button">Outside the panel</button>
+          <SavedMomentsPanel
+            workspaceName={workspaceName}
+            items={items}
+            isLoading={false}
+            error={null}
+            removingId={null}
+            removeError={null}
+            onOpenMoment={() => undefined}
+            onRemoveMoment={async () => undefined}
+          />
+        </div>
+      );
+    }
+
+    const view = render(panel('Distributed Systems', [first, second]));
+    const anchor = screen.getByRole('button', { name: 'Outside the panel' });
+
+    await act(async () => {
+      removeButton('Vector Clocks Lecture').click();
+    });
+    anchor.focus();
+
+    // A Workspace switch arriving before the removal renders is not a removal: neither an
+    // unrelated item nor the heading may take focus.
+    view.rerender(panel('Operations', [otherWorkspaceItem]));
+    await waitFor(() => expect(screen.getByText('Operations Handover')).toBeInTheDocument());
+    expect(anchor).toHaveFocus();
+    expect(openButton('Operations Handover')).not.toHaveFocus();
+  });
+
+  it('does not focus the heading when a Workspace switch empties the list mid-removal', async () => {
+    function panel(workspaceName: string, items: SavedMoment[]) {
+      return (
+        <div>
+          <button type="button">Outside the panel</button>
+          <SavedMomentsPanel
+            workspaceName={workspaceName}
+            items={items}
+            isLoading={false}
+            error={null}
+            removingId={null}
+            removeError={null}
+            onOpenMoment={() => undefined}
+            onRemoveMoment={async () => undefined}
+          />
+        </div>
+      );
+    }
+
+    const view = render(panel('Distributed Systems', [first, second]));
+    const anchor = screen.getByRole('button', { name: 'Outside the panel' });
+
+    await act(async () => {
+      removeButton('Vector Clocks Lecture').click();
+    });
+    anchor.focus();
+
+    // An empty new Workspace looks like "the list is gone", but it is a Workspace change, not a
+    // removal, so the heading must not take focus.
+    view.rerender(panel('Operations', []));
+
+    await waitFor(() => expect(screen.getByText('No saved moments yet')).toBeInTheDocument());
+    expect(anchor).toHaveFocus();
+    expect(screen.getByRole('heading', { name: 'Saved moments' })).not.toHaveFocus();
+  });
+
+  it('keeps the heading out of normal Tab order while allowing programmatic focus', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    const heading = screen.getByRole('heading', { name: 'Saved moments' });
+    expect(heading).toHaveAttribute('tabindex', '-1');
+
+    await user.tab();
+    expect(heading).not.toHaveFocus();
+    expect(screen.getByRole('button', { name: /^Open moment/ })).toHaveFocus();
+
+    heading.focus();
+    expect(heading).toHaveFocus();
+  });
+
+  it('preserves Open, Copy, Remove keyboard ordering after the focus change', async () => {
+    const user = userEvent.setup();
+    render(
+      <ControlledSavedMoments
+        initialItems={[first, second, third]}
+        onRemove={async () => undefined}
+      />,
+    );
+
+    await user.click(removeButton('Consensus Lecture'));
+    await waitFor(() => expect(openButton('Incident Review')).toHaveFocus());
+
+    await user.tab();
+    expect(screen.getByRole('button', { name: /^Copy link to moment in Incident Review/ }))
+      .toHaveFocus();
+    await user.tab();
+    expect(removeButton('Incident Review')).toHaveFocus();
   });
 });
 

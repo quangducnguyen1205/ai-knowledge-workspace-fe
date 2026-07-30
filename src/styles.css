@@ -2625,6 +2625,12 @@ summary:focus-visible {
   overflow-wrap: anywhere;
 }
 
+/* The heading is a programmatic focus target after the last saved moment is removed. */
+.saved-moments__heading h2:focus-visible {
+  outline: 3px solid rgba(23, 111, 100, 0.28);
+  outline-offset: 3px;
+}
+
 .saved-moments__list {
   min-width: 0;
   margin: 0;

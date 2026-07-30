@@ -70,4 +70,6 @@ The refinement changes presentation and information hierarchy, not product contr
 
 Explicit indexing remains available only as recovery while a transcript is ready and automatic search preparation has not completed.
 
-Saved moments and search-ranking redesign are not part of the current product structure.
+Saved moments are part of the current product structure: Explore lists the Workspace's saved
+moments, and each one copies a canonical `origin + pathname + Asset hash` permalink that carries no
+page query string. Search-ranking redesign is not part of the current product structure.

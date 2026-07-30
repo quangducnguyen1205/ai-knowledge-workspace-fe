@@ -235,6 +235,7 @@ Browser Range behavior and runtime Upload playback acceptance are verified in Sl
 - P3-FE1 browser checks are Vite-only by design. They do not claim authenticated backend/browser integration when Spring/auth services are not running.
 - Search/viewer component tests cover labelled `Search within <workspace>` versus Find in transcript, grouped result readability, route/state produced by opening a result, loading/empty/error states, selected context, transcript display, missing-moment feedback, Search return behavior, and keyboard activation.
 - Moment preview tests cover the `contextSnippet` fallback chain for present, null, absent, whitespace and doubly-blank values, Unicode and Vietnamese content, plain-text rendering of markup, long-context wrapping inside the result structure, unchanged grouping/moment order, timestamps and `transcriptRowId` navigation, an accessible action name that excludes the snippet, and the same fallback in Asset-scoped search.
+- Saved-moment closure tests cover permalink query-string stripping including callback-style `code`/`state`/`session_state`, non-root pathnames, encoding round-trips and the non-browser hash fallback; removal focus for middle, last and only items plus failed removal, background refresh, Workspace switch and the heading staying out of Tab order; and item-scoped save failure across navigation, retry and successful clearing.
 - P3-FE2 browser checks are public/auth-surface only when no real authenticated backend session is available; search and asset study behavior are validated through frontend component tests without fake backend sessions.
 - P3-FE2.2 modularized app routing/bootstrap, Search route hydration, study route interpretation, and transcript display ownership without changing routes, API calls, auth defaults, or visible UX.
 - P3-S5.B4.R1 passed the bounded browser flow from upload through automatic indexing,
@@ -250,6 +251,9 @@ Browser Range behavior and runtime Upload playback acceptance are verified in Sl
 - Search stays disabled until automatic search preparation produces ready videos
 - Workspace search groups timestamped moments by Asset without changing Spring result relevance
 - Moment previews prefer Spring's canonical `contextSnippet` and remain readable when the backend does not send it
+- A copied moment permalink is `origin + pathname + canonical Asset hash`; the current page query string is never copied, so OAuth/OIDC callback values and search state cannot leak into a bookmark
+- Removing a saved moment moves focus predictably to the following item, else the previous item, else the Saved moments heading; a failed removal keeps focus on its own Remove button, and background refreshes or Workspace changes never move focus
+- Saved-moment save failures are reported only on the canonical moment that failed, so focusing another moment never inherits an unrelated failure
 - Opening a moment reuses the existing Asset/row route and keeps selected search context distinct from playback-active state
 - Search return links carry only compact route state; scoped query/results are retained when safe, incompatible Workspace state is reset, and result rows are never serialized into the URL
 - The viewer exposes the same transcript-hit/context behavior as Find in transcript, scoped to the current video
@@ -276,7 +280,6 @@ Browser Range behavior and runtime Upload playback acceptance are verified in Sl
 - Collaboration features
 - Cross-workspace asset movement
 - Advanced search filters
-- Saved moments
 - Search-ranking redesign
 - Analytics dashboards
 - Broader auth-platform features beyond the current supported backend path

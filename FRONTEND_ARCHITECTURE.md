@@ -106,10 +106,26 @@ Asset id alone.
   by Workspace and normalized query in React Query; scope changes reset incompatible visible
   state, and aborted or old-key responses cannot replace current results.
 - `useWorkspaceManagement` now owns workspace mutation notices and 404 reconciliation; bootstrap selection remains isolated in `useWorkspaceBootstrap`.
+- `buildMomentPermalink` is the only owner of the absolute moment link. The contract is
+  `origin + pathname + canonical Asset hash`: the deployment origin and base path are preserved,
+  but the current page's query string is deliberately excluded, so OAuth/OIDC callback values
+  (`code`, `state`, `session_state`), search state (`q`, `from`, Workspace ID) and any other
+  transient parameter can never be pasted into a durable bookmark. No product contract places
+  tenancy in the query string.
+- `SavedMomentsPanel` owns focus restoration after a successful removal through its own element
+  refs: the following item's Open moment button, else the preceding item's, else the section
+  heading, which carries `tabIndex={-1}` so it can be focused programmatically without joining the
+  Tab order. Focus moves only once the removed item has actually left the rendered list, so a
+  failed removal instead returns focus to its own Remove button, and background refetches or
+  Workspace changes never move focus. No timers and no document-wide text-based lookups are used.
+- Saved-moment mutation feedback is scoped to one canonical moment. A single shared save mutation
+  is kept, and `saveErrorKey` attributes a failure to the `assetId + transcriptRowId` it was
+  attempted for, so focusing another moment never inherits an unrelated failure and a successful
+  retry clears its own feedback.
 
-Spring remains the only browser-facing product API for search, transcript context,
+Spring remains the only browser-facing product API for search, transcript context, saved moments,
 authorization, and Asset data. The frontend does not call Elasticsearch or FastAPI directly.
-Saved moments and search-ranking redesign are intentionally outside this boundary.
+Search-ranking redesign is intentionally outside this boundary.
 
 Static assertions protect the neutral HTTP direction, shell/API separation, lifecycle/assistant separation, upload/polling separation, infrastructure URL ban, the provider-neutral player contract, Upload media URL ownership inside the asset feature API, media-element details staying inside the Upload adapter, and absence of circular production imports.
 

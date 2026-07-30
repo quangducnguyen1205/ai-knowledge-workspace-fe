@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react';
 import { getUserSafeErrorCopy } from '../shared/api/user-error-copy';
 
@@ -27,23 +28,24 @@ export function formatScore(value: number | null | undefined): string {
   return value.toFixed(2);
 }
 
-export function Button({
-  tone = 'primary',
-  className,
-  children,
-  ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & {
-  tone?: 'primary' | 'secondary' | 'ghost';
-}) {
+/**
+ * Forwards its ref so a feature can own a stable, bounded focus target instead of searching the
+ * document for a control by its visible text.
+ */
+export const Button = forwardRef<
+  HTMLButtonElement,
+  ButtonHTMLAttributes<HTMLButtonElement> & { tone?: 'primary' | 'secondary' | 'ghost' }
+>(function Button({ tone = 'primary', className, children, ...props }, ref) {
   return (
     <button
       {...props}
+      ref={ref}
       className={joinClassNames('button', `button--${tone}`, className)}
     >
       {children}
     </button>
   );
-}
+});
 
 export function Section({
   title,
