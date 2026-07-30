@@ -242,7 +242,7 @@ describe('auth mode UI boundary', () => {
 
     renderApp(legacyConfig);
 
-    expect(await screen.findByRole('heading', { name: /welcome back/i, level: 1 })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /find the exact moment in every video/i, level: 1 })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /skip to content/i })).toHaveAttribute('href', '#main-content');
     expect(screen.getByRole('navigation', { name: /primary navigation/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('aria-current', 'page');

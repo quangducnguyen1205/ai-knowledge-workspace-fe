@@ -10,7 +10,9 @@ Public entry is intentionally concise:
 
 The authenticated video knowledge workspace contains:
 
-- Home for Add video/search actions and recent videos
+- Home as the product landing: the product statement, workspace search and Add video actions,
+  current work (Continue watching, Recent videos, Saved moments), and a first-video path with an
+  example-labelled moment preview when the workspace is still empty
 - Library for video filtering, upload or YouTube URL entry, source display, rename, open, and delete
 - Video for source-aware YouTube and Upload playback, transcript reading and explicit segment seek,
   transcript-local search, grounded questions, citations, and disclosed details

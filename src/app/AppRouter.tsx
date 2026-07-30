@@ -637,6 +637,34 @@ export function AppRouter() {
       </div>
     );
   } else {
+    // Feature-owned current-work panels, composed once and arranged by Search and Home alike.
+    const continueWatchingPanel = (
+      <ContinueWatchingPanel
+        workspaceName={selectedWorkspace.name}
+        items={continueWatching.items}
+        isLoading={continueWatching.isLoading}
+        error={continueWatching.error}
+        onContinueWatching={(item) => navigate({ name: 'asset', assetId: item.assetId })}
+      />
+    );
+    const savedMomentsPanel = (
+      <SavedMomentsPanel
+        workspaceId={selectedWorkspace.id}
+        workspaceName={selectedWorkspace.name}
+        items={savedMoments.items}
+        isLoading={savedMoments.isLoading}
+        error={savedMoments.error}
+        removingId={savedMoments.removingId}
+        removeError={savedMoments.removeError}
+        onOpenMoment={(moment) => navigate({
+          name: 'asset',
+          assetId: moment.assetId,
+          transcriptRowId: moment.transcriptRowId,
+        })}
+        onRemoveMoment={savedMoments.removeAsync}
+      />
+    );
+
     switch (route.name) {
       case 'library':
         screenContent = (
@@ -752,32 +780,8 @@ export function AppRouter() {
             }}
             onSelectResult={workspaceSearch.setSelectedResult}
             onOpenResultContext={(result) => openTranscriptMoment(result, 'workspace-search')}
-            continueWatching={(
-              <ContinueWatchingPanel
-                workspaceName={selectedWorkspace.name}
-                items={continueWatching.items}
-                isLoading={continueWatching.isLoading}
-                error={continueWatching.error}
-                onContinueWatching={(item) => navigate({ name: 'asset', assetId: item.assetId })}
-              />
-            )}
-            savedMoments={(
-              <SavedMomentsPanel
-                workspaceId={selectedWorkspace.id}
-                workspaceName={selectedWorkspace.name}
-                items={savedMoments.items}
-                isLoading={savedMoments.isLoading}
-                error={savedMoments.error}
-                removingId={savedMoments.removingId}
-                removeError={savedMoments.removeError}
-                onOpenMoment={(moment) => navigate({
-                  name: 'asset',
-                  assetId: moment.assetId,
-                  transcriptRowId: moment.transcriptRowId,
-                })}
-                onRemoveMoment={savedMoments.removeAsync}
-              />
-            )}
+            continueWatching={continueWatchingPanel}
+            savedMoments={savedMomentsPanel}
           />
         );
         break;
@@ -792,6 +796,8 @@ export function AppRouter() {
             assets={displayAssets}
             selectedAsset={selectedAsset}
             searchableAssetCount={searchableAssetCount}
+            continueWatching={continueWatchingPanel}
+            savedMoments={savedMomentsPanel}
             onUploadVideo={() => navigate({ name: 'library', upload: true })}
             onOpenSearch={() => navigate({ name: 'search' })}
             onOpenAsset={openAsset}

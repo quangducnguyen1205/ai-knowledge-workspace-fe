@@ -71,7 +71,7 @@ This refactor preserves existing routes, API request shapes, auth defaults, toke
 - Load the visible owned workspace scope
 - Switch workspaces from the persistent app shell
 - Create, rename, and conservatively delete workspaces through Settings
-- Land on Home with upload/search actions and recent videos
+- Land on Home as the product landing: the real product statement, search/Add video actions tied to real routes, Continue watching, Recent videos and Saved moments as distinct current work, and an actionable example-labelled first-video page when the workspace is empty — with no fake metrics, logos or testimonials anywhere
 - Open a dedicated asset library screen
 - Upload videos or submit a public YouTube URL through one focus-managed Add video dialog
 - Preserve Spring-owned source type, YouTube video identity, canonical source URL, and nullable upload metadata
@@ -236,6 +236,7 @@ Browser Range behavior and runtime Upload playback acceptance are verified in Sl
 - Search/viewer component tests cover labelled `Search within <workspace>` versus Find in transcript, grouped result readability, route/state produced by opening a result, loading/empty/error states, selected context, transcript display, missing-moment feedback, Search return behavior, and keyboard activation.
 - Moment preview tests cover the `contextSnippet` fallback chain for present, null, absent, whitespace and doubly-blank values, Unicode and Vietnamese content, plain-text rendering of markup, long-context wrapping inside the result structure, unchanged grouping/moment order, timestamps and `transcriptRowId` navigation, an accessible action name that excludes the snippet, and the same fallback in Asset-scoped search.
 - Saved-moment closure tests cover permalink query-string stripping including callback-style `code`/`state`/`session_state`, non-root pathnames, encoding round-trips and the non-browser hash fallback; removal focus for middle, last and only items plus failed removal, background refresh, Workspace switch and the heading staying out of Tab order; and item-scoped save failure across navigation, retry and successful clearing.
+- Foundation and landing tests cover the shared/lib dependency direction, lib/ui staying a pure re-export, query-key ownership, theme-token presence, brand literals confined to tokens.css, focus outlines on the single focus token, reduced-motion support, Button/PanelHeading semantics and ref forwarding, one-h1 landing hierarchy, real CTAs for returning/processing/empty workspaces, the example-labelled moment preview, distinct Continue watching versus Recent videos naming, absence of fake metrics/testimonial vocabulary, keyboard order and stacked mobile composition.
 - P3-FE2 browser checks are public/auth-surface only when no real authenticated backend session is available; search and asset study behavior are validated through frontend component tests without fake backend sessions.
 - P3-FE2.2 modularized app routing/bootstrap, Search route hydration, study route interpretation, and transcript display ownership without changing routes, API calls, auth defaults, or visible UX.
 - P3-S5.B4.R1 passed the bounded browser flow from upload through automatic indexing,
