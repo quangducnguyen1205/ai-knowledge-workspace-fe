@@ -31,7 +31,11 @@ import { searchKeys, useSearchController, useTranscriptContextQuery } from '../f
 import { getClearedStudyRoute, getSearchReturnRoute, getStudyRouteState } from '../features/search/model/study-route-state';
 import { resolveTranscriptLookupId } from '../features/search/model/search-result-reference';
 import { useRouteSearchHydration } from '../features/search/model/use-route-search-hydration';
+import { matchesTranscriptReference } from '../entities/transcript/model/transcript-display';
 import { WorkspaceSearchScreen } from '../features/search/search-screen';
+import { buildSavedMomentKey, useSavedMoments } from '../features/saved-moments/hooks/use-saved-moments';
+import { SaveMomentButton } from '../features/saved-moments/save-moment-button';
+import { SavedMomentsPanel, momentTimestampLabel } from '../features/saved-moments/saved-moments-panel';
 import { useAssetUpload } from '../features/upload/hooks/use-asset-upload';
 import { useYouTubeAssetCreation } from '../features/upload/hooks/use-youtube-asset-creation';
 import { SettingsScreen } from '../features/settings/settings';
@@ -138,9 +142,30 @@ export function AppRouter() {
     submittedSearch: workspaceSearch.submittedSearch,
     onRouteSearchSubmit: workspaceSearch.submit,
   });
+  const savedMoments = useSavedMoments(selectedWorkspaceId);
   const studyRouteState = getStudyRouteState(route, selectedWorkspaceId, workspaceSearch.submittedSearch);
   const routedStudyContextQuery = useTranscriptContextQuery(studyRouteState.contextParams);
   const noticeContextKey = `${currentUser?.id ?? 'anonymous'}:${selectedWorkspaceId ?? 'no-workspace'}:${routeToHash(route)}`;
+  const focusedSavedMomentRowId = studyRouteState.focusedTranscriptRowId;
+  const focusedSavedMomentRow = focusedSavedMomentRowId
+    ? lifecycle.transcriptRows?.find((row) => matchesTranscriptReference(row, focusedSavedMomentRowId))
+    : undefined;
+  const savedMomentAction = route.name === 'asset' && focusedSavedMomentRowId && selectedAsset
+    ? (
+      <SaveMomentButton
+        assetTitle={selectedAsset.title}
+        timestampLabel={momentTimestampLabel(focusedSavedMomentRow?.startMs ?? null)}
+        isSaved={savedMoments.isSaved(route.assetId, focusedSavedMomentRowId)}
+        isSaving={savedMoments.savingKey === buildSavedMomentKey(route.assetId, focusedSavedMomentRowId)}
+        hasFailed={Boolean(savedMoments.saveError)}
+        onSave={() => savedMoments.save({
+          assetId: route.assetId,
+          transcriptRowId: focusedSavedMomentRowId,
+        })}
+      />
+    )
+    : undefined;
+
 
   const assetManagement = useAssetManagement({
     currentUserId: currentUser?.id,
@@ -697,6 +722,7 @@ export function AppRouter() {
             onOpenAssistantCitation={openAssistantCitationInAsset}
             onReturnToSearch={route.name === 'asset' && route.source === 'search' ? returnToSearchFromAsset : undefined}
             onClearStudyContext={studyRouteState.focusedTranscriptRowId ? clearRoutedStudyContext : undefined}
+            momentAction={savedMomentAction}
           />
         );
         break;
@@ -723,6 +749,22 @@ export function AppRouter() {
             }}
             onSelectResult={workspaceSearch.setSelectedResult}
             onOpenResultContext={(result) => openTranscriptMoment(result, 'workspace-search')}
+            savedMoments={(
+              <SavedMomentsPanel
+                workspaceName={selectedWorkspace.name}
+                items={savedMoments.items}
+                isLoading={savedMoments.isLoading}
+                error={savedMoments.error}
+                removingId={savedMoments.removingId}
+                removeError={savedMoments.removeError}
+                onOpenMoment={(moment) => navigate({
+                  name: 'asset',
+                  assetId: moment.assetId,
+                  transcriptRowId: moment.transcriptRowId,
+                })}
+                onRemoveMoment={savedMoments.remove}
+              />
+            )}
           />
         );
         break;

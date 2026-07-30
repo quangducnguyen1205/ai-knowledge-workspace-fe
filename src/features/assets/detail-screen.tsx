@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import type {
   AssetIndexResponse,
   AssetPlaybackProgress,
@@ -87,6 +87,8 @@ type AssetDetailScreenProps = {
   onOpenAssistantCitation?: (citation: AssistantAnswerCitation) => void;
   onReturnToSearch?: () => void;
   onClearStudyContext?: () => void;
+  /** Control for saving the currently focused canonical moment; rendered outside every row. */
+  momentAction?: ReactNode;
 };
 
 export function AssetDetailScreen({
@@ -138,6 +140,7 @@ export function AssetDetailScreen({
   onOpenAssistantCitation,
   onReturnToSearch,
   onClearStudyContext,
+  momentAction,
 }: AssetDetailScreenProps) {
   const [activeTab, setActiveTab] = useState<StudyTab>('transcript');
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
@@ -508,6 +511,7 @@ export function AssetDetailScreen({
             transcriptLoading={transcriptLoading}
             focusedTranscriptRowId={focusedTranscriptRowId}
             focusedTranscriptSource={focusedTranscriptSource}
+            momentAction={momentAction}
             activePlaybackRowId={mediaPlaybackAvailable ? activePlaybackRowId : null}
             followMode={effectiveFollowMode}
             transcriptViewVisible={!isMobileStudyLayout || activeTab === 'transcript'}

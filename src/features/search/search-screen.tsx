@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { TranscriptContextResponse } from '../../entities/transcript/model/types';
 import type { SearchResponse, SearchResult } from './api/search-api';
 import { SearchPanel, type SearchAssetSource } from './search';
@@ -19,6 +20,8 @@ type SearchScreenProps = {
   onSearch: (query: string) => void;
   onSelectResult: (result: SearchResult) => void;
   onOpenResultContext: (result: SearchResult) => void;
+  /** Workspace-scoped saved moments rendered under the search surface. */
+  savedMoments?: ReactNode;
 };
 
 export function WorkspaceSearchScreen({
@@ -38,6 +41,7 @@ export function WorkspaceSearchScreen({
   onSearch,
   onSelectResult,
   onOpenResultContext,
+  savedMoments,
 }: SearchScreenProps) {
   return (
     <div className="screen-stack workspace-search-screen">
@@ -73,6 +77,12 @@ export function WorkspaceSearchScreen({
           onOpenResultContext={onOpenResultContext}
         />
       </section>
+
+      {savedMoments ? (
+        <section className="workspace-saved-moments-surface" aria-label={`Saved moments in ${workspaceName}`}>
+          {savedMoments}
+        </section>
+      ) : null}
     </div>
   );
 }

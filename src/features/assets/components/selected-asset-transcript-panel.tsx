@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, type KeyboardEvent, type PointerEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
 import { buildTranscriptDisplayRows, matchesTranscriptReference } from '../../../entities/transcript/model/transcript-display';
 import { getTranscriptRowIdentity } from '../../../entities/transcript/model/active-transcript-row';
 import { formatTranscriptTimestamp } from '../../../entities/transcript/model/transcript-time';
@@ -98,6 +98,7 @@ export function SelectedAssetTranscriptPanel({
   onSuspendFollowing,
   onResumeFollowing,
   onPlaySegment,
+  momentAction,
   embedded = false,
 }: {
   asset: AssetSummary | null;
@@ -115,6 +116,8 @@ export function SelectedAssetTranscriptPanel({
   onSuspendFollowing?: () => void;
   onResumeFollowing?: () => void;
   onPlaySegment?: (startMs: number, rowIdentity: string) => void;
+  /** Optional control for the currently selected moment; kept outside every interactive row. */
+  momentAction?: ReactNode;
   embedded?: boolean;
 }) {
   const transcriptConflictCopy = getTranscriptConflictCopy(transcriptError, resolvedAssetStatus, statusResponse?.processingJobStatus);
@@ -220,6 +223,7 @@ export function SelectedAssetTranscriptPanel({
             <p className="panel__eyebrow">{workspaceName}</p>
             <h2>Transcript</h2>
           </div>
+          {momentAction ? <div className="panel-block__actions">{momentAction}</div> : null}
         </div>
 
         {transcriptLoading ? <LoadingBlock label="Loading transcript..." /> : null}

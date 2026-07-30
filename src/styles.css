@@ -2598,3 +2598,131 @@ summary:focus-visible {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Saved moments ---------------------------------------------------------- */
+
+.workspace-saved-moments-surface {
+  min-width: 0;
+}
+
+.saved-moments {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.saved-moments__heading {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.saved-moments__heading h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.saved-moments__list {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.saved-moment {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 10px);
+  background: var(--surface, transparent);
+}
+
+.saved-moment__header {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.saved-moment__identity {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.saved-moment__asset-title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.saved-moment__timestamp {
+  display: grid;
+  justify-items: end;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.saved-moment__timestamp-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.saved-moment__text {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.saved-moment__saved-at {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.saved-moment__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.saved-moment__remove {
+  color: var(--danger, #b3261e);
+  text-decoration: underline;
+}
+
+.saved-moment__feedback:empty,
+.save-moment__feedback:empty {
+  display: none;
+}
+
+.saved-moment__feedback,
+.save-moment__feedback {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.save-moment {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.panel-block__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
