@@ -751,6 +751,7 @@ export function AppRouter() {
             onOpenResultContext={(result) => openTranscriptMoment(result, 'workspace-search')}
             savedMoments={(
               <SavedMomentsPanel
+                workspaceId={selectedWorkspace.id}
                 workspaceName={selectedWorkspace.name}
                 items={savedMoments.items}
                 isLoading={savedMoments.isLoading}

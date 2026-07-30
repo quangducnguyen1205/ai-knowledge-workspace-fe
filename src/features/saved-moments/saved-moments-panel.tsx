@@ -6,6 +6,9 @@ import { SourceBadge } from '../assets/components/source-badge';
 import type { SavedMoment } from './api/saved-moments-api';
 
 export type SavedMomentsPanelProps = {
+  /** Stable identity of the active Workspace. Owns pending-removal focus; never used as copy. */
+  workspaceId: string;
+  /** Display name only. Names are not unique, so identity must never be derived from it. */
   workspaceName: string;
   items: readonly SavedMoment[];
   isLoading: boolean;
@@ -29,7 +32,8 @@ type PendingRemovalFocus = {
   followingId: string | null;
   previousId: string | null;
   knownIds: ReadonlySet<string>;
-  workspaceName: string;
+  /** The Workspace the removal was started in, by stable ID rather than display name. */
+  workspaceId: string;
 };
 
 export function momentTimestampLabel(startMs: number | null): string {
@@ -43,6 +47,7 @@ export function momentTimestampLabel(startMs: number | null): string {
  * canonical row and the three reversible actions a bookmark needs.
  */
 export function SavedMomentsPanel({
+  workspaceId,
   workspaceName,
   items,
   isLoading,
@@ -75,13 +80,20 @@ export function SavedMomentsPanel({
   useEffect(() => {
     const pending = pendingRemovalFocus.current;
     if (!pending) return;
+
+    // Stable Workspace identity owns the pending removal, and is checked first so any change of
+    // active Workspace discards it outright. Display names are not unique and the replacement list
+    // may be empty or even share savedMoment IDs, so neither can be trusted here.
+    if (pending.workspaceId !== workspaceId) {
+      pendingRemovalFocus.current = null;
+      return;
+    }
+
     if (items.some((item) => item.savedMomentId === pending.removedId)) return;
 
     pendingRemovalFocus.current = null;
 
-    // A Workspace switch replaces the whole list — including with an empty one — and is not a
-    // removal, so it must never move focus.
-    if (pending.workspaceName !== workspaceName) return;
+    // Within the same Workspace, a refetch that brings an unrelated set is not a removal either.
     if (!items.every((item) => pending.knownIds.has(item.savedMomentId))) return;
 
     const followingButton = pending.followingId
@@ -94,7 +106,7 @@ export function SavedMomentsPanel({
 
     if (target) target.focus();
     else if (items.length === 0) headingRef.current?.focus();
-  }, [items]);
+  }, [items, workspaceId]);
 
   /**
    * Restores focus to a Remove button that a failed removal left disabled, once it is interactive
@@ -120,7 +132,7 @@ export function SavedMomentsPanel({
       followingId: items[index + 1]?.savedMomentId ?? null,
       previousId: items[index - 1]?.savedMomentId ?? null,
       knownIds: new Set(items.map((item) => item.savedMomentId)),
-      workspaceName,
+      workspaceId,
     };
 
     try {

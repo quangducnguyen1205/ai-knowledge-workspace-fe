@@ -25,6 +25,7 @@ function renderPanel(overrides: Partial<Parameters<typeof SavedMomentsPanel>[0]>
   const onOpenMoment = vi.fn();
   const onRemoveMoment = vi.fn();
   const props = {
+    workspaceId: 'workspace-1',
     workspaceName: 'Distributed Systems',
     items: [moment],
     isLoading: false,
@@ -271,10 +272,12 @@ describe('predictable focus after removal', () => {
   function ControlledSavedMoments({
     initialItems,
     onRemove,
+    workspaceId = 'workspace-1',
     workspaceName = 'Distributed Systems',
   }: {
     initialItems: SavedMoment[];
     onRemove: (savedMomentId: string) => Promise<unknown>;
+    workspaceId?: string;
     workspaceName?: string;
   }) {
     const [items, setItems] = useState(initialItems);
@@ -285,6 +288,7 @@ describe('predictable focus after removal', () => {
       <div>
         <button type="button">Before the panel</button>
         <SavedMomentsPanel
+          workspaceId={workspaceId}
           workspaceName={workspaceName}
           items={items}
           isLoading={false}
@@ -405,6 +409,42 @@ describe('predictable focus after removal', () => {
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
   });
 
+  /** Static panel used to drive a Workspace switch that lands between click and re-render. */
+  function switchablePanel(workspaceId: string, workspaceName: string, items: SavedMoment[]) {
+    return (
+      <div>
+        <button type="button">Outside the panel</button>
+        <SavedMomentsPanel
+          workspaceId={workspaceId}
+          workspaceName={workspaceName}
+          items={items}
+          isLoading={false}
+          error={null}
+          removingId={null}
+          removeError={null}
+          onOpenMoment={() => undefined}
+          onRemoveMoment={async () => undefined}
+        />
+      </div>
+    );
+  }
+
+  /** Starts a removal in the first Workspace, then hands the switch to the caller. */
+  async function startRemovalThenSwitch(
+    from: { workspaceId: string; workspaceName: string; items: SavedMoment[] },
+    removeAssetTitle: string,
+  ) {
+    const view = render(switchablePanel(from.workspaceId, from.workspaceName, from.items));
+    const anchor = screen.getByRole('button', { name: 'Outside the panel' });
+
+    await act(async () => {
+      removeButton(removeAssetTitle).click();
+    });
+    anchor.focus();
+
+    return { view, anchor };
+  }
+
   it('does not run removal focus behavior when the Workspace list is replaced', async () => {
     const otherWorkspaceItem: SavedMoment = {
       ...moment,
@@ -414,60 +454,125 @@ describe('predictable focus after removal', () => {
       transcriptRowId: 'row-9',
     };
 
-    function panel(workspaceName: string, items: SavedMoment[]) {
-      return (
-        <div>
-          <button type="button">Outside the panel</button>
-          <SavedMomentsPanel
-            workspaceName={workspaceName}
-            items={items}
-            isLoading={false}
-            error={null}
-            removingId={null}
-            removeError={null}
-            onOpenMoment={() => undefined}
-            onRemoveMoment={async () => undefined}
-          />
-        </div>
-      );
-    }
-
-    const view = render(panel('Distributed Systems', [first, second]));
-    const anchor = screen.getByRole('button', { name: 'Outside the panel' });
-
-    await act(async () => {
-      removeButton('Vector Clocks Lecture').click();
-    });
-    anchor.focus();
+    const { view, anchor } = await startRemovalThenSwitch(
+      { workspaceId: 'workspace-1', workspaceName: 'Distributed Systems', items: [first, second] },
+      'Vector Clocks Lecture',
+    );
 
     // A Workspace switch arriving before the removal renders is not a removal: neither an
     // unrelated item nor the heading may take focus.
-    view.rerender(panel('Operations', [otherWorkspaceItem]));
+    view.rerender(switchablePanel('workspace-2', 'Operations', [otherWorkspaceItem]));
     await waitFor(() => expect(screen.getByText('Operations Handover')).toBeInTheDocument());
     expect(anchor).toHaveFocus();
     expect(openButton('Operations Handover')).not.toHaveFocus();
   });
 
   it('does not focus the heading when a Workspace switch empties the list mid-removal', async () => {
-    function panel(workspaceName: string, items: SavedMoment[]) {
+    const { view, anchor } = await startRemovalThenSwitch(
+      { workspaceId: 'workspace-1', workspaceName: 'Distributed Systems', items: [first, second] },
+      'Vector Clocks Lecture',
+    );
+
+    // An empty new Workspace looks like "the list is gone", but it is a Workspace change, not a
+    // removal, so the heading must not take focus.
+    view.rerender(switchablePanel('workspace-2', 'Operations', []));
+
+    await waitFor(() => expect(screen.getByText('No saved moments yet')).toBeInTheDocument());
+    expect(anchor).toHaveFocus();
+    expect(screen.getByRole('heading', { name: 'Saved moments' })).not.toHaveFocus();
+  });
+
+  it('does not move focus when a same-name Workspace with its own items replaces the list', async () => {
+    const sameNameItem: SavedMoment = {
+      ...moment,
+      savedMomentId: 'saved-other',
+      workspaceId: 'workspace-2',
+      assetTitle: 'Operations Handover',
+      transcriptRowId: 'row-9',
+    };
+
+    const { view, anchor } = await startRemovalThenSwitch(
+      { workspaceId: 'workspace-1', workspaceName: 'Distributed Systems', items: [first, second] },
+      'Vector Clocks Lecture',
+    );
+
+    // Workspace names are not unique: identical copy must not be read as the same Workspace.
+    view.rerender(switchablePanel('workspace-2', 'Distributed Systems', [sameNameItem]));
+
+    await waitFor(() => expect(screen.getByText('Operations Handover')).toBeInTheDocument());
+    expect(anchor).toHaveFocus();
+    expect(openButton('Operations Handover')).not.toHaveFocus();
+    expect(screen.getByRole('heading', { name: 'Saved moments' })).not.toHaveFocus();
+  });
+
+  it('does not focus the heading when an empty same-name Workspace replaces the list', async () => {
+    const { view, anchor } = await startRemovalThenSwitch(
+      { workspaceId: 'workspace-1', workspaceName: 'Distributed Systems', items: [first, second] },
+      'Vector Clocks Lecture',
+    );
+
+    // The sharpest case: identical name and an empty list, where `[].every(...)` is vacuously true.
+    view.rerender(switchablePanel('workspace-2', 'Distributed Systems', []));
+
+    await waitFor(() => expect(screen.getByText('No saved moments yet')).toBeInTheDocument());
+    expect(anchor).toHaveFocus();
+    expect(screen.getByRole('heading', { name: 'Saved moments' })).not.toHaveFocus();
+  });
+
+  it('does not move focus when a same-name Workspace reuses overlapping savedMoment IDs', async () => {
+    // The other Workspace happens to reuse 'saved-2' and 'saved-3'. Only the Workspace ID differs.
+    const overlappingSecond: SavedMoment = { ...second, workspaceId: 'workspace-2' };
+    const overlappingThird: SavedMoment = { ...third, workspaceId: 'workspace-2' };
+
+    const { view, anchor } = await startRemovalThenSwitch(
+      {
+        workspaceId: 'workspace-1',
+        workspaceName: 'Distributed Systems',
+        items: [first, second, third],
+      },
+      'Vector Clocks Lecture',
+    );
+
+    // This defeats every contents-based guard at once: the removed 'saved-1' is absent, so the
+    // list looks like the removal landed, and every remaining ID was already known, so the
+    // known-IDs check passes too. The recorded following item 'saved-2' even has a live Open
+    // button here. Only stable Workspace identity can veto the focus move.
+    view.rerender(switchablePanel('workspace-2', 'Distributed Systems', [
+      overlappingSecond,
+      overlappingThird,
+    ]));
+
+    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(2));
+    expect(anchor).toHaveFocus();
+    expect(openButton('Consensus Lecture')).not.toHaveFocus();
+    expect(openButton('Incident Review')).not.toHaveFocus();
+    expect(screen.getByRole('heading', { name: 'Saved moments' })).not.toHaveFocus();
+  });
+
+  it('ignores a removal that settles after a same-name Workspace switch', async () => {
+    let releaseRemoval: (() => void) | null = null;
+    const removal = new Promise<void>((resolve) => { releaseRemoval = resolve; });
+
+    function panel(workspaceId: string, items: SavedMoment[]) {
       return (
         <div>
           <button type="button">Outside the panel</button>
           <SavedMomentsPanel
-            workspaceName={workspaceName}
+            workspaceId={workspaceId}
+            workspaceName="Distributed Systems"
             items={items}
             isLoading={false}
             error={null}
             removingId={null}
             removeError={null}
             onOpenMoment={() => undefined}
-            onRemoveMoment={async () => undefined}
+            onRemoveMoment={() => removal}
           />
         </div>
       );
     }
 
-    const view = render(panel('Distributed Systems', [first, second]));
+    const view = render(panel('workspace-1', [first, second]));
     const anchor = screen.getByRole('button', { name: 'Outside the panel' });
 
     await act(async () => {
@@ -475,13 +580,35 @@ describe('predictable focus after removal', () => {
     });
     anchor.focus();
 
-    // An empty new Workspace looks like "the list is gone", but it is a Workspace change, not a
-    // removal, so the heading must not take focus.
-    view.rerender(panel('Operations', []));
-
+    // The Workspace switch lands while the removal is still in flight.
+    view.rerender(panel('workspace-2', []));
     await waitFor(() => expect(screen.getByText('No saved moments yet')).toBeInTheDocument());
+
+    // Only now does the original removal succeed; it belongs to a Workspace no longer shown.
+    await act(async () => {
+      releaseRemoval?.();
+      await removal;
+    });
+
     expect(anchor).toHaveFocus();
     expect(screen.getByRole('heading', { name: 'Saved moments' })).not.toHaveFocus();
+  });
+
+  it('still focuses correctly for a normal removal inside the same Workspace ID', async () => {
+    const user = userEvent.setup();
+    render(
+      <ControlledSavedMoments
+        workspaceId="workspace-1"
+        workspaceName="Distributed Systems"
+        initialItems={[first, second, third]}
+        onRemove={async () => undefined}
+      />,
+    );
+
+    await user.click(removeButton('Consensus Lecture'));
+
+    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(2));
+    await waitFor(() => expect(openButton('Incident Review')).toHaveFocus());
   });
 
   it('keeps the heading out of normal Tab order while allowing programmatic focus', async () => {
