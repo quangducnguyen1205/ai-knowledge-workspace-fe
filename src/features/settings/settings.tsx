@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Button, ErrorBanner, Section } from '../../lib/ui';
 import { getFriendlyLogoutErrorCopy } from '../auth/auth';
+import { formatAppRevision, resolveAppRevision } from '../../shared/build/build-identity';
 
 type SettingsScreenProps = {
   currentUserEmail: string;
@@ -45,6 +46,16 @@ export function SettingsScreen({
           {logoutError ? (
             <ErrorBanner error={logoutError} title={logoutErrorCopy?.title} message={logoutErrorCopy?.message} />
           ) : null}
+        </Section>
+
+        <Section title="Diagnostics" className="settings-diagnostics">
+          <div className="account-details">
+            <span>App revision</span>
+            <strong data-testid="app-revision">{formatAppRevision(resolveAppRevision())}</strong>
+          </div>
+          <p className="settings-diagnostics__hint">
+            Identifies which frontend build is running. Report it with any issue.
+          </p>
         </Section>
       </div>
     </div>

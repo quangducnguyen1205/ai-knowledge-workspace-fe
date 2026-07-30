@@ -2126,6 +2126,12 @@ summary:focus-visible {
   font-size: 0.95rem;
 }
 
+.settings-diagnostics__hint {
+  margin-top: var(--space-2);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
 .workspace-bar__cluster {
   gap: var(--space-5);
 }
