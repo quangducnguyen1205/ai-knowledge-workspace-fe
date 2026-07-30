@@ -33,6 +33,8 @@ import { resolveTranscriptLookupId } from '../features/search/model/search-resul
 import { useRouteSearchHydration } from '../features/search/model/use-route-search-hydration';
 import { matchesTranscriptReference } from '../entities/transcript/model/transcript-display';
 import { WorkspaceSearchScreen } from '../features/search/search-screen';
+import { ContinueWatchingPanel } from '../features/continue-watching/continue-watching-panel';
+import { useContinueWatching } from '../features/continue-watching/hooks/use-continue-watching';
 import { buildSavedMomentKey, useSavedMoments } from '../features/saved-moments/hooks/use-saved-moments';
 import { SaveMomentButton } from '../features/saved-moments/save-moment-button';
 import { SavedMomentsPanel, momentTimestampLabel } from '../features/saved-moments/saved-moments-panel';
@@ -143,6 +145,7 @@ export function AppRouter() {
     onRouteSearchSubmit: workspaceSearch.submit,
   });
   const savedMoments = useSavedMoments(selectedWorkspaceId);
+  const continueWatching = useContinueWatching(selectedWorkspaceId);
   const studyRouteState = getStudyRouteState(route, selectedWorkspaceId, workspaceSearch.submittedSearch);
   const routedStudyContextQuery = useTranscriptContextQuery(studyRouteState.contextParams);
   const noticeContextKey = `${currentUser?.id ?? 'anonymous'}:${selectedWorkspaceId ?? 'no-workspace'}:${routeToHash(route)}`;
@@ -749,6 +752,15 @@ export function AppRouter() {
             }}
             onSelectResult={workspaceSearch.setSelectedResult}
             onOpenResultContext={(result) => openTranscriptMoment(result, 'workspace-search')}
+            continueWatching={(
+              <ContinueWatchingPanel
+                workspaceName={selectedWorkspace.name}
+                items={continueWatching.items}
+                isLoading={continueWatching.isLoading}
+                error={continueWatching.error}
+                onContinueWatching={(item) => navigate({ name: 'asset', assetId: item.assetId })}
+              />
+            )}
             savedMoments={(
               <SavedMomentsPanel
                 workspaceId={selectedWorkspace.id}

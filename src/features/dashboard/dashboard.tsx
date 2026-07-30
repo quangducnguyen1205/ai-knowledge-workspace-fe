@@ -49,9 +49,9 @@ export function WorkspaceHomeScreen({
       </header>
 
       <Section
-        title="Continue watching"
-        actions={recentAssets.length ? <span className="panel-pill">Recent videos</span> : undefined}
-        className="continue-learning"
+        title="Recent videos"
+        actions={recentAssets.length ? <span className="panel-pill">Latest first</span> : undefined}
+        className="recent-videos"
       >
         {recentAssets.length === 0 ? (
           <div className="home-empty">

@@ -20,6 +20,8 @@ type SearchScreenProps = {
   onSearch: (query: string) => void;
   onSelectResult: (result: SearchResult) => void;
   onOpenResultContext: (result: SearchResult) => void;
+  /** Workspace-scoped Assets the viewer can resume, rendered above the search surface. */
+  continueWatching?: ReactNode;
   /** Workspace-scoped saved moments rendered under the search surface. */
   savedMoments?: ReactNode;
 };
@@ -41,6 +43,7 @@ export function WorkspaceSearchScreen({
   onSearch,
   onSelectResult,
   onOpenResultContext,
+  continueWatching,
   savedMoments,
 }: SearchScreenProps) {
   return (
@@ -52,6 +55,15 @@ export function WorkspaceSearchScreen({
           <p>Find relevant video moments and open the exact transcript row that matters.</p>
         </div>
       </header>
+
+      {continueWatching ? (
+        <section
+          className="workspace-continue-watching-surface"
+          aria-label={`Continue watching in ${workspaceName}`}
+        >
+          {continueWatching}
+        </section>
+      ) : null}
 
       <section
         className="workspace-search-surface"
