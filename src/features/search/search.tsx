@@ -10,6 +10,7 @@ import {
   getSearchMomentAssetTitle,
   groupSearchMomentsByAsset,
 } from './model/group-search-moments';
+import { resolveSearchMomentPreview } from './model/search-moment-preview';
 import { resolveTranscriptLookupId } from './model/search-result-reference';
 
 type SearchPanelScope = {
@@ -144,7 +145,7 @@ export function SearchPanel({
             </span>
           </span>
           <span className="search-result__excerpt">
-            {result.text?.trim() || 'Transcript snippet unavailable.'}
+            {resolveSearchMomentPreview(result)}
           </span>
           <span className="search-result__open-label">
             {!hasContextAction ? 'Unavailable' : onOpenResultContext ? 'Open moment' : isSelected ? 'Context shown' : 'Show context'}

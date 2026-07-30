@@ -31,6 +31,7 @@ const baseResult: SearchResult = {
   startMs: 1000,
   endMs: 2000,
   text: 'Vector clocks preserve causal relationships between events in distributed systems.',
+  contextSnippet: null,
   createdAt: '2026-06-26T10:02:00Z',
   score: 3.21,
 };
@@ -658,5 +659,292 @@ describe('search-to-study workflow', () => {
 
     expect(onOpenResultContext).toHaveBeenCalledTimes(2);
     expect(onOpenResultContext).toHaveBeenLastCalledWith(baseResult);
+  });
+});
+
+describe('canonical moment context previews', () => {
+  const canonicalSnippet =
+    'Before the hit we define happens-before. Vector clocks preserve causal relationships between events in distributed systems. Concurrent events have no total ordering.';
+
+  function renderMoments(
+    results: SearchResult[],
+    overrides: Partial<ComponentProps<typeof SearchPanel>> = {},
+  ) {
+    return renderSearchPanel({
+      activeQuery: 'vector clocks',
+      searchResponse: { ...searchResponse, resultCount: results.length, results },
+      onOpenResultContext: vi.fn(),
+      ...overrides,
+    });
+  }
+
+  function excerptOf(action: HTMLElement): HTMLElement {
+    return action.querySelector('.search-result__excerpt') as HTMLElement;
+  }
+
+  it('renders the canonical snippet instead of the exact matching row text', () => {
+    renderMoments([{ ...baseResult, contextSnippet: canonicalSnippet }]);
+
+    const action = screen.getByRole('button', {
+      name: 'Open moment in Vector Clocks Lecture at 00:01',
+    });
+    expect(excerptOf(action)).toHaveTextContent(canonicalSnippet);
+    expect(excerptOf(action).textContent).toBe(canonicalSnippet);
+    expect(screen.queryByText(baseResult.text, { selector: '.search-result__excerpt' }))
+      .not.toBeInTheDocument();
+  });
+
+  it('falls back to the matching row text for null, absent, and whitespace snippets', () => {
+    const absentSnippet: SearchResult = { ...baseResult, transcriptRowId: 'row-absent' };
+    Reflect.deleteProperty(absentSnippet, 'contextSnippet');
+
+    renderMoments([
+      { ...baseResult, transcriptRowId: 'row-null', contextSnippet: null },
+      absentSnippet,
+      { ...baseResult, transcriptRowId: 'row-blank', contextSnippet: '   \n\t ' },
+    ]);
+
+    const excerpts = document.querySelectorAll('.search-result__excerpt');
+    expect(excerpts).toHaveLength(3);
+    expect(Array.from(excerpts).map((excerpt) => excerpt.textContent)).toEqual([
+      baseResult.text,
+      baseResult.text,
+      baseResult.text,
+    ]);
+  });
+
+  it('uses the bounded fallback when neither snippet nor text is readable', () => {
+    renderMoments([{ ...baseResult, contextSnippet: '  ', text: '   ' }]);
+
+    const action = screen.getByRole('button', {
+      name: 'Open moment in Vector Clocks Lecture at 00:01',
+    });
+    expect(excerptOf(action).textContent).toBe('Transcript snippet unavailable.');
+  });
+
+  it('renders a Vietnamese snippet as readable plain text', () => {
+    const vietnameseSnippet =
+      'Trước đoạn khớp: định nghĩa quan hệ xảy ra trước. Đồng hồ vector giữ quan hệ nhân quả giữa các sự kiện.';
+    renderMoments([{ ...baseResult, contextSnippet: vietnameseSnippet }]);
+
+    const excerpt = excerptOf(screen.getByRole('button', {
+      name: 'Open moment in Vector Clocks Lecture at 00:01',
+    }));
+    expect(excerpt.textContent).toBe(vietnameseSnippet);
+    expect(excerpt.querySelectorAll('*')).toHaveLength(0);
+  });
+
+  it('does not interpret markup inside a snippet as HTML', () => {
+    const markupSnippet = 'Compare <em>vector</em> clocks & <script>alert(1)</script> ordering.';
+    renderMoments([{ ...baseResult, contextSnippet: markupSnippet }]);
+
+    const excerpt = excerptOf(screen.getByRole('button', {
+      name: 'Open moment in Vector Clocks Lecture at 00:01',
+    }));
+    expect(excerpt.textContent).toBe(markupSnippet);
+    expect(excerpt.querySelector('em')).toBeNull();
+    expect(excerpt.querySelector('script')).toBeNull();
+    expect(excerpt.innerHTML).not.toContain('<em>');
+  });
+
+  it('keeps a long snippet wrapping inside the bounded grouped-result structure', () => {
+    const longSnippet = `Context-${'y'.repeat(600)}`;
+    renderMoments([{ ...baseResult, contextSnippet: longSnippet }]);
+
+    const action = screen.getByRole('button', {
+      name: 'Open moment in Vector Clocks Lecture at 00:01',
+    });
+    const excerpt = excerptOf(action);
+    expect(excerpt.textContent).toBe(longSnippet);
+    expect(excerpt.closest('.search-result__moment')).toBe(action);
+    expect(action.closest('.search-result-group')).not.toBeNull();
+    expect(action).toHaveClass('search-result__moment');
+  });
+
+  it('keeps the accessible action name based on Asset title and timestamp, not the snippet', () => {
+    const longSnippet = `Context-${'z'.repeat(600)}`;
+    renderMoments([{ ...baseResult, contextSnippet: longSnippet }]);
+
+    const action = screen.getByRole('button', {
+      name: 'Open moment in Vector Clocks Lecture at 00:01',
+    });
+    const accessibleName = action.getAttribute('aria-label') ?? '';
+    expect(accessibleName).toBe('Open moment in Vector Clocks Lecture at 00:01');
+    expect(accessibleName).not.toContain(longSnippet);
+    expect(accessibleName).not.toContain('Context-');
+    expect(accessibleName.length).toBeLessThan(120);
+    expect(excerptOf(action).textContent).toBe(longSnippet);
+    expect(document.querySelectorAll('[aria-live]')).toHaveLength(1);
+  });
+
+  it('keeps group order, moment order, timestamps and source badges unchanged', () => {
+    const laterMoment: SearchResult = {
+      ...baseResult,
+      transcriptRowId: 'row-a-2',
+      segmentIndex: 9,
+      startMs: 520_000,
+      endMs: 522_000,
+      text: 'A later ranked result for vector clocks.',
+      contextSnippet: 'Canonical context for the later moment.',
+      score: 0.01,
+    };
+    const youtubeMoment: SearchResult = {
+      ...baseResult,
+      assetId: 'asset-2',
+      assetTitle: 'Incident Review',
+      transcriptRowId: 'row-b-1',
+      segmentIndex: 0,
+      startMs: 0,
+      endMs: 900,
+      text: 'The incident timeline starts with the first alert.',
+      contextSnippet: null,
+      score: 99,
+    };
+
+    renderMoments(
+      [laterMoment, youtubeMoment, { ...baseResult, contextSnippet: canonicalSnippet }],
+      { assetSources: [asset, { assetId: 'asset-2', sourceType: 'YOUTUBE' }] },
+    );
+
+    expect(screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent))
+      .toEqual(['Vector Clocks Lecture', 'Incident Review']);
+    expect(Array.from(document.querySelectorAll('.search-result__excerpt'))
+      .map((excerpt) => excerpt.textContent)).toEqual([
+      'Canonical context for the later moment.',
+      canonicalSnippet,
+      'The incident timeline starts with the first alert.',
+    ]);
+    expect(Array.from(document.querySelectorAll('.search-result__timestamp-value'))
+      .map((value) => value.textContent)).toEqual(['08:40', '00:01', '00:00']);
+    expect(screen.getAllByText('Upload')).toHaveLength(3);
+    expect(screen.getAllByText('YouTube')).toHaveLength(2);
+  });
+
+  it('opens the original transcript row identity when the preview came from a snippet', async () => {
+    const user = userEvent.setup();
+    const onOpenResultContext = vi.fn();
+    const snippetResult: SearchResult = { ...baseResult, contextSnippet: canonicalSnippet };
+
+    renderMoments([snippetResult], {
+      onOpenResultContext: (result) => {
+        onOpenResultContext(result);
+        window.location.hash = routeToHash({
+          name: 'asset',
+          assetId: result.assetId,
+          transcriptRowId: resolveTranscriptLookupId(result) ?? '',
+          source: 'search',
+          searchQuery: 'vector clocks',
+        });
+      },
+    });
+
+    await user.click(screen.getByRole('button', {
+      name: 'Open moment in Vector Clocks Lecture at 00:01',
+    }));
+
+    expect(onOpenResultContext).toHaveBeenCalledWith(snippetResult);
+    expect(resolveTranscriptLookupId(snippetResult)).toBe('row-2');
+    expect(parseRoute(window.location.hash)).toEqual({
+      name: 'asset',
+      assetId: 'asset-1',
+      transcriptRowId: 'row-2',
+      source: 'search',
+      searchQuery: 'vector clocks',
+    });
+  });
+
+  it('applies the same preview fallback to Asset-scoped Find in transcript results', () => {
+    const absentSnippet: SearchResult = { ...baseResult, transcriptRowId: 'row-absent' };
+    Reflect.deleteProperty(absentSnippet, 'contextSnippet');
+
+    renderMoments(
+      [
+        { ...baseResult, contextSnippet: canonicalSnippet },
+        absentSnippet,
+        { ...baseResult, transcriptRowId: 'row-blank', contextSnippet: ' ', text: ' ' },
+      ],
+      { scope: { mode: 'asset', assetTitle: 'Vector Clocks Lecture' } },
+    );
+
+    expect(screen.getAllByRole('heading', { name: 'Find in transcript' }).length)
+      .toBeGreaterThan(0);
+    expect(screen.queryByRole('heading', { name: 'Video moments' })).not.toBeInTheDocument();
+    expect(Array.from(document.querySelectorAll('.search-result__excerpt'))
+      .map((excerpt) => excerpt.textContent)).toEqual([
+      canonicalSnippet,
+      baseResult.text,
+      'Transcript snippet unavailable.',
+    ]);
+  });
+
+  it('leaves loading, empty, and error states untouched when snippets are available', () => {
+    const { rerender } = render(
+      <SearchPanel
+        workspaceName={workspaceName}
+        searchableAssetCount={1}
+        resetToken={0}
+        activeQuery="vector clocks"
+        searchResponse={undefined}
+        searchError={null}
+        isSearching
+        contextResponse={undefined}
+        contextError={null}
+        isContextLoading={false}
+        selectedResult={null}
+        onSearch={vi.fn()}
+        onSelectResult={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/searching within distributed systems/i)).toBeInTheDocument();
+    expect(document.querySelectorAll('.search-result__excerpt')).toHaveLength(0);
+
+    rerender(
+      <SearchPanel
+        workspaceName={workspaceName}
+        searchableAssetCount={1}
+        resetToken={0}
+        activeQuery="missing topic"
+        searchResponse={{ ...searchResponse, resultCount: 0, results: [] }}
+        searchError={null}
+        isSearching={false}
+        contextResponse={undefined}
+        contextError={null}
+        isContextLoading={false}
+        selectedResult={null}
+        onSearch={vi.fn()}
+        onSelectResult={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/no video moments found/i)).toBeInTheDocument();
+    expect(document.querySelectorAll('.search-result__excerpt')).toHaveLength(0);
+
+    rerender(
+      <SearchPanel
+        workspaceName={workspaceName}
+        searchableAssetCount={1}
+        resetToken={0}
+        activeQuery="vector clocks"
+        assetSources={[asset]}
+        searchResponse={{
+          ...searchResponse,
+          results: [{ ...baseResult, contextSnippet: canonicalSnippet }],
+        }}
+        searchError={new Error('Search service unavailable')}
+        isSearching={false}
+        contextResponse={undefined}
+        contextError={null}
+        isContextLoading={false}
+        selectedResult={null}
+        onSearch={vi.fn()}
+        onSelectResult={vi.fn()}
+        onOpenResultContext={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Something went wrong')).toBeInTheDocument();
+    expect(screen.queryByText(canonicalSnippet)).not.toBeInTheDocument();
+    expect(document.querySelectorAll('.search-result__excerpt')).toHaveLength(0);
   });
 });

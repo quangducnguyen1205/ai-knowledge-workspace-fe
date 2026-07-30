@@ -16,6 +16,7 @@ const resultRow: SearchResult = {
   startMs: 0,
   endMs: 1250,
   text: 'Vector clocks preserve causality.',
+  contextSnippet: null,
   createdAt: '2026-06-26T10:02:00Z',
   score: 3.21,
 };

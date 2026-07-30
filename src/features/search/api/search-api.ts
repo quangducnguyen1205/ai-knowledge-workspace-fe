@@ -13,13 +13,15 @@ export type SearchResult = {
   startMs: number | null;
   endMs: number | null;
   text: string;
+  contextSnippet: string | null;
   createdAt: string | null;
   score: number | null;
 };
 
-type SearchResultPayload = Omit<SearchResult, 'startMs' | 'endMs'> & {
+type SearchResultPayload = Omit<SearchResult, 'startMs' | 'endMs' | 'contextSnippet'> & {
   startMs?: number | null;
   endMs?: number | null;
+  contextSnippet?: string | null;
 };
 
 type SearchResponsePayload = Omit<SearchResponse, 'results'> & {
@@ -33,6 +35,14 @@ export type SearchResponse = {
   resultCount: number;
   results: SearchResult[];
 };
+
+/**
+ * Spring may add a canonical `contextSnippet` per moment independently of this deployment, so an
+ * absent, null or whitespace-only field all mean "no canonical snippet" rather than empty text.
+ */
+function normalizeSearchContextSnippet(contextSnippet: string | null | undefined): string | null {
+  return contextSnippet?.trim() || null;
+}
 
 export async function searchTranscript(
   query: string,
@@ -50,6 +60,7 @@ export async function searchTranscript(
       ...result,
       startMs: result.startMs ?? null,
       endMs: result.endMs ?? null,
+      contextSnippet: normalizeSearchContextSnippet(result.contextSnippet),
     })),
   };
 }

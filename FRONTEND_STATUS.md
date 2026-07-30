@@ -91,6 +91,7 @@ This refactor preserves existing routes, API request shapes, auth defaults, toke
 - Open a dedicated Workspace moment-search screen
 - Search only within the active workspace
 - Review Spring-ranked, frontend-grouped video moments with Asset title, source, timestamp, and transcript excerpt
+- Read the canonical Spring-provided moment context when it is available, with the exact matching row text as the compatibility fallback
 - Open a result through the existing Asset route with the Asset id, selected transcript-row reference, and optional source query preserved in the hash route
 - Read nearby transcript rows from the existing transcript context API in the viewer
 - Preserve nullable integer-millisecond transcript timing through API mapping, React Query
@@ -131,6 +132,16 @@ This refactor preserves existing routes, API request shapes, auth defaults, toke
 Transcript, search, context, and assistant citation responses use additive nullable `startMs`
 and `endMs` fields. Legacy responses that omit either field are normalized to `null`; frontend
 logic does not use truthiness because `startMs = 0` is valid.
+
+Search results may additionally carry an optional canonical `contextSnippet`. The field is read
+as `contextSnippet?: string | null` on the wire and normalized to `string | null` in the
+frontend-owned result model, so an absent field, an explicit `null` and a whitespace-only value
+all become `null`. Moment previews prefer a nonblank `contextSnippet`, fall back to the existing
+`text` for compatibility with deployments that do not send it, and use one bounded label when
+neither is readable. The request URL and query parameters are unchanged, the exact
+`transcriptRowId` and hit timestamp stay the navigation identity, the frontend does not build
+neighbor context, and the browser still reaches only Spring — never PostgreSQL, Elasticsearch or
+FastAPI.
 
 Asset list/detail/create/retry responses preserve the authoritative `sourceType` plus nullable
 `youtubeVideoId` and Spring-derived `sourceUrl`. Status responses may expose a bounded
@@ -223,6 +234,7 @@ Browser Range behavior and runtime Upload playback acceptance are verified in Sl
 - Component tests cover signed-out routing, authenticated Home, the simplified navigation, account/mobile menu Escape behavior, upload dialog focus handling, Library overflow actions, mobile Study tabs, and workspace deletion focus trapping.
 - P3-FE1 browser checks are Vite-only by design. They do not claim authenticated backend/browser integration when Spring/auth services are not running.
 - Search/viewer component tests cover labelled `Search within <workspace>` versus Find in transcript, grouped result readability, route/state produced by opening a result, loading/empty/error states, selected context, transcript display, missing-moment feedback, Search return behavior, and keyboard activation.
+- Moment preview tests cover the `contextSnippet` fallback chain for present, null, absent, whitespace and doubly-blank values, Unicode and Vietnamese content, plain-text rendering of markup, long-context wrapping inside the result structure, unchanged grouping/moment order, timestamps and `transcriptRowId` navigation, an accessible action name that excludes the snippet, and the same fallback in Asset-scoped search.
 - P3-FE2 browser checks are public/auth-surface only when no real authenticated backend session is available; search and asset study behavior are validated through frontend component tests without fake backend sessions.
 - P3-FE2.2 modularized app routing/bootstrap, Search route hydration, study route interpretation, and transcript display ownership without changing routes, API calls, auth defaults, or visible UX.
 - P3-S5.B4.R1 passed the bounded browser flow from upload through automatic indexing,
@@ -237,6 +249,7 @@ Browser Range behavior and runtime Upload playback acceptance are verified in Sl
 - YouTube entry performs only small nonblank/HTTPS UX checks and leaves full normalization to Spring
 - Search stays disabled until automatic search preparation produces ready videos
 - Workspace search groups timestamped moments by Asset without changing Spring result relevance
+- Moment previews prefer Spring's canonical `contextSnippet` and remain readable when the backend does not send it
 - Opening a moment reuses the existing Asset/row route and keeps selected search context distinct from playback-active state
 - Search return links carry only compact route state; scoped query/results are retained when safe, incompatible Workspace state is reset, and result rows are never serialized into the URL
 - The viewer exposes the same transcript-hit/context behavior as Find in transcript, scoped to the current video

@@ -176,6 +176,19 @@ describe('frontend import boundaries', () => {
     );
   });
 
+  it('keeps canonical moment previews presentation-only and neighbor-context free', () => {
+    const preview = readSource('features/search/model/search-moment-preview.ts');
+    const searchApi = readSource('features/search/api/search-api.ts');
+    const searchPanel = readSource('features/search/search.tsx');
+
+    expect(preview).not.toMatch(/fetch\s*\(|\brequest\s*\(|['"`]\/api\/|elasticsearch|fastapi|postgres/i);
+    // Spring owns canonical context; the frontend never assembles neighbor rows for a preview.
+    expect(preview).not.toMatch(/getTranscriptContext|transcript\/context|TranscriptRow|\bconcat\b/);
+    expect(searchApi).toMatch(/contextSnippet\?:\s*string\s*\|\s*null/);
+    expect(searchPanel).toMatch(/resolveSearchMomentPreview\(result\)/);
+    expect(searchPanel).not.toMatch(/dangerouslySetInnerHTML/);
+  });
+
   it('contains no circular production imports', () => {
     const sources = productionSources();
     const sourceSet = new Set(sources);

@@ -18,6 +18,7 @@ function result(
     startMs: 0,
     endMs: 1_000,
     text: transcriptRowId,
+    contextSnippet: null,
     createdAt: null,
     score: 1,
     ...overrides,

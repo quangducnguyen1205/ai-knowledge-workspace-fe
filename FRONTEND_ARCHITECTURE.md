@@ -95,6 +95,13 @@ Asset id alone.
 - Workspace moment grouping is frontend presentation logic: it preserves the first backend
   appearance of each Asset and relative moment order inside that Asset, so grouping never
   changes Spring relevance or reranks by score or timestamp.
+- Spring may provide a canonical `contextSnippet` per moment. `resolveSearchMomentPreview` is the
+  single preview owner for Workspace-wide and Asset-scoped results: it prefers a nonblank
+  `contextSnippet`, keeps the exact matching row `text` as the compatibility fallback, and
+  otherwise renders one bounded label. The two values are never concatenated, no HTML
+  highlighting is produced, and the frontend never constructs neighbor context itself. Exact-row
+  identity, hit timestamp, source badge, grouping order and accessible action names are unchanged
+  by the preview choice.
 - Exact-moment opening reuses the existing compact Asset/row route. Search state remains scoped
   by Workspace and normalized query in React Query; scope changes reset incompatible visible
   state, and aborted or old-key responses cannot replace current results.
