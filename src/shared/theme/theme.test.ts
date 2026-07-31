@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { contrastRatio, readCssToken } from '../../test/contrast';
+import { compositeOver, contrastRatio, readCssToken } from '../../test/contrast';
 
 const tokensCss = readFileSync(resolve(process.cwd(), 'src/shared/theme/tokens.css'), 'utf8');
 const stylesCss = readFileSync(resolve(process.cwd(), 'src/styles.css'), 'utf8');
@@ -78,11 +78,47 @@ describe('WCAG contrast of live token values', () => {
     'blue-soft surface': readCssToken(tokensCss, '--blue-soft'),
   };
 
-  it('keeps normal muted text at or above 4.5:1 on every light surface', () => {
-    const muted = readCssToken(tokensCss, '--text-muted');
+  // Every semantic token that renders visible normal-sized text, with its explicit floor.
+  const visibleTextTokens: Array<[token: string, floor: number]> = [
+    ['--text', 7],
+    ['--text-secondary', 7],
+    ['--text-muted', 4.5],
+  ];
 
-    for (const [name, surface] of Object.entries(lightSurfaces)) {
-      expect(contrastRatio(muted, surface), `--text-muted on ${name}`)
+  // The translucent panel surface is measured as actually seen: flattened onto both page washes.
+  const effectiveSurfaces = () => {
+    const surface = readCssToken(tokensCss, '--surface');
+    const toHex = ({ r, g, b }: { r: number; g: number; b: number }) =>
+      `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+    return {
+      ...lightSurfaces,
+      'surface over warm background': toHex(compositeOver(surface, readCssToken(tokensCss, '--bg-warm'))),
+      'surface over cool background': toHex(compositeOver(surface, readCssToken(tokensCss, '--bg-cool'))),
+    };
+  };
+
+  for (const [token, floor] of visibleTextTokens) {
+    it(`keeps ${token} at or above ${floor}:1 on every light surface`, () => {
+      const color = readCssToken(tokensCss, token);
+
+      for (const [name, surface] of Object.entries(effectiveSurfaces())) {
+        expect(contrastRatio(color, surface), `${token} on ${name} (${surface})`)
+          .toBeGreaterThanOrEqual(floor);
+      }
+    });
+  }
+
+  it('forbids reintroducing a soft text tier below the normal-text floor', () => {
+    // --text-soft was removed because it failed 4.5:1 and duplicated --text-muted semantically.
+    // If a soft tier ever returns, it must pass the same floor on every surface it can sit on.
+    const softValue = tokensCss.match(/--text-soft:\s*([^;]+);/)?.[1]?.trim();
+
+    if (softValue === undefined) {
+      expect(tokensCss).not.toContain('--text-soft');
+      return;
+    }
+    for (const [name, surface] of Object.entries(effectiveSurfaces())) {
+      expect(contrastRatio(softValue, surface), `--text-soft on ${name}`)
         .toBeGreaterThanOrEqual(4.5);
     }
   });

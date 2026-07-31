@@ -50,8 +50,9 @@
   /* Text */
   --text: #192234;
   --text-secondary: #354052;
+  /* One subordinate text tier only: labels, eyebrows and meta share --text-muted. A separate
+     lighter "soft" tier failed 4.5:1 on the light surfaces and carried no semantic distinction. */
   --text-muted: #5e6980;
-  --text-soft: #8b95a6;
   --text-inverse: #ffffff;
 
   /* Brand — deep teal */

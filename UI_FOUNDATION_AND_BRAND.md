@@ -95,6 +95,12 @@ rings and a *second*, unrelated blue ramp (`#2563eb`, `#eff6ff`, `#dbeafe`, `#1d
 currently-playing transcript row; three near-identical body-text grays (`#354052`, `#313b4d`,
 `#2d3748`); teal at nine arbitrary alpha values; two competing focus-ring colors.
 
+The former fourth text tier `--text-soft` (`#8b95a6`) was removed at freeze: every production use
+was visible normal-sized label text (eyebrows, field labels, transcript meta, account identity)
+that measured ~3.1:1 on white, and the soft-versus-muted distinction carried no semantic value.
+All uses now read `--text-muted`; uppercase/letter-spacing/weight remain purely stylistic and are
+never used to excuse contrast. A guard test forbids reintroducing a soft tier below 4.5:1.
+
 There was a de-facto brand — calm deep teal on warm ivory with an editorial serif — but no formal
 system. This refinement formalizes it rather than inventing a new identity: it already matches the
 product's personality (a calm, intelligent video knowledge workspace) and avoids generic AI
@@ -109,7 +115,7 @@ clichés (no neon gradients, no glow effects, no fake metrics).
 | `--primary-soft` | `#dcefeb` | Brand wash, secondary buttons | background only |
 | `--primary-border` / `--primary-ring` | teal α 0.2 / 0.3 | borders, rings, glows | non-text |
 | `--ink` | `#111827` | Dark anchor surfaces (players, workflow band) | white on ink 17.74:1 |
-| `--text` / `--text-secondary` / `--text-muted` | `#192234` / `#354052` / `#5e6980` | primary / body / meta text | 14.26:1 on warm bg; 10.47:1; ≥4.62:1 on every light surface incl. primary-soft (AA normal text) |
+| `--text` / `--text-secondary` / `--text-muted` | `#192234` / `#354052` / `#5e6980` | primary / body / all subordinate text (meta, labels, eyebrows) | 14.26:1 on warm bg; 10.47:1; measured floor 4.62:1 (primary-soft) across every light surface incl. the translucent panel flattened on both washes — AA normal text |
 | `--bg-warm` → `--bg-cool` | `#f6f2eb` → `#eef3f7` | Page background wash | with restrained amber/indigo glow |
 | `--blue` / `--blue-soft` | `#3159cb` / `#edf2ff` | Informational status accent | 5.48:1 on soft (AA) |
 | `--focus` / `--focus-on-dark` | `#3159cb` / `#a7c4ff` | Focus rings for light / dark adjacent surfaces (3px + offset, `:focus-visible`) | ≥5.14:1 on all light surfaces; ≥3.43:1 on ink and both teals |

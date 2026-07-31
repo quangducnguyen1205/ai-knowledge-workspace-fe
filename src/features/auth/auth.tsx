@@ -72,7 +72,14 @@ function getFriendlyAuthErrorCopy(error: unknown, mode: 'register' | 'login' | '
     };
   }
 
-  if (mode === 'login' && error.status === 401 && error.code === 'INVALID_CREDENTIALS') {
+  // At sign-in every credential-shaped failure collapses into one non-enumerating message:
+  // whether the email is unknown, the password is wrong, or the input could never be a valid
+  // credential (for example shorter than the minimum), the caller learns only that the pair did
+  // not match. Field-format guidance belongs to registration, where it helps rather than leaks.
+  if (mode === 'login'
+      && ((error.status === 401 && error.code === 'INVALID_CREDENTIALS')
+        || (error.status === 400
+          && (error.code === 'INVALID_EMAIL' || error.code === 'INVALID_PASSWORD')))) {
     return {
       title: 'Email or password is incorrect',
       message: 'Check your details and try again.',

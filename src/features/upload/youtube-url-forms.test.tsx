@@ -64,12 +64,12 @@ describe('YouTube URL forms accepted by the client', () => {
       }), { status: 202, headers: { 'Content-Type': 'application/json' } }));
     vi.stubGlobal('fetch', fetchMock);
 
-    const response = await createYouTubeAsset({ url, title: '  Fixture  ' });
+    const response = await createYouTubeAsset({ workspaceId: 'ws-1', url, title: '  Fixture  ' });
 
     const [requestUrl, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(requestUrl).toBe('/api/assets/youtube');
     expect(init.method).toBe('POST');
-    expect(JSON.parse(String(init.body))).toEqual({ url, title: 'Fixture' });
+    expect(JSON.parse(String(init.body))).toEqual({ workspaceId: 'ws-1', url, title: 'Fixture' });
     // Spring owns canonicalization; the client renders what Spring derived.
     expect(response.sourceUrl).toBe(`https://www.youtube.com/watch?v=${VIDEO_ID}`);
     expect(response.youtubeVideoId).toBe(VIDEO_ID);
