@@ -128,8 +128,10 @@ non-essential motion collapses under `prefers-reduced-motion: reduce`.
 
 ## 5. Landing surface
 
-The application has two entry surfaces: a public signed-out landing (`PublicLanding`) and the
-authenticated Workspace Home (`#/`, `features/dashboard`). The **authenticated Workspace Home** is
+The application has two entry surfaces: a public signed-out landing (`features/public-landing`,
+the cinematic "Moment Engine" — see `PUBLIC_LANDING_MOMENT_ENGINE.md` for its own theme layer,
+scene architecture and fallback policy) and the authenticated Workspace Home (`#/`,
+`features/dashboard`). The **authenticated Workspace Home** is
 the practical product landing — it is where every returning user starts — so the premium redesign
 targets it: hero with the real product statement, a product-preview composition built from
 DOM/CSS transcript motifs, current work (Continue watching, Recent videos, Saved moments — three

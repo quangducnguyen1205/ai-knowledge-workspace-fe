@@ -105,7 +105,7 @@ describe('auth mode UI boundary', () => {
 
     renderApp(legacyConfig);
 
-    expect(await screen.findByRole('heading', { name: /turn long videos into knowledge/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /find the exact moment in every video/i })).toBeInTheDocument();
     await userEvent.click(screen.getAllByRole('link', { name: /^sign in$/i })[0]!);
     expect(await screen.findByRole('heading', { name: /sign in to your workspace/i })).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText(/email/i), 'learner@example.com');

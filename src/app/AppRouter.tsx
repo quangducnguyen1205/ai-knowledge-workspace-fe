@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useTransition } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useTransition } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ApiClientError } from '../shared/api/api-error';
 import type { SearchResponse, SearchResult } from '../features/search/api/search-api';
@@ -16,7 +16,11 @@ import {
   useLogoutMutation,
   useRegisterMutation,
 } from '../features/auth/auth';
-import { PublicLanding } from '../features/auth/public-landing';
+// The public landing is its own lazy chunk: signed-in sessions never download the cinematic
+// landing (or its WebGL dependencies), and the landing chunk loads only for signed-out visitors.
+const PublicLanding = lazy(() =>
+  import('../features/public-landing/public-landing').then((module) => ({ default: module.PublicLanding })),
+);
 import { useAuth } from '../features/auth/auth-provider';
 import { assetKeys, useAssetRouteQuery } from '../features/assets/hooks/asset-queries';
 import { useAssetSelection } from '../features/assets/hooks/use-asset-selection';
@@ -515,7 +519,12 @@ export function AppRouter() {
       (auth.mode === 'keycloak_jwt' &&
         (auth.configIssue || (!auth.hasBearerToken && !isJwtAuthModeUnavailable && !auth.authErrorMessage))))
   ) {
-    return <PublicLanding navigate={navigate} />;
+    return (
+      // The fallback holds the landing's ink background so the chunk swap never flashes white.
+      <Suspense fallback={<div style={{ minHeight: '100vh', background: '#050b10' }} aria-hidden="true" />}>
+        <PublicLanding navigate={navigate} />
+      </Suspense>
+    );
   }
 
   if (auth.mode === 'keycloak_jwt' && (auth.configIssue || isJwtAuthModeUnavailable || !auth.hasBearerToken)) {
