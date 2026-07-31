@@ -1512,6 +1512,9 @@ summary:focus-visible {
 /* Library and upload */
 
 .library-filters {
+  /* min-width lets the chip scroller shrink inside the stacked mobile column instead of
+     forcing the panel wider than the viewport. */
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
