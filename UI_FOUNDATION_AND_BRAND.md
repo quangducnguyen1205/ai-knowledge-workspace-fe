@@ -132,6 +132,21 @@ Assets get an actionable first-video page instead of three empty panels; no fake
 metrics, logos or testimonials anywhere. Auth flow, routes, Workspace selection, API calls and
 error/loading behavior are unchanged.
 
+**Spatial scene.** The hero's product illustration is `SpatialMomentScene`
+(`features/dashboard/spatial-moment-scene.tsx`) — deliberately feature-owned, never a shared/ui
+primitive, because its motifs are this product's flow: video → transcript layers → search signal
+→ timestamp → selected canonical row → stable-link marker. It is semantic DOM + CSS 3D only
+(perspective, preserve-3d, restrained per-plane rotate/translate, depth shadows) with zero new
+dependencies. Pointer-driven depth (max 5°) runs only for precise pointers, writes CSS custom
+properties through one pending animation frame (no React state per move), returns to neutral on
+pointer exit, and renders statically for coarse pointers, reduced motion, missing matchMedia or
+unsupported 3D transforms; there is no idle animation. The whole scene is one `role="img"` with a
+concise description; every sublayer is `aria-hidden` and nothing inside is keyboard-reachable —
+real CTAs live outside it. Its content is always labelled "Example": welcome and returning
+variants describe the flow, and the processing variant states that search opens only once a
+transcript finishes, so the scene never implies search is already available. On narrow
+working-state viewports the scene yields entirely to real work.
+
 ## 6. Lessons taken from the Viettel/Tendoo reference (and what was not copied)
 
 Adapted principles: one token owner with semantic aliases over a raw palette; a foundation-only

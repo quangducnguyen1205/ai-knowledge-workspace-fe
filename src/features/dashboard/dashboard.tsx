@@ -3,6 +3,7 @@ import type { AssetSummary } from '../assets/public';
 import { Button, EmptyState, Section } from '../../shared/ui';
 import { formatDateTime } from '../../shared/format';
 import { SourceBadge, StatusBadge } from '../assets/public';
+import { SpatialMomentScene } from './spatial-moment-scene';
 
 type WorkspaceHomeScreenProps = {
   workspaceName: string;
@@ -17,39 +18,6 @@ type WorkspaceHomeScreenProps = {
   onOpenAsset: (assetId: string) => void;
 };
 
-/**
- * Illustrative search-to-moment composition built from the product's own motifs: a query, one
- * result, three transcript lines with the exact hit, and the stable-link cue. It is visibly an
- * example — never production data — and only appears while the workspace has no videos yet.
- */
-function MomentPreview() {
-  return (
-    <div className="moment-preview" role="img" aria-label="Example of searching a workspace and landing on the exact spoken moment">
-      <div className="moment-preview__search" aria-hidden="true">
-        <span className="moment-preview__query">&ldquo;retrieval practice&rdquo;</span>
-        <span className="moment-preview__scope">Whole workspace</span>
-        <span className="moment-preview__example-pill">Example</span>
-      </div>
-      <div className="moment-preview__result" aria-hidden="true">
-        <div className="moment-preview__result-header">
-          <strong>Learning Science Lecture</strong>
-          <span className="source-badge">Upload</span>
-          <span className="moment-preview__timestamp">12:40</span>
-        </div>
-        <ol className="moment-preview__transcript">
-          <li>…we compared passive review with active recall sessions.</li>
-          <li className="moment-preview__hit">
-            <span>12:40</span>
-            Retrieval practice strengthens memory by asking you to recall it.
-          </li>
-          <li>That effect compounds when the sessions are spaced over days.</li>
-        </ol>
-        <p className="moment-preview__link">Copy a stable link to this exact canonical row.</p>
-      </div>
-    </div>
-  );
-}
-
 export function WorkspaceHomeScreen({
   workspaceName,
   assets,
@@ -63,13 +31,18 @@ export function WorkspaceHomeScreen({
 }: WorkspaceHomeScreenProps) {
   const hasAssets = assets.length > 0;
   const processingCount = assets.filter((asset) => asset.assetStatus === 'PROCESSING').length;
+  const sceneVariant = !hasAssets
+    ? 'welcome' as const
+    : searchableAssetCount === 0
+      ? 'processing' as const
+      : 'returning' as const;
   const recentAssets = [...assets]
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
     .slice(0, 4);
 
   return (
     <div className="screen-stack home-screen">
-      <header className={`home-hero ${hasAssets ? '' : 'home-hero--welcome'}`}>
+      <header className={`home-hero ${hasAssets ? 'home-hero--working' : 'home-hero--welcome'}`}>
         <div className="home-hero__copy">
           <p className="hero__eyebrow">{workspaceName}</p>
           <h1>Find the exact moment in every video.</h1>
@@ -106,7 +79,7 @@ export function WorkspaceHomeScreen({
           ) : null}
         </div>
 
-        {!hasAssets ? <MomentPreview /> : null}
+        <SpatialMomentScene variant={sceneVariant} />
       </header>
 
       {!hasAssets ? (

@@ -1045,12 +1045,20 @@ summary:focus-visible {
   }
 }
 
-.home-hero--welcome {
+.home-hero--welcome,
+.home-hero--working {
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
   align-items: center;
   gap: clamp(2rem, 5vw, 4.5rem);
+}
+
+.home-hero--welcome {
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
   padding-bottom: var(--space-6);
+}
+
+.home-hero--working {
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.7fr);
 }
 
 .home-hero__copy {
@@ -1086,132 +1094,244 @@ summary:focus-visible {
   font-size: 0.88rem;
 }
 
-/* Moment preview — the search-to-exact-moment example composition */
+/* Spatial moment scene — decorative CSS 3D rendering of the real product flow */
 
-.moment-preview {
+.moment-scene {
   min-width: 0;
+  margin: 0;
   display: grid;
   gap: var(--space-3);
-  padding: var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  background: var(--surface);
-  box-shadow: var(--shadow-lg);
+  justify-items: center;
 }
 
-.moment-preview__search {
-  display: flex;
+.moment-scene__stage {
+  width: 100%;
+  perspective: 1100px;
+}
+
+.moment-scene__space {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  /* The front result plane sits in normal flow so the scene always fits its content; the
+     padding reserves the depth zone where the video and layer planes float. */
+  padding-top: 150px;
+  transform-style: preserve-3d;
+  transform: rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+  transition: transform var(--motion-base) var(--ease-standard);
+}
+
+.moment-scene__plane {
+  position: absolute;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+/* Video plane — the source, anchored deepest with the timeline rail */
+.moment-scene__plane--video {
+  top: 0;
+  right: 0;
+  width: min(78%, 340px);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  flex-wrap: wrap;
   gap: var(--space-2);
-  padding: 0.7rem 0.9rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--surface-strong);
+  padding: var(--space-3) var(--space-4);
+  color: var(--text-inverse);
+  background: var(--ink);
+  border-color: transparent;
+  box-shadow: var(--shadow-lg);
+  transform: translateZ(-90px) rotateZ(1.2deg);
 }
 
-.moment-preview__query {
-  font-weight: 750;
+.moment-scene__play {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--primary);
+  font-size: 0.6rem;
 }
 
-.moment-preview__scope {
-  color: var(--text-muted);
-  font-size: 0.78rem;
+.moment-scene__video-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 0.82rem;
   font-weight: 700;
 }
 
-.moment-preview__example-pill {
-  margin-left: auto;
-  padding: 0.18rem 0.55rem;
+.moment-scene__rail {
+  position: relative;
+  grid-column: 1 / -1;
+  height: 4px;
   border-radius: 999px;
-  color: var(--text-muted);
-  background: var(--surface-muted);
-  border: 1px solid var(--border);
-  font-size: 0.7rem;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.moment-scene__rail-marker {
+  position: absolute;
+  top: 50%;
+  left: 64%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--focus-on-dark);
+  transform: translate(-50%, -50%);
+}
+
+.moment-scene__stamp {
+  grid-column: 1 / -1;
+  justify-self: end;
+  color: var(--focus-on-dark);
+  font-size: 0.72rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.moment-preview__result {
-  display: grid;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface-strong);
-  transition: box-shadow var(--motion-base) var(--ease-standard), transform var(--motion-base) var(--ease-standard);
-}
-
-.moment-preview:hover .moment-preview__result {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-sm);
-}
-
-.moment-preview__result-header {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.moment-preview__result-header strong {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.moment-preview__timestamp {
-  margin-left: auto;
-  color: var(--primary-strong);
   font-variant-numeric: tabular-nums;
-  font-weight: 800;
-  font-size: 0.82rem;
 }
 
-.moment-preview__transcript {
+/* Intermediate transcript layers — abstract text bars, progressively closer */
+.moment-scene__plane--layer {
+  left: 6%;
+  width: 74%;
+  display: grid;
+  gap: 0.55rem;
+  padding: var(--space-3);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+}
+
+.moment-scene__plane--layer span {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--border-strong);
+}
+
+.moment-scene__plane--layer span:last-child {
+  width: 62%;
+}
+
+.moment-scene__plane--back {
+  top: 62px;
+  transform: translateZ(-48px) rotateZ(-1.4deg);
+  opacity: 0.72;
+}
+
+.moment-scene__plane--mid {
+  top: 104px;
+  left: 10%;
+  transform: translateZ(-16px) rotateZ(0.8deg);
+  opacity: 0.9;
+}
+
+/* Front plane — the search result with the exact canonical row, in normal flow */
+.moment-scene__plane--result {
+  position: relative;
+  transform: translateZ(26px);
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  background: var(--surface-strong);
+  box-shadow: var(--shadow-lg);
+}
+
+.moment-scene__query {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  justify-self: start;
+  padding: 0.32rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-muted);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.moment-scene__query-glyph {
+  color: var(--primary-strong);
+  font-weight: 800;
+}
+
+.moment-scene__rows {
   display: grid;
   margin: 0;
   padding: 0;
   list-style: none;
   color: var(--text-muted);
-  font-size: 0.92rem;
+  font-size: 0.8rem;
 }
 
-.moment-preview__transcript li {
-  padding: 0.55rem 0.2rem;
+.moment-scene__rows li {
+  padding: 0.4rem 0.15rem;
   border-bottom: 1px solid var(--border);
 }
 
-.moment-preview__transcript li:last-child {
+.moment-scene__rows li:last-child {
   border-bottom: 0;
 }
 
-.moment-preview__hit {
+.moment-scene__hit {
   display: flex;
   gap: var(--space-2);
   align-items: baseline;
-  margin: 0 -0.5rem;
-  padding: 0.55rem 0.7rem !important;
-  border-radius: 10px;
+  margin: 0 -0.45rem;
+  padding: 0.45rem 0.6rem !important;
+  border-radius: 9px;
   border-bottom: 0 !important;
   color: var(--text);
   background: var(--primary-soft);
   box-shadow: inset 3px 0 0 var(--primary);
 }
 
-.moment-preview__hit span {
+.moment-scene__hit span {
   flex: 0 0 auto;
   color: var(--primary-strong);
-  font-variant-numeric: tabular-nums;
+  font-size: 0.72rem;
   font-weight: 800;
-  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
 }
 
-.moment-preview__link {
+.moment-scene__link {
   margin: 0;
   color: var(--primary-strong);
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   font-weight: 750;
+}
+
+.moment-scene__caption {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.moment-scene__example-pill {
+  padding: 0.16rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Returning users: the scene stays subordinate to real work */
+.moment-scene--returning .moment-scene__space {
+  max-width: 400px;
+  padding-top: 122px;
+  transform: scale(0.92) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .moment-scene__space {
+    transform: none;
+  }
 }
 
 /* First steps — new-workspace guidance on the ink band */
@@ -2495,8 +2615,14 @@ summary:focus-visible {
     padding-top: var(--space-4);
   }
 
-  .home-hero--welcome {
+  .home-hero--welcome,
+  .home-hero--working {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* On narrow viewports the decorative scene yields entirely to real work. */
+  .home-hero--working .moment-scene {
+    display: none;
   }
 
   .home-first-steps {

@@ -103,17 +103,17 @@ describe('workspace home landing', () => {
     expect(summary).toHaveTextContent('1 processing');
   });
 
-  it('gives a new user an actionable page with the example preview instead of empty panels', async () => {
+  it('gives a new user an actionable page with the example scene instead of empty panels', async () => {
     const user = userEvent.setup();
     const props = renderHome({ assets: [], searchableAssetCount: 0 });
 
     await user.click(screen.getByRole('button', { name: 'Add your first video' }));
     expect(props.onUploadVideo).toHaveBeenCalledTimes(1);
 
-    // The preview is explicitly an example, never production data.
-    expect(screen.getByRole('img', {
-      name: /example of searching a workspace/i,
-    })).toBeInTheDocument();
+    // The spatial scene is explicitly an example, never production data.
+    const scene = screen.getByRole('img', { name: /example of the product flow/i });
+    expect(scene).toHaveClass('moment-scene--welcome');
+    expect(scene.querySelector('.moment-scene__example-pill')).toHaveTextContent('Example');
     expect(screen.getByRole('heading', { name: 'From video to searchable moments' }))
       .toBeInTheDocument();
     expect(screen.queryByLabelText('Continue watching panel')).not.toBeInTheDocument();
@@ -130,6 +130,11 @@ describe('workspace home landing', () => {
     expect(screen.getByRole('button', { name: 'Search this workspace' })).toBeDisabled();
     expect(screen.getByRole('status'))
       .toHaveTextContent('Search unlocks as soon as a transcript finishes processing.');
+    // The scene must not imply search is already available in this workspace.
+    const scene = screen.getByRole('img', { name: /example of the product flow/i });
+    expect(scene).toHaveClass('moment-scene--processing');
+    expect(scene.querySelector('.moment-scene__caption')?.textContent)
+      .toContain('Search opens once a transcript finishes processing.');
   });
 
   it('grounds the capability section in shipped features only', () => {
@@ -149,20 +154,44 @@ describe('workspace home landing', () => {
     expect(text).not.toMatch(/lesson|course|learner score|study summary/i);
   });
 
-  it('keeps the moment-preview composition inside semantic list markup', () => {
+  it('renders the spatial scene as one described image with hidden decorative sublayers', () => {
     renderHome({ assets: [], searchableAssetCount: 0 });
 
-    const preview = screen.getByRole('img', { name: /example of searching a workspace/i });
-    const rows = preview.querySelectorAll('.moment-preview__transcript li');
+    const scene = screen.getByRole('img', { name: /example of the product flow/i });
+    // One concise accessible description on the container; sublayers hidden from AT.
+    expect(scene.querySelector('.moment-scene__stage')).toHaveAttribute('aria-hidden', 'true');
+    const rows = scene.querySelectorAll('.moment-scene__rows li');
     expect(rows).toHaveLength(3);
-    expect(rows[1]).toHaveClass('moment-preview__hit');
+    expect(rows[1]).toHaveClass('moment-scene__hit');
     // Truthful canonical-addressing wording: stable addressing, no permanence claim.
-    expect(preview.querySelector('.moment-preview__link')?.textContent)
+    expect(scene.querySelector('.moment-scene__link')?.textContent)
       .toBe('Copy a stable link to this exact canonical row.');
     expect(document.body.textContent)
       .not.toMatch(/keeps working|stays stable|forever|permanent|never breaks?/i);
-    // The preview is illustrative, not interactive.
-    expect(preview.querySelectorAll('button, a, input')).toHaveLength(0);
+    // Decorative only: nothing interactive, nothing keyboard-reachable inside the scene.
+    expect(scene.querySelectorAll('button, a, input, select, textarea')).toHaveLength(0);
+    expect(scene.querySelectorAll('[tabindex]')).toHaveLength(0);
+  });
+
+  it('keeps the returning-user scene subordinate while real work leads', () => {
+    renderHome();
+
+    const scene = screen.getByRole('img', { name: /example of the product flow/i });
+    expect(scene).toHaveClass('moment-scene--returning');
+    expect(scene.querySelector('.moment-scene__example-pill')).toHaveTextContent('Example');
+    // Real work still renders in full next to the scene.
+    expect(screen.getByLabelText('Continue watching panel')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Recent videos' })).toBeInTheDocument();
+  });
+
+  it('never attaches pointer-depth handling when matchMedia support is absent', () => {
+    // jsdom has no matchMedia: the scene must render statically without throwing, which is the
+    // same graceful path used for coarse pointers and reduced motion.
+    renderHome();
+
+    const space = document.querySelector('.moment-scene__space') as HTMLElement;
+    expect(space).not.toBeNull();
+    expect(space.style.getPropertyValue('--tilt-x')).toBe('');
   });
 
   it('is keyboard reachable in a predictable order for a returning user', async () => {
@@ -185,7 +214,9 @@ describe('workspace home responsive composition', () => {
     const under760 = styles.slice(styles.indexOf('@media (max-width: 760px)'));
 
     expect(under1080).toMatch(/\.home-current-work\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\)/);
-    expect(under900).toMatch(/\.home-hero--welcome\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\)/);
+    expect(under900).toMatch(/\.home-hero--welcome,\s*\.home-hero--working\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\)/);
+    // The decorative scene yields entirely to real work on narrow working-state viewports.
+    expect(under900).toMatch(/\.home-hero--working \.moment-scene\s*\{[\s\S]*?display:\s*none/);
     expect(under760).toMatch(/\.home-capabilities__grid\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\)/);
   });
 
