@@ -66,6 +66,12 @@ The baseline was `0c4797436c9e7106146388a09322e2d32782fceb`. `AppShell.tsx` was 
   `Button`, `Section`, `PanelHeading`, banners, `LoadingBlock`, `EmptyState`,
   `useEphemeralNotice`, `joinClassNames`. `src/shared/format` owns generic formatting.
   `src/lib/ui.tsx` is a compatibility re-export only.
+- `ErrorBanner` is pure presentation (safe copy in, alert out); the `src/shared/feedback`
+  adapter (`ErrorFeedback`) owns mapping an unknown error to bounded copy. shared/ui never
+  imports shared/api or shared/feedback.
+- Features import each other only through the provider's named `public.ts` entrypoint
+  (assets, search, assistant, upload, auth); internal `model`/`hooks`/`api`/component paths
+  stay private to their feature. App-level composition is exempt.
 - `src/shared/theme/tokens.css` is the single owner of shared design decisions (color,
   typography stacks, geometry, layers, motion, one `--focus` color). Raw brand palette values are
   legal only there; component CSS consumes semantic tokens.
@@ -143,7 +149,7 @@ Spring remains the only browser-facing product API for search, transcript contex
 authorization, and Asset data. The frontend does not call Elasticsearch or FastAPI directly.
 Search-ranking redesign is intentionally outside this boundary.
 
-Static assertions protect the neutral HTTP direction, shell/API separation, lifecycle/assistant separation, upload/polling separation, infrastructure URL ban, the provider-neutral player contract, Upload media URL ownership inside the asset feature API, media-element details staying inside the Upload adapter, the shared/lib foundation tier direction, query-key ownership, theme-token ownership, and absence of circular production imports.
+Static assertions protect the neutral HTTP direction, shell/API separation, lifecycle/assistant separation, upload/polling separation, infrastructure URL ban, the provider-neutral player contract, Upload media URL ownership inside the asset feature API, media-element details staying inside the Upload adapter, the shared/lib foundation tier direction, shared/ui transport neutrality (no shared/api or shared/feedback imports in primitives), the cross-feature public-entrypoint rule, query-key ownership, theme-token ownership, WCAG contrast of muted text and both focus tokens, favicon/brand parity, and absence of circular production imports.
 
 ## Assistant and citation ownership
 

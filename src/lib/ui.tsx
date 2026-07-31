@@ -14,4 +14,5 @@ export {
   SuccessNotification,
   joinClassNames,
 } from '../shared/ui';
+export { ErrorFeedback } from '../shared/feedback';
 export { formatDateTime, formatScore } from '../shared/format';

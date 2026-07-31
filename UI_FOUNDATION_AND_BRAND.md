@@ -19,6 +19,18 @@ is the reference for visual and foundation decisions.
 Generic formatting lives in `src/shared/format` (`formatDateTime`, `formatScore`). Domain
 formatting stays with its owner (transcript timestamps in `entities/transcript`).
 
+`ErrorBanner` is a pure presentation primitive: it renders exactly the safe copy it receives and
+never inspects an error object. Mapping an unknown error to bounded copy lives in the
+`src/shared/feedback` adapter (`ErrorFeedback`), which applies the user-safe error-copy policy and
+renders the pure banner. Direction is one-way — shared/feedback may import shared/api and
+shared/ui; shared/ui imports neither (enforced in `import-boundaries.test.ts`).
+
+Cross-feature imports go through the provider feature's named `public.ts` entrypoint only
+(`features/assets/public`, `features/search/public`, `features/assistant/public`,
+`features/upload/public`, `features/auth/public`); no feature reaches another feature's internal
+`model`, `hooks`, `api` or component paths, and internal query-key shapes stay private to their
+owners. App-level composition is not bound by this rule.
+
 `src/lib/ui.tsx` is a compatibility re-export only, kept so existing imports migrate gradually —
 the same coexistence discipline the Viettel/Tendoo reference uses between its old theme layer and
 its new foundation package. New code imports `shared/ui` / `shared/format` directly.
@@ -50,10 +62,20 @@ are legal only there (enforced by `src/shared/theme/theme.test.ts` for the brand
 families). Components consume semantic names: color (`--primary*`, `--text*`, `--surface*`,
 `--border*`, status), typography (`--font-body`, `--font-display`), geometry (spacing, radii,
 `--radius-control`, shadows, `--content-width`), layers (`--layer-*`), motion (`--motion-fast/base/slow`,
-`--ease-standard`) and one focus color (`--focus`).
+`--ease-standard`) and two focus colors: `--focus` (solid indigo `#3159cb` for rings on light
+surfaces, >=5.1:1 everywhere it lands) and `--focus-on-dark` (`#a7c4ff` for rings on ink or
+deep-teal surfaces, >=3.4:1). Focus is always a 3px `:focus-visible` outline with offset — never
+blur or shadow alone. WCAG ratios are enforced by dependency-free tests
+(`src/test/contrast.ts` + `src/shared/theme/theme.test.ts`) using relative luminance with alpha
+compositing.
 
 Canonical responsive breakpoints (media queries cannot read custom properties): `1080px`,
 `900px`, `760px`, `430px` — reuse these instead of inventing new ones.
+
+**Standalone-asset exception.** Raw brand colors belong in the token owner, except standalone
+assets that cannot consume CSS custom properties — today only `public/favicon.svg`. A parity test
+in `theme.test.ts` proves the favicon's primary fill equals the current `--primary` value, so the
+literal cannot drift.
 
 **Hard-coding policy.** Replace a literal with a token when it represents a shared decision:
 brand or status color, focus color, shared spacing/radius/shadow, content width, motion duration,
@@ -87,10 +109,10 @@ clichés (no neon gradients, no glow effects, no fake metrics).
 | `--primary-soft` | `#dcefeb` | Brand wash, secondary buttons | background only |
 | `--primary-border` / `--primary-ring` | teal α 0.2 / 0.3 | borders, rings, glows | non-text |
 | `--ink` | `#111827` | Dark anchor surfaces (players, workflow band) | white on ink 17.74:1 |
-| `--text` / `--text-secondary` / `--text-muted` | `#192234` / `#354052` / `#6d788b` | primary / body / meta text | 14.26:1 on warm bg; 10.47:1; 4.46:1 (AA, meta only) |
+| `--text` / `--text-secondary` / `--text-muted` | `#192234` / `#354052` / `#5e6980` | primary / body / meta text | 14.26:1 on warm bg; 10.47:1; ≥4.62:1 on every light surface incl. primary-soft (AA normal text) |
 | `--bg-warm` → `--bg-cool` | `#f6f2eb` → `#eef3f7` | Page background wash | with restrained amber/indigo glow |
 | `--blue` / `--blue-soft` | `#3159cb` / `#edf2ff` | Informational status accent | 5.48:1 on soft (AA) |
-| `--focus` | indigo α 0.34 | The one focus ring (3px + offset) | visible on teal, ivory and white |
+| `--focus` / `--focus-on-dark` | `#3159cb` / `#a7c4ff` | Focus rings for light / dark adjacent surfaces (3px + offset, `:focus-visible`) | ≥5.14:1 on all light surfaces; ≥3.43:1 on ink and both teals |
 | `--playback*` | `#2563eb` family | Playing-row semantic, distinct from teal selection | 5.49:1 strong-on-chip |
 | `--danger` / `--warning` / `--success` | `#ae4141` / `#9c5c20` / `#1f7657` | Status | 5.26 / 4.91 / 5.10 on their soft surfaces (AA) |
 

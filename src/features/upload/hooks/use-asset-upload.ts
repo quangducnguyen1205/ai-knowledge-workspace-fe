@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { assetKeys } from '../../assets/hooks/asset-queries';
+import { assetKeys } from '../../assets/public';
 import { uploadAsset, type AssetUploadResponse, type UploadAssetInput } from '../api/upload-api';
 
 export function useAssetUpload({

@@ -1,5 +1,5 @@
 import { buildQueryString, request } from '../../../shared/api/http-client';
-import type { AssetSourceType } from '../../assets/model/types';
+import type { AssetSourceType } from '../../assets/public';
 
 export type SavedMoment = {
   savedMomentId: string;

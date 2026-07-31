@@ -8,7 +8,7 @@ import {
   retryAssetProcessing,
 } from '../api/assets-api';
 import { assetKeys } from './asset-queries';
-import { searchKeys } from '../../search/model/search-keys';
+import { searchKeys } from '../../search/public';
 import {
   canLoadTranscript,
   deriveAssetStatus,

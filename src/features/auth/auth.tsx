@@ -9,7 +9,7 @@ import {
   type AuthCredentialsInput,
 } from './api/auth-api';
 import type { AuthConfigurationIssue } from '../../lib/auth-config';
-import { Button, ErrorBanner } from '../../lib/ui';
+import { Button, ErrorFeedback } from '../../lib/ui';
 import { useAuth } from './auth-provider';
 
 export { authKeys } from './auth-keys';
@@ -243,7 +243,7 @@ export function AuthEntrySurface({
           </form>
 
           {activeError ? (
-            <ErrorBanner
+            <ErrorFeedback
               error={activeError}
               title={errorCopy?.title}
               message={errorCopy?.message}
@@ -303,7 +303,7 @@ export function KeycloakAuthEntrySurface({
           </div>
 
           {configIssue ? (
-            <ErrorBanner
+            <ErrorFeedback
               error={new Error(configIssue.message)}
               title="Sign in is not configured"
               message="The app cannot start sign in yet. Contact your administrator."
@@ -311,7 +311,7 @@ export function KeycloakAuthEntrySurface({
           ) : null}
 
           {authModeUnavailable ? (
-            <ErrorBanner
+            <ErrorFeedback
               error={new Error(authErrorMessage ?? 'Authentication mode is unavailable.')}
               title="Sign in is temporarily unavailable"
               message="The current sign-in method is not available. Try again later."
@@ -319,7 +319,7 @@ export function KeycloakAuthEntrySurface({
           ) : null}
 
           {!configIssue && !authModeUnavailable && authErrorMessage ? (
-            <ErrorBanner
+            <ErrorFeedback
               error={new Error(authErrorMessage)}
               title="Sign in was not completed"
               message="Try signing in again."

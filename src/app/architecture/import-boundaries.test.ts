@@ -227,6 +227,32 @@ describe('frontend import boundaries', () => {
     expect(legacyUi).not.toMatch(/return\s*\(|<button|<div|function\s+\w+\s*\(/);
   });
 
+  it('keeps shared/ui transport-neutral: no shared/api and no shared/feedback imports', () => {
+    // UI primitives render the safe copy they are given. Mapping an unknown error to copy lives
+    // in the shared/feedback adapter, which may depend on shared/api and shared/ui — never the
+    // reverse — so a primitive can never inspect ApiClientError or leak backend details.
+    const uiSources = productionSources(join(sourceRoot, 'shared/ui'));
+    const violations: string[] = [];
+
+    for (const absolutePath of uiSources) {
+      const source = readFileSync(absolutePath, 'utf8');
+      const file = relative(sourceRoot, absolutePath);
+      for (const match of source.matchAll(/from\s+['"]([^'"]+)['"]/g)) {
+        if (/\bshared\/(api|feedback)\b|\.\.\/(api|feedback)\b/.test(match[1])) {
+          violations.push(`${file} -> ${match[1]}`);
+        }
+      }
+      if (/ApiClientError|getUserSafeErrorCopy/.test(source)) {
+        violations.push(`${file} inspects error transport internals`);
+      }
+    }
+
+    expect(violations).toEqual([]);
+    const feedback = readSource('shared/feedback/index.tsx');
+    expect(feedback).toMatch(/getUserSafeErrorCopy/);
+    expect(feedback).toMatch(/from '\.\.\/ui'/);
+  });
+
   it('keeps query keys with their owners instead of ad-hoc arrays', () => {
     const violations = productionSources()
       .map((absolutePath) => ({
@@ -239,6 +265,31 @@ describe('frontend import boundaries', () => {
         return !owner && /queryKey:\s*\['(search|auth)'/.test(source);
       })
       .map(({ file }) => file);
+
+    expect(violations).toEqual([]);
+  });
+
+  it('keeps every cross-feature import on the provider feature public entrypoint', () => {
+    // A feature never reaches into another feature's model/hooks/api/component internals. The
+    // deliberate contracts are named in each provider's public.ts; app-level composition remains
+    // free to compose feature internals directly.
+    const featuresRoot = join(sourceRoot, 'features');
+    const violations: string[] = [];
+
+    for (const absolutePath of productionSources(featuresRoot)) {
+      const sourceFeature = relative(featuresRoot, absolutePath).split('/')[0];
+      const source = readFileSync(absolutePath, 'utf8');
+
+      for (const match of source.matchAll(/from\s+['"](\.[^'"]+)['"]/g)) {
+        const resolved = resolve(dirname(absolutePath), match[1]);
+        if (!resolved.startsWith(featuresRoot)) continue;
+        const targetFeature = relative(featuresRoot, resolved).split('/')[0];
+        if (targetFeature === sourceFeature) continue;
+        if (!/\/public$/.test(resolved)) {
+          violations.push(`${relative(sourceRoot, absolutePath)} -> ${match[1]}`);
+        }
+      }
+    }
 
     expect(violations).toEqual([]);
   });

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { isApiClientError } from '../../../shared/api/api-error';
-import { Button, ErrorBanner, InfoBanner } from '../../../lib/ui';
+import { Button, ErrorFeedback, InfoBanner } from '../../../lib/ui';
 import type { Workspace } from '../api/workspaces-api';
 
 type DeleteErrorCopy = {
@@ -142,7 +142,7 @@ export function WorkspaceDeleteDialog({
           <InfoBanner tone="warning" title={errorCopy.title} message={errorCopy.message} />
         ) : null}
         {errorCopy?.tone === 'error' ? (
-          <ErrorBanner error={error} title={errorCopy.title} message={errorCopy.message} />
+          <ErrorFeedback error={error} title={errorCopy.title} message={errorCopy.message} />
         ) : null}
 
         <div className="workspace-delete-dialog__actions">

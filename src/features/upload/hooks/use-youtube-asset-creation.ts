@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { assetKeys } from '../../assets/hooks/asset-queries';
-import type { AssetProcessingResponse } from '../../assets/model/types';
+import { assetKeys } from '../../assets/public';
+import type { AssetProcessingResponse } from '../../assets/public';
 import {
   createYouTubeAsset,
   type CreateYouTubeAssetInput,

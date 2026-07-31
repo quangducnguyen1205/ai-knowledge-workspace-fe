@@ -1,28 +1,25 @@
-import { getUserSafeErrorCopy } from '../api/user-error-copy';
 import { joinClassNames } from './class-names';
 
-/** Bounded error feedback. Raw backend diagnostics never reach this surface. */
+/**
+ * Pure error presentation: it renders exactly the safe copy it is given and never inspects an
+ * error object. Mapping an unknown error to bounded copy is the job of the shared/feedback
+ * adapter, which keeps this primitive transport-neutral.
+ */
 export function ErrorBanner({
-  error,
-  className,
   title,
   message,
   detail,
+  className,
 }: {
-  error: unknown;
-  className?: string;
-  title?: string;
-  message?: string;
+  title: string;
+  message: string;
   detail?: string;
+  className?: string;
 }) {
-  const copy = getUserSafeErrorCopy(error);
-  const resolvedTitle = title ?? copy.title;
-  const resolvedMessage = message ?? copy.message;
-
   return (
     <div className={joinClassNames('message message--error', className)} role="alert">
-      <strong>{resolvedTitle}</strong>
-      <p>{resolvedMessage}</p>
+      <strong>{title}</strong>
+      <p>{message}</p>
       {detail ? <small className="message__detail">{detail}</small> : null}
     </div>
   );

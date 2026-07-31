@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import type { TranscriptRow } from '../../../entities/transcript/model/types';
-import { Button, ErrorBanner, InfoBanner, SuccessNotification } from '../../../lib/ui';
+import { Button, ErrorFeedback, InfoBanner, SuccessNotification } from '../../../lib/ui';
 import { useEphemeralNotice } from '../../../shared/ui/use-ephemeral-notice';
 import { getIndexActionState } from '../model/lifecycle';
 import type { AssetIndexResponse, AssetStatus, AssetStatusResponse } from '../model/types';
@@ -66,7 +66,7 @@ export function AssetIndexingRecoveryAction({
       {notice ? (
         <SuccessNotification title={notice.title} message={notice.message} onDismiss={notice.dismiss} />
       ) : null}
-      {indexError ? <ErrorBanner error={indexError} /> : null}
+      {indexError ? <ErrorFeedback error={indexError} /> : null}
     </>
   );
 }

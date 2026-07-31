@@ -21,7 +21,7 @@ function NoticeHarness({ contextKey, showError = false }: { contextKey: string; 
           onDismiss={notice.dismiss}
         />
       ) : null}
-      {showError ? <ErrorBanner error={new Error('persistent failure')} /> : null}
+      {showError ? <ErrorBanner title="Something went wrong" message="persistent failure stays visible" /> : null}
     </div>
   );
 }

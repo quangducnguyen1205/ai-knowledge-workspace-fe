@@ -1,7 +1,6 @@
 import { createRef } from 'react';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ApiClientError } from '../api/api-error';
 import {
   Button,
   EmptyState,
@@ -57,12 +56,20 @@ describe('shared UI foundation', () => {
     expect(container.querySelectorAll('button, a, input, select')).toHaveLength(0);
   });
 
-  it('announces errors through role=alert with bounded copy', () => {
-    render(<ErrorBanner error={new ApiClientError(503, 'raw backend detail')} />);
+  it('renders exactly the presentation copy it is given through role=alert', () => {
+    render(<ErrorBanner title="Something went wrong" message="Try again later." detail="More" />);
 
     const alert = screen.getByRole('alert');
-    expect(alert.textContent).not.toContain('raw backend detail');
-    expect(alert.textContent?.length ?? 0).toBeGreaterThan(0);
+    expect(alert).toHaveTextContent('Something went wrong');
+    expect(alert).toHaveTextContent('Try again later.');
+    expect(alert).toHaveTextContent('More');
+  });
+
+  it('keeps the pure ErrorBanner free of error-object inspection', () => {
+    // The primitive takes strings only; mapping unknown errors is shared/feedback's job. This
+    // compile-level fact is re-asserted structurally by the import-boundaries test.
+    render(<ErrorBanner title="T" message="M" />);
+    expect(screen.getByRole('alert')).toBeInTheDocument();
   });
 
   it('keeps LoadingBlock labelled by text with the dot hidden from assistive tech', () => {

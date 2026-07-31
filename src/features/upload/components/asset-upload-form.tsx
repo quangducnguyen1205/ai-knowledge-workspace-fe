@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Button, ErrorBanner, InfoBanner } from '../../../lib/ui';
-import { getFriendlyUploadErrorCopy } from '../../assets/model/error-copy';
+import { Button, ErrorFeedback, InfoBanner } from '../../../lib/ui';
+import { getFriendlyUploadErrorCopy } from '../../assets/public';
 import {
   getUploadMediaValidationError,
   SUPPORTED_UPLOAD_MEDIA_ACCEPT,
@@ -94,7 +94,7 @@ export function AssetUploadForm({
           />
         ) : null}
         {uploadError ? (
-          <ErrorBanner
+          <ErrorFeedback
             error={uploadError}
             title={uploadErrorCopy?.title}
             message={uploadErrorCopy?.message}

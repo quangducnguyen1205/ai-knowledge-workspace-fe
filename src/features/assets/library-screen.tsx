@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import type { AssetStatus, AssetSummary } from './model/types';
 import { Button, Section } from '../../lib/ui';
 import { AssetList } from './components/asset-list';
-import { AssetUploadDialog } from '../upload/components/asset-upload-dialog';
+import { AssetUploadDialog } from '../upload/public';
 import type { EphemeralNotice } from '../../shared/ui/use-ephemeral-notice';
 
 type LibraryFilter = 'ALL' | AssetStatus;

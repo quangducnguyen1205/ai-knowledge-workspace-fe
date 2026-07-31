@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Button, ErrorBanner, InfoBanner } from '../../../lib/ui';
-import { getFriendlyYouTubeCreationErrorCopy } from '../../assets/model/error-copy';
+import { Button, ErrorFeedback, InfoBanner } from '../../../lib/ui';
+import { getFriendlyYouTubeCreationErrorCopy } from '../../assets/public';
 
 function getYouTubeUrlValidationError(url: string): string | null {
   const trimmedUrl = url.trim();
@@ -107,7 +107,7 @@ export function YouTubeAssetForm({
         />
       ) : null}
       {creationError ? (
-        <ErrorBanner
+        <ErrorFeedback
           error={creationError}
           title={creationErrorCopy?.title}
           message={creationErrorCopy?.message}

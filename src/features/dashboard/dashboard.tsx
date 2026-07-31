@@ -1,9 +1,8 @@
 import type { ReactNode } from 'react';
-import type { AssetSummary } from '../assets/model/types';
+import type { AssetSummary } from '../assets/public';
 import { Button, EmptyState, Section } from '../../shared/ui';
 import { formatDateTime } from '../../shared/format';
-import { SourceBadge } from '../assets/components/source-badge';
-import { StatusBadge } from '../assets/components/status-badge';
+import { SourceBadge, StatusBadge } from '../assets/public';
 
 type WorkspaceHomeScreenProps = {
   workspaceName: string;
@@ -45,7 +44,7 @@ function MomentPreview() {
           </li>
           <li>That effect compounds when the sessions are spaced over days.</li>
         </ol>
-        <p className="moment-preview__link">Opens at this exact row — its link stays stable.</p>
+        <p className="moment-preview__link">Copy a stable link to this exact canonical row.</p>
       </div>
     </div>
   );
@@ -195,8 +194,8 @@ export function WorkspaceHomeScreen({
           <article>
             <h3>Keep canonical context</h3>
             <p>
-              Every moment opens with its surrounding transcript, and its link keeps working —
-              share it or come back to the same row later.
+              Every moment opens with its surrounding transcript, and you can copy a stable link
+              to the exact canonical row while the video stays in your workspace.
             </p>
           </article>
           <article>

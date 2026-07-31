@@ -9,7 +9,7 @@ import {
   type Workspace,
 } from './api/workspaces-api';
 import { isApiClientError } from '../../shared/api/api-error';
-import { Button, ErrorBanner, InfoBanner, SuccessNotification } from '../../lib/ui';
+import { Button, ErrorFeedback, InfoBanner, SuccessNotification } from '../../lib/ui';
 import type { EphemeralNotice } from '../../shared/ui/use-ephemeral-notice';
 import { WorkspaceDeleteDialog } from './components/workspace-delete-dialog';
 
@@ -310,7 +310,7 @@ export function WorkspaceBar({
           onDismiss={successNotice.dismiss}
         />
       ) : null}
-      {createError ? <ErrorBanner error={createError} className="workspace-bar__error" /> : null}
+      {createError ? <ErrorFeedback error={createError} className="workspace-bar__error" /> : null}
       {renameErrorCopy?.tone === 'warning' ? (
         <InfoBanner
           className="workspace-bar__error"
@@ -320,7 +320,7 @@ export function WorkspaceBar({
         />
       ) : null}
       {renameErrorCopy?.tone === 'error' ? (
-        <ErrorBanner
+        <ErrorFeedback
           error={renameError}
           className="workspace-bar__error"
           title={renameErrorCopy.title}

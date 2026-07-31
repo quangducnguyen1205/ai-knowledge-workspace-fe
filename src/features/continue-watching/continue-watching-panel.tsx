@@ -1,7 +1,8 @@
 import { formatTranscriptTimestamp } from '../../entities/transcript/model/transcript-time';
-import { Button, EmptyState, ErrorBanner, LoadingBlock, PanelHeading } from '../../shared/ui';
+import { Button, EmptyState, LoadingBlock, PanelHeading } from '../../shared/ui';
+import { ErrorFeedback } from '../../shared/feedback';
 import { formatDateTime } from '../../shared/format';
-import { SourceBadge } from '../assets/components/source-badge';
+import { SourceBadge } from '../assets/public';
 import type { ContinueWatchingItem } from './api/continue-watching-api';
 
 export type ContinueWatchingPanelProps = {
@@ -49,7 +50,7 @@ export function ContinueWatchingPanel({
         </div>
       ) : null}
 
-      {!isLoading && error ? <ErrorBanner error={error} /> : null}
+      {!isLoading && error ? <ErrorFeedback error={error} /> : null}
 
       {!isLoading && !error && items.length === 0 ? (
         <div role="status">

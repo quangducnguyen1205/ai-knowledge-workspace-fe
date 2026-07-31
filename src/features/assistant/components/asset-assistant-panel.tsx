@@ -1,6 +1,6 @@
 import type { FormEvent } from 'react';
 import type { AssistantAnswerCitation } from '../model/types';
-import { Button, ErrorBanner, LoadingBlock, Section } from '../../../lib/ui';
+import { Button, ErrorFeedback, LoadingBlock, Section } from '../../../lib/ui';
 import { useAssetAssistant } from '../hooks/use-asset-assistant';
 import { getGenericAssistantErrorMessage } from '../model/assistant-state';
 import { AssistantAnswerPanel } from './assistant-answer-panel';
@@ -72,14 +72,14 @@ export function AssetAssistantPanel({
           />
         ) : null}
         {assistant.result.status === 'unavailable' ? (
-          <ErrorBanner
+          <ErrorFeedback
             error={assistant.result.error}
             title="Answers are temporarily unavailable"
             message="You can still read and search this transcript. Try asking again later."
           />
         ) : null}
         {assistant.result.status === 'error' ? (
-          <ErrorBanner error={assistant.result.error} title="Could not answer this question" message={getGenericAssistantErrorMessage(assistant.result.error)} />
+          <ErrorFeedback error={assistant.result.error} title="Could not answer this question" message={getGenericAssistantErrorMessage(assistant.result.error)} />
         ) : null}
       </div>
     </Section>

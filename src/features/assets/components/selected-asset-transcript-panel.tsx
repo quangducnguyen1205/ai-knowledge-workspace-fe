@@ -3,7 +3,7 @@ import { buildTranscriptDisplayRows, matchesTranscriptReference } from '../../..
 import { getTranscriptRowIdentity } from '../../../entities/transcript/model/active-transcript-row';
 import { formatTranscriptTimestamp } from '../../../entities/transcript/model/transcript-time';
 import type { TranscriptRow } from '../../../entities/transcript/model/types';
-import { EmptyState, ErrorBanner, InfoBanner, LoadingBlock, Section } from '../../../lib/ui';
+import { EmptyState, ErrorFeedback, InfoBanner, LoadingBlock, Section } from '../../../lib/ui';
 import { getTranscriptConflictCopy } from '../model/error-copy';
 import type { AssetStatus, AssetStatusResponse, AssetSummary } from '../model/types';
 
@@ -230,7 +230,7 @@ export function SelectedAssetTranscriptPanel({
         {!transcriptLoading && transcriptConflictCopy ? (
           <InfoBanner tone="warning" title={transcriptConflictCopy.title} message={transcriptConflictCopy.message} detail={transcriptConflictCopy.detail} />
         ) : null}
-        {!transcriptLoading && transcriptError && !transcriptConflictCopy ? <ErrorBanner error={transcriptError} /> : null}
+        {!transcriptLoading && transcriptError && !transcriptConflictCopy ? <ErrorFeedback error={transcriptError} /> : null}
         {!transcriptLoading && !transcriptError && !transcriptRows?.length ? (
           <EmptyState title="Transcript not ready yet" description="This page updates automatically while the video is being prepared." />
         ) : null}

@@ -3,9 +3,10 @@ import type { SearchResponse, SearchResult } from './api/search-api';
 import type { TranscriptContextResponse } from '../../entities/transcript/model/types';
 import { buildTranscriptDisplayRows, matchesTranscriptReference } from '../../entities/transcript/model/transcript-display';
 import { formatTranscriptTimestamp } from '../../entities/transcript/model/transcript-time';
-import { Button, EmptyState, ErrorBanner, LoadingBlock, PanelHeading, Section } from '../../shared/ui';
-import { SourceBadge } from '../assets/components/source-badge';
-import type { AssetSourceType } from '../assets/model/types';
+import { Button, EmptyState, LoadingBlock, PanelHeading, Section } from '../../shared/ui';
+import { ErrorFeedback } from '../../shared/feedback';
+import { SourceBadge } from '../assets/public';
+import type { AssetSourceType } from '../assets/public';
 import {
   getSearchMomentAssetTitle,
   groupSearchMomentsByAsset,
@@ -190,7 +191,7 @@ export function SearchPanel({
         </p>
       ) : null}
 
-      {searchError ? <ErrorBanner error={searchError} /> : null}
+      {searchError ? <ErrorFeedback error={searchError} /> : null}
       {isSearching ? (
         <div className="search-loading-status" role="status" aria-live="polite" aria-atomic="true">
           <LoadingBlock label={isAssetScoped ? 'Searching this transcript...' : `Searching within ${workspaceName}...`} compact />
@@ -289,7 +290,7 @@ export function SearchPanel({
             </div>
           </div>
           {isContextLoading ? <LoadingBlock label="Loading context..." compact /> : null}
-          {!isContextLoading && contextError ? <ErrorBanner error={contextError} /> : null}
+          {!isContextLoading && contextError ? <ErrorFeedback error={contextError} /> : null}
           {!isContextLoading && !contextError && !contextResponse ? (
             <EmptyState title="Context unavailable" description="Continue with the full transcript below." />
           ) : null}

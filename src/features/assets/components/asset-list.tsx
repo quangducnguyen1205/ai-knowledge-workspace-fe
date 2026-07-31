@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Button, EmptyState, ErrorBanner, InfoBanner, LoadingBlock, SuccessNotification, formatDateTime } from '../../../lib/ui';
+import { Button, EmptyState, ErrorFeedback, InfoBanner, LoadingBlock, SuccessNotification, formatDateTime } from '../../../lib/ui';
 import type { EphemeralNotice } from '../../../shared/ui/use-ephemeral-notice';
 import { getFriendlyDeleteErrorCopy, getFriendlyRenameErrorCopy } from '../model/error-copy';
 import type { AssetSummary } from '../model/types';
@@ -96,12 +96,12 @@ export function AssetList({
   return (
     <div className="asset-list">
       {assetsLoading ? <LoadingBlock label="Loading videos..." compact /> : null}
-      {!assetsLoading && assetsError ? <ErrorBanner error={assetsError} /> : null}
+      {!assetsLoading && assetsError ? <ErrorFeedback error={assetsError} /> : null}
       {!assetsLoading && !assetsError && deleteErrorCopy?.tone === 'warning' ? (
         <InfoBanner tone="warning" title={deleteErrorCopy.title} message={deleteErrorCopy.message} detail={deleteErrorCopy.detail} />
       ) : null}
       {!assetsLoading && !assetsError && deleteErrorCopy?.tone === 'error' ? (
-        <ErrorBanner error={deleteError} title={deleteErrorCopy.title} message={deleteErrorCopy.message} detail={deleteErrorCopy.detail} />
+        <ErrorFeedback error={deleteError} title={deleteErrorCopy.title} message={deleteErrorCopy.message} detail={deleteErrorCopy.detail} />
       ) : null}
       {!assetsLoading && !assetsError && successNotice ? (
         <SuccessNotification
@@ -216,7 +216,7 @@ export function AssetList({
                       <InfoBanner tone="warning" title={renameErrorCopy.title} message={renameErrorCopy.message} />
                     ) : null}
                     {renameErrorCopy?.tone === 'error' ? (
-                      <ErrorBanner error={renameError} title={renameErrorCopy.title} message={renameErrorCopy.message} />
+                      <ErrorFeedback error={renameError} title={renameErrorCopy.title} message={renameErrorCopy.message} />
                     ) : null}
                   </form>
                 ) : null}

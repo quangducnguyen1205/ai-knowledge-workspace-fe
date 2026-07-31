@@ -2,7 +2,7 @@ import { useEffect, useMemo, useTransition } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ApiClientError } from '../shared/api/api-error';
 import type { SearchResponse, SearchResult } from '../features/search/api/search-api';
-import { Button, EmptyState, ErrorBanner, LoadingBlock } from '../lib/ui';
+import { Button, EmptyState, ErrorFeedback, LoadingBlock } from '../lib/ui';
 import { routeToHash, useHashRoute, type AppRoute } from './router';
 import { AppShell } from './AppShell';
 import { useProtectedRouteFallback } from './bootstrap/use-protected-route-fallback';
@@ -551,7 +551,7 @@ export function AppRouter() {
   if (currentUserQuery.error) {
     return (
       <div className="app-shell app-shell--centered">
-        <ErrorBanner error={currentUserQuery.error} />
+        <ErrorFeedback error={currentUserQuery.error} />
       </div>
     );
   }
@@ -567,7 +567,7 @@ export function AppRouter() {
   if (workspacesQuery.error) {
     return (
       <div className="app-shell app-shell--centered">
-        <ErrorBanner error={workspacesQuery.error} />
+        <ErrorFeedback error={workspacesQuery.error} />
       </div>
     );
   }

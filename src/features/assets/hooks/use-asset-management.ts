@@ -4,8 +4,8 @@ import { ApiClientError } from '../../../shared/api/api-error';
 import { assetKeys, useDeleteAssetMutation, useRenameAssetMutation } from './asset-queries';
 import type { AssetSourceType, AssetSummary } from '../model/types';
 import { useEphemeralNotice } from '../../../shared/ui/use-ephemeral-notice';
-import type { SearchResponse } from '../../search/api/search-api';
-import { searchKeys } from '../../search/model/search-keys';
+import type { SearchResponse } from '../../search/public';
+import { searchKeys } from '../../search/public';
 
 export function useAssetManagement({
   currentUserId,

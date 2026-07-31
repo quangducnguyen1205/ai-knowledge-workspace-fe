@@ -50,7 +50,7 @@
   /* Text */
   --text: #192234;
   --text-secondary: #354052;
-  --text-muted: #6d788b;
+  --text-muted: #5e6980;
   --text-soft: #8b95a6;
   --text-inverse: #ffffff;
 
@@ -66,8 +66,11 @@
   --blue-soft: #edf2ff;
   --blue-border: rgba(49, 89, 203, 0.15);
 
-  /* Focus — one ring color everywhere; indigo stays visible on teal and ivory alike */
-  --focus: rgba(49, 89, 203, 0.34);
+  /* Focus — solid rings, >=3:1 against adjacent surfaces. --focus serves every light surface
+     (>=5.1:1 on the ivory/teal/soft family); --focus-on-dark serves controls whose ring lands on
+     ink or deep-teal surfaces (>=3.4:1). Always 3px + offset via :focus-visible. */
+  --focus: #3159cb;
+  --focus-on-dark: #a7c4ff;
 
   /* Playback-active — deliberately distinct from brand-teal selection so a "selected" transcript
      row and the row currently "playing" can never blur together. */

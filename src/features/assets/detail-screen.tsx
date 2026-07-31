@@ -7,14 +7,14 @@ import type {
   AssetStatusResponse,
   AssetSummary,
 } from './model/types';
-import type { AssistantAnswerCitation } from '../assistant/model/types';
-import type { SearchResponse, SearchResult } from '../search/api/search-api';
+import type { AssistantAnswerCitation } from '../assistant/public';
+import type { SearchResponse, SearchResult } from '../search/public';
 import type { TranscriptContextResponse, TranscriptRow } from '../../entities/transcript/model/types';
 import {
   getTranscriptRowIdentity,
   resolveActiveTranscriptRow,
 } from '../../entities/transcript/model/active-transcript-row';
-import { Button, EmptyState, ErrorBanner, InfoBanner, SuccessNotification, formatDateTime } from '../../lib/ui';
+import { Button, EmptyState, ErrorFeedback, InfoBanner, SuccessNotification, formatDateTime } from '../../lib/ui';
 import type { EphemeralNotice } from '../../shared/ui/use-ephemeral-notice';
 import { getFriendlyRenameErrorCopy } from './model/error-copy';
 import { AssetIndexingRecoveryAction } from './components/asset-indexing-recovery-action';
@@ -33,8 +33,8 @@ import type {
 import { resolveMediaPlaybackAvailability } from './player/media-playback-availability';
 import { UploadMediaPlayer } from './player/upload-media-player';
 import { YouTubePlayer } from './player/youtube-player';
-import { AssetAssistantPanel } from '../assistant/components/asset-assistant-panel';
-import { SearchPanel } from '../search/search';
+import { AssetAssistantPanel } from '../assistant/public';
+import { SearchPanel } from '../search/public';
 
 type StudyTab = 'transcript' | 'ask' | 'details';
 
@@ -404,7 +404,7 @@ export function AssetDetailScreen({
         ) : null}
 
         {renameErrorCopy?.tone === 'warning' ? <InfoBanner tone="warning" title={renameErrorCopy.title} message={renameErrorCopy.message} /> : null}
-        {renameErrorCopy?.tone === 'error' ? <ErrorBanner error={renameError} title={renameErrorCopy.title} message={renameErrorCopy.message} /> : null}
+        {renameErrorCopy?.tone === 'error' ? <ErrorFeedback error={renameError} title={renameErrorCopy.title} message={renameErrorCopy.message} /> : null}
         {successNotice ? (
           <SuccessNotification
             title={successNotice.title}
@@ -581,7 +581,7 @@ export function AssetDetailScreen({
           <details className="processing-details">
             <summary>Processing details</summary>
             <p>{getProcessingSummary(resolvedAssetStatus)}</p>
-            {statusError ? <ErrorBanner error={statusError} /> : null}
+            {statusError ? <ErrorFeedback error={statusError} /> : null}
             <AssetIndexingRecoveryAction
               resolvedAssetStatus={resolvedAssetStatus}
               statusResponse={statusResponse}

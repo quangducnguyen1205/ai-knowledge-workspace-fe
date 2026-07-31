@@ -1,5 +1,5 @@
 import { request } from '../../../shared/api/http-client';
-import type { AssetProcessingResponse } from '../../assets/model/types';
+import type { AssetProcessingResponse } from '../../assets/public';
 
 export type AssetUploadResponse = AssetProcessingResponse;
 

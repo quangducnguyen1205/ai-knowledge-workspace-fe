@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
-import { Button, ErrorBanner, Section } from '../../lib/ui';
-import { getFriendlyLogoutErrorCopy } from '../auth/auth';
+import { Button, ErrorFeedback, Section } from '../../lib/ui';
+import { getFriendlyLogoutErrorCopy } from '../auth/public';
 import { formatAppRevision, resolveAppRevision } from '../../shared/build/build-identity';
 
 type SettingsScreenProps = {
@@ -44,7 +44,7 @@ export function SettingsScreen({
             {isLoggingOut ? 'Signing out...' : 'Sign out'}
           </Button>
           {logoutError ? (
-            <ErrorBanner error={logoutError} title={logoutErrorCopy?.title} message={logoutErrorCopy?.message} />
+            <ErrorFeedback error={logoutError} title={logoutErrorCopy?.title} message={logoutErrorCopy?.message} />
           ) : null}
         </Section>
 

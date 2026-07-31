@@ -80,6 +80,16 @@ summary:focus-visible {
   outline-offset: 3px;
 }
 
+/* Rings that land on ink or deep-teal surfaces switch to the on-dark focus token. */
+.home-first-steps :focus-visible,
+.landing-workflow :focus-visible,
+.youtube-player__viewport :focus-visible,
+.upload-media-player__viewport :focus-visible,
+.upload-media-player__video:focus-visible {
+  outline: 3px solid var(--focus-on-dark);
+  outline-offset: 3px;
+}
+
 [hidden] {
   display: none !important;
 }

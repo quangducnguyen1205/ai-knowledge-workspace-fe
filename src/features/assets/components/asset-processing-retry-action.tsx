@@ -1,4 +1,4 @@
-import { Button, ErrorBanner } from '../../../lib/ui';
+import { Button, ErrorFeedback } from '../../../lib/ui';
 import { getAssetFailureCopy, getFriendlyRetryErrorCopy } from '../model/error-copy';
 import type { AssetStatus } from '../model/types';
 
@@ -33,7 +33,7 @@ export function AssetProcessingRetryAction({
         </Button>
       </div>
       {retryError ? (
-        <ErrorBanner
+        <ErrorFeedback
           error={retryError}
           title={retryErrorCopy?.title}
           message={retryErrorCopy?.message}

@@ -156,8 +156,11 @@ describe('workspace home landing', () => {
     const rows = preview.querySelectorAll('.moment-preview__transcript li');
     expect(rows).toHaveLength(3);
     expect(rows[1]).toHaveClass('moment-preview__hit');
+    // Truthful canonical-addressing wording: stable addressing, no permanence claim.
     expect(preview.querySelector('.moment-preview__link')?.textContent)
-      .toMatch(/link stays stable/i);
+      .toBe('Copy a stable link to this exact canonical row.');
+    expect(document.body.textContent)
+      .not.toMatch(/keeps working|stays stable|forever|permanent|never breaks?/i);
     // The preview is illustrative, not interactive.
     expect(preview.querySelectorAll('button, a, input')).toHaveLength(0);
   });
