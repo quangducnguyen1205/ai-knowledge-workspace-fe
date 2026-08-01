@@ -24,6 +24,7 @@ export const PLAYBACK_POSITION_POLL_INTERVAL_MS = 250;
 type PendingPlayerCommand = {
   seekMs: number;
   shouldPlay: boolean;
+  keepPaused: boolean;
 };
 
 const PLAYER_STATE_LABELS: Record<MediaPlayerState, string> = {
@@ -58,6 +59,31 @@ export function readYouTubePositionMs(player: YouTubePlayerInstance): number | n
   return toPlaybackPositionMs(player.getCurrentTime());
 }
 
+/**
+ * Positions this provider at a moment without starting playback.
+ *
+ * The provider's own seek contract keeps a paused video paused but starts playing when it is
+ * seeked from any other state, including a video that has never been played. Cueing the same
+ * video at the moment is the provider's documented way to prepare that position silently, so the
+ * provider's own play control also starts from the selected moment.
+ */
+function positionYouTubeWithoutPlayback(
+  player: YouTubePlayerInstance,
+  videoId: string,
+  timeMs: number,
+): void {
+  const startSeconds = timeMs / 1_000;
+  const playbackState = mapYouTubePlaybackState(player.getPlayerState());
+
+  if (playbackState === 'unstarted' || playbackState === 'cued') {
+    player.cueVideoById({ videoId, startSeconds });
+    return;
+  }
+
+  player.seekTo(startSeconds, true);
+  if (playbackState !== 'playing' && playbackState !== 'buffering') player.pauseVideo();
+}
+
 export const YouTubePlayer = forwardRef<MediaPlayerHandle, {
   videoId: string;
   title: string;
@@ -78,24 +104,33 @@ export const YouTubePlayer = forwardRef<MediaPlayerHandle, {
   const playerReadyRef = useRef(false);
   const pendingCommandRef = useRef<PendingPlayerCommand | null>(null);
   const titleRef = useRef(title);
+  const videoIdRef = useRef(videoId);
   const observationEnabledRef = useRef(playbackObservationEnabled);
   const snapshotListenerRef = useRef(onPlaybackSnapshot);
   const refreshObservationRef = useRef<() => void>(() => undefined);
   const [playerState, setPlayerState] = useState<MediaPlayerState>('idle');
   titleRef.current = title;
+  videoIdRef.current = videoId;
   observationEnabledRef.current = playbackObservationEnabled;
   snapshotListenerRef.current = onPlaybackSnapshot;
 
   useImperativeHandle(ref, () => ({
-    seekToMs(timeMs) {
+    seekToMs(timeMs, options) {
       if (!Number.isFinite(timeMs) || timeMs < 0) return;
 
+      const keepPaused = options?.keepPaused === true;
+
       if (playerReadyRef.current && playerRef.current) {
+        if (keepPaused) {
+          positionYouTubeWithoutPlayback(playerRef.current, videoIdRef.current, timeMs);
+          return;
+        }
+
         playerRef.current.seekTo(timeMs / 1_000, true);
         return;
       }
 
-      pendingCommandRef.current = { seekMs: timeMs, shouldPlay: false };
+      pendingCommandRef.current = { seekMs: timeMs, shouldPlay: false, keepPaused };
     },
     play() {
       if (playerReadyRef.current && playerRef.current) {
@@ -107,6 +142,7 @@ export const YouTubePlayer = forwardRef<MediaPlayerHandle, {
         pendingCommandRef.current = {
           ...pendingCommandRef.current,
           shouldPlay: true,
+          keepPaused: false,
         };
       }
     },
@@ -228,6 +264,11 @@ export const YouTubePlayer = forwardRef<MediaPlayerHandle, {
               const pendingCommand = pendingCommandRef.current;
               pendingCommandRef.current = null;
               if (!pendingCommand) return;
+
+              if (pendingCommand.keepPaused) {
+                positionYouTubeWithoutPlayback(event.target, videoId, pendingCommand.seekMs);
+                return;
+              }
 
               event.target.seekTo(pendingCommand.seekMs / 1_000, true);
               if (pendingCommand.shouldPlay) event.target.playVideo();

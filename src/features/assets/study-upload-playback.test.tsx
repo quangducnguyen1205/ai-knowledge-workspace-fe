@@ -232,6 +232,25 @@ describe('Study Upload playback synchronization', () => {
     );
   });
 
+  it('positions Upload media at a selected moment without playing it, until playback is asked for', async () => {
+    const user = userEvent.setup();
+    renderStudy({ focusedTranscriptRowId: 'row-2', focusedTranscriptSource: 'search' });
+    const { video, media } = stubUploadMedia();
+    fireEvent.loadedMetadata(video);
+
+    expect(media.readCurrentTime()).toBe(12);
+    expect(media.play).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText('Currently playing transcript segment')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Play from 00:12' }));
+
+    expect(media.readCurrentTime()).toBe(12);
+    expect(media.play).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText('Selected transcript moment, currently playing')).toHaveTextContent(
+      'This segment closes the lecture.',
+    );
+  });
+
   it('applies only the latest pre-metadata transcript action once metadata arrives', async () => {
     const user = userEvent.setup();
     renderStudy();

@@ -1,9 +1,17 @@
 export const YOUTUBE_IFRAME_API_SCRIPT_ID = 'youtube-iframe-api';
 export const YOUTUBE_IFRAME_API_SCRIPT_SRC = 'https://www.youtube.com/iframe_api';
 
+export type YouTubeVideoCueRequest = {
+  videoId: string;
+  startSeconds: number;
+};
+
 export type YouTubePlayerInstance = {
   seekTo(seconds: number, allowSeekAhead: boolean): void;
   playVideo(): void;
+  pauseVideo(): void;
+  /** Prepares the video at a position without playing it. */
+  cueVideoById(request: YouTubeVideoCueRequest): void;
   getCurrentTime(): number;
   getPlayerState(): number;
   destroy(): void;

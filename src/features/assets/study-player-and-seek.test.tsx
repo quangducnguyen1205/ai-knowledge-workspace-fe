@@ -12,10 +12,15 @@ import {
   type YouTubePlayerOptions,
 } from './player/youtube-iframe-api';
 
-type MockPlayer = Omit<YouTubePlayerInstance, 'getCurrentTime' | 'getPlayerState'> & {
+type MockPlayer = Omit<
+  YouTubePlayerInstance,
+  'getCurrentTime' | 'getPlayerState' | 'pauseVideo' | 'cueVideoById'
+> & {
   options: YouTubePlayerOptions;
   getCurrentTime: ReturnType<typeof vi.fn>;
   getPlayerState: ReturnType<typeof vi.fn>;
+  pauseVideo: ReturnType<typeof vi.fn>;
+  cueVideoById: ReturnType<typeof vi.fn>;
 };
 
 const transcriptRows: TranscriptRow[] = [
@@ -77,6 +82,8 @@ function installPlayerApi() {
       options,
       seekTo: vi.fn(),
       playVideo: vi.fn(),
+      pauseVideo: vi.fn(),
+      cueVideoById: vi.fn(),
       destroy: vi.fn(),
       getCurrentTime: vi.fn(() => 0),
       getPlayerState: vi.fn(() => -1),
@@ -87,6 +94,36 @@ function installPlayerApi() {
   });
   window.YT = { Player } as unknown as YouTubeIframeApi;
   return { Player, players };
+}
+
+/**
+ * Gives every element the same fixed geometry and records which elements were scrolled into
+ * view, so "bring the player on screen" can be observed in an environment without layout.
+ */
+function stubViewportGeometry(bounds: { top: number; bottom: number }) {
+  const scrolledInto: { element: HTMLElement; options: unknown }[] = [];
+
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+    configurable: true,
+    value(this: HTMLElement, options: unknown) {
+      scrolledInto.push({ element: this, options });
+    },
+  });
+  Object.defineProperty(HTMLElement.prototype, 'getBoundingClientRect', {
+    configurable: true,
+    value: () => ({
+      ...bounds,
+      left: 0,
+      right: 640,
+      width: 640,
+      height: bounds.bottom - bounds.top,
+      x: 0,
+      y: bounds.top,
+      toJSON: () => ({}),
+    }),
+  });
+
+  return scrolledInto;
 }
 
 function renderStudy(overrides: Partial<ComponentProps<typeof AssetDetailScreen>> = {}) {
@@ -141,6 +178,8 @@ afterEach(() => {
   resetYouTubeIframeApiLoaderForTests();
   Reflect.deleteProperty(window, 'YT');
   Reflect.deleteProperty(window, 'onYouTubeIframeAPIReady');
+  Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
+  Reflect.deleteProperty(HTMLElement.prototype, 'getBoundingClientRect');
 });
 
 describe('Study YouTube player and transcript seek', () => {
@@ -196,6 +235,94 @@ describe('Study YouTube player and transcript seek', () => {
     expect(screen.getByLabelText('Currently playing transcript segment')).toHaveTextContent(
       'The introduction starts at zero.',
     );
+  });
+
+  it('positions the player at the selected moment, stays paused, and offers explicit playback', async () => {
+    const user = userEvent.setup();
+    const { players } = installPlayerApi();
+    renderStudy({ focusedTranscriptRowId: 'row-1', focusedTranscriptSource: 'search' });
+    await waitFor(() => expect(players).toHaveLength(1));
+    players[0].options.events.onReady({ target: players[0] });
+
+    // Selecting a moment prepares its exact timestamp and never starts playing on its own.
+    expect(players[0].cueVideoById).toHaveBeenCalledWith({
+      videoId: 'abc_DEF-123',
+      startSeconds: 4.25,
+    });
+    expect(players[0].playVideo).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText('Currently playing transcript segment')).not.toBeInTheDocument();
+
+    const playMoment = screen.getByRole('button', { name: 'Play from 00:04' });
+    await user.click(playMoment);
+
+    expect(players[0].seekTo).toHaveBeenCalledWith(4.25, true);
+    expect(players[0].playVideo).toHaveBeenCalledTimes(1);
+  });
+
+  it('withdraws moment playback once the player reports an error', async () => {
+    const { players } = installPlayerApi();
+    renderStudy({ focusedTranscriptRowId: 'row-1', focusedTranscriptSource: 'search' });
+    await waitFor(() => expect(players).toHaveLength(1));
+    players[0].options.events.onReady({ target: players[0] });
+
+    expect(screen.getByRole('button', { name: 'Play from 00:04' })).toBeInTheDocument();
+
+    players[0].options.events.onError();
+
+    // A control that cannot play anything must not stay offered, and nothing may be commanded.
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The YouTube player could not be loaded.',
+    );
+    expect(screen.queryByRole('button', { name: /play from/i })).not.toBeInTheDocument();
+    expect(players[0].seekTo).not.toHaveBeenCalled();
+    expect(players[0].playVideo).not.toHaveBeenCalled();
+  });
+
+  it('offers no moment playback for a selected row the transcript cannot time', async () => {
+    const { players } = installPlayerApi();
+    renderStudy({ focusedTranscriptRowId: 'legacy-row', focusedTranscriptSource: 'search' });
+    await waitFor(() => expect(players).toHaveLength(1));
+    players[0].options.events.onReady({ target: players[0] });
+
+    expect(screen.queryByRole('button', { name: /play from/i })).not.toBeInTheDocument();
+    expect(players[0].cueVideoById).not.toHaveBeenCalled();
+    expect(players[0].seekTo).not.toHaveBeenCalled();
+    expect(players[0].playVideo).not.toHaveBeenCalled();
+  });
+
+  it('leaves ordinary Viewer navigation without a selected moment untouched', async () => {
+    const { players } = installPlayerApi();
+    const scrolledInto = stubViewportGeometry({ top: -400, bottom: -100 });
+    renderStudy();
+    await waitFor(() => expect(players).toHaveLength(1));
+    players[0].options.events.onReady({ target: players[0] });
+
+    expect(screen.queryByRole('button', { name: /play from/i })).not.toBeInTheDocument();
+    expect(players[0].cueVideoById).not.toHaveBeenCalled();
+    expect(players[0].seekTo).not.toHaveBeenCalled();
+    expect(players[0].playVideo).not.toHaveBeenCalled();
+    expect(scrolledInto).toHaveLength(0);
+  });
+
+  it('brings an off-screen player into view for a selected moment, and leaves a visible one alone', async () => {
+    const { players } = installPlayerApi();
+    const scrolledOffScreen = stubViewportGeometry({ top: -400, bottom: -100 });
+    renderStudy({ focusedTranscriptRowId: 'row-1', focusedTranscriptSource: 'search' });
+    await waitFor(() => expect(players).toHaveLength(1));
+
+    expect(scrolledOffScreen).toHaveLength(1);
+    expect(scrolledOffScreen[0].element).toHaveAttribute(
+      'aria-label',
+      'YouTube player for Causal ordering',
+    );
+    expect(scrolledOffScreen[0].options).toEqual({ block: 'center', behavior: 'instant' });
+
+    cleanup();
+    const scrolledOnScreen = stubViewportGeometry({ top: 24, bottom: 480 });
+    renderStudy({ focusedTranscriptRowId: 'row-1', focusedTranscriptSource: 'search' });
+    await waitFor(() => expect(players).toHaveLength(2));
+
+    expect(scrolledOnScreen).toHaveLength(0);
   });
 
   it('maps observed playback directly to active rows without moving keyboard focus', async () => {

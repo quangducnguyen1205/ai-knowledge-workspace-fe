@@ -14,6 +14,7 @@ import {
   getTranscriptRowIdentity,
   resolveActiveTranscriptRow,
 } from '../../entities/transcript/model/active-transcript-row';
+import { matchesTranscriptReference } from '../../entities/transcript/model/transcript-display';
 import { Button, EmptyState, ErrorFeedback, InfoBanner, SuccessNotification, formatDateTime } from '../../lib/ui';
 import type { EphemeralNotice } from '../../shared/ui/use-ephemeral-notice';
 import { getFriendlyRenameErrorCopy } from './model/error-copy';
@@ -170,6 +171,15 @@ export function AssetDetailScreen({
     ).length,
     [transcriptRows],
   );
+  // The timestamp of the canonical row the route selected, resolved from the canonical transcript.
+  const focusedMomentStartMs = useMemo(() => {
+    if (!focusedTranscriptRowId) return null;
+
+    const focusedRow = (transcriptRows ?? []).find(
+      (row) => matchesTranscriptReference(row, focusedTranscriptRowId),
+    );
+    return focusedRow?.startMs ?? null;
+  }, [focusedTranscriptRowId, transcriptRows]);
   // Progress tracking needs position snapshots even when no transcript timing exists.
   const playbackObservationEnabled = timestampedRowCount > 0 || Boolean(onObservePlayback);
   const resumableProgress =
@@ -220,9 +230,20 @@ export function AssetDetailScreen({
     );
     playerRef.current?.seekToMs(positionMs);
     playerRef.current?.play();
-    // Keep focus in the media region without letting focus reposition the page.
+    // Playback the learner asked for should be watchable, then keep focus in the media region
+    // without letting focus itself reposition the page.
+    revealPlayerRegion(playerRegionRef.current);
     playerRegionRef.current?.focus({ preventScroll: true });
   }, [focusedTranscriptRowId, transcriptRows]);
+
+  // Opening a moment has to land on the moment: the player is positioned at the canonical row's
+  // timestamp and brought on screen, while playback waits for an explicit control.
+  useEffect(() => {
+    if (focusedMomentStartMs === null || !mediaPlaybackAvailable) return;
+
+    playerRef.current?.seekToMs(focusedMomentStartMs, { keepPaused: true });
+    revealPlayerRegion(playerRegionRef.current);
+  }, [focusedMomentStartMs, focusedTranscriptRowId, mediaPlaybackAvailable]);
 
   useEffect(() => {
     setActiveTab('transcript');
@@ -492,6 +513,8 @@ export function AssetDetailScreen({
             isContextLoading={focusedTranscriptRowId ? isStudyContextLoading : isContextLoading}
             selectedResult={selectedSearchResult}
             selectedContextRowId={focusedTranscriptRowId}
+            selectedMomentStartMs={focusedMomentStartMs}
+            onPlaySelectedMoment={mediaPlaybackAvailable && !hasPlayerError ? startPlaybackAt : undefined}
             scope={{ mode: 'asset', assetTitle: asset.title }}
             onSearch={onSearchWithinAsset}
             onSelectResult={onSelectSearchResult}
@@ -597,6 +620,24 @@ export function AssetDetailScreen({
       </div>
     </div>
   );
+}
+
+/**
+ * Brings the media region on screen when, and only when, it is not already visible.
+ *
+ * A moment opened from search must not leave the learner looking at an unrelated part of the
+ * page, but an already visible player must never be repositioned under them. The move is
+ * deliberately immediate: the page scrolls smoothly by default, and an animated jump can be
+ * interrupted or left unfinished, which would leave the opened moment off screen after all.
+ */
+function revealPlayerRegion(region: HTMLElement | null) {
+  if (!region || typeof region.scrollIntoView !== 'function') return;
+
+  const bounds = region.getBoundingClientRect();
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+  if (bounds.top >= 0 && bounds.bottom <= viewportHeight) return;
+
+  region.scrollIntoView({ block: 'center', behavior: 'instant' });
 }
 
 function useMobileStudyLayout(): boolean {

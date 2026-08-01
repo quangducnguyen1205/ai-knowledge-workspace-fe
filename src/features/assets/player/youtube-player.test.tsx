@@ -16,11 +16,16 @@ import {
   YouTubePlayer,
 } from './youtube-player';
 
-type MockPlayer = Omit<YouTubePlayerInstance, 'seekTo' | 'playVideo' | 'destroy'> & {
+type MockPlayer = Omit<
+  YouTubePlayerInstance,
+  'seekTo' | 'playVideo' | 'pauseVideo' | 'cueVideoById' | 'destroy'
+> & {
   options: YouTubePlayerOptions;
   iframe: HTMLIFrameElement;
   seekTo: ReturnType<typeof vi.fn>;
   playVideo: ReturnType<typeof vi.fn>;
+  pauseVideo: ReturnType<typeof vi.fn>;
+  cueVideoById: ReturnType<typeof vi.fn>;
   destroy: ReturnType<typeof vi.fn>;
   getCurrentTime: ReturnType<typeof vi.fn>;
   getPlayerState: ReturnType<typeof vi.fn>;
@@ -36,6 +41,8 @@ function installPlayerApi() {
       iframe,
       seekTo: vi.fn(),
       playVideo: vi.fn(),
+      pauseVideo: vi.fn(),
+      cueVideoById: vi.fn(),
       destroy: vi.fn(),
       getCurrentTime: vi.fn(() => 0),
       getPlayerState: vi.fn(() => -1),
@@ -152,6 +159,84 @@ describe('YouTube player adapter', () => {
     expect(players[0].playVideo).toHaveBeenCalledTimes(1);
     expect(players[0].seekTo.mock.invocationCallOrder[0])
       .toBeLessThan(players[0].playVideo.mock.invocationCallOrder[0]);
+  });
+
+  it('cues a moment instead of seeking it when the video has never been played', async () => {
+    const { players } = installPlayerApi();
+    const ref = createRef<MediaPlayerHandle>();
+    render(
+      <YouTubePlayer ref={ref} videoId="video-a" title="Video A" sourceUrl={null} />,
+    );
+    await waitFor(() => expect(players).toHaveLength(1));
+    ready(players[0]);
+
+    // The provider starts playing when it is seeked from an unstarted or cued state.
+    for (const unplayedState of [-1, 5]) {
+      players[0].getPlayerState.mockReturnValue(unplayedState);
+      ref.current?.seekToMs(8_800, { keepPaused: true });
+    }
+
+    expect(players[0].cueVideoById).toHaveBeenCalledTimes(2);
+    expect(players[0].cueVideoById).toHaveBeenCalledWith({ videoId: 'video-a', startSeconds: 8.8 });
+    expect(players[0].seekTo).not.toHaveBeenCalled();
+    expect(players[0].playVideo).not.toHaveBeenCalled();
+  });
+
+  it('seeks a paused video in place and keeps it paused, and never interrupts playback', async () => {
+    const { players } = installPlayerApi();
+    const ref = createRef<MediaPlayerHandle>();
+    render(
+      <YouTubePlayer ref={ref} videoId="video-a" title="Video A" sourceUrl={null} />,
+    );
+    await waitFor(() => expect(players).toHaveLength(1));
+    ready(players[0]);
+
+    players[0].getPlayerState.mockReturnValue(2);
+    ref.current?.seekToMs(4_250, { keepPaused: true });
+
+    expect(players[0].cueVideoById).not.toHaveBeenCalled();
+    expect(players[0].seekTo).toHaveBeenCalledWith(4.25, true);
+    expect(players[0].pauseVideo).toHaveBeenCalledTimes(1);
+    expect(players[0].playVideo).not.toHaveBeenCalled();
+
+    players[0].getPlayerState.mockReturnValue(1);
+    ref.current?.seekToMs(7_500, { keepPaused: true });
+
+    expect(players[0].seekTo).toHaveBeenLastCalledWith(7.5, true);
+    expect(players[0].pauseVideo).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies a pre-ready moment as a cue, so becoming ready never starts playback', async () => {
+    const { players } = installPlayerApi();
+    const ref = createRef<MediaPlayerHandle>();
+    render(
+      <YouTubePlayer ref={ref} videoId="video-a" title="Video A" sourceUrl={null} />,
+    );
+    await waitFor(() => expect(players).toHaveLength(1));
+
+    ref.current?.seekToMs(8_800, { keepPaused: true });
+    ready(players[0]);
+
+    expect(players[0].cueVideoById).toHaveBeenCalledWith({ videoId: 'video-a', startSeconds: 8.8 });
+    expect(players[0].seekTo).not.toHaveBeenCalled();
+    expect(players[0].playVideo).not.toHaveBeenCalled();
+  });
+
+  it('lets an explicit play override a pending moment position', async () => {
+    const { players } = installPlayerApi();
+    const ref = createRef<MediaPlayerHandle>();
+    render(
+      <YouTubePlayer ref={ref} videoId="video-a" title="Video A" sourceUrl={null} />,
+    );
+    await waitFor(() => expect(players).toHaveLength(1));
+
+    ref.current?.seekToMs(8_800, { keepPaused: true });
+    ref.current?.play();
+    ready(players[0]);
+
+    expect(players[0].seekTo).toHaveBeenCalledWith(8.8, true);
+    expect(players[0].playVideo).toHaveBeenCalledTimes(1);
+    expect(players[0].cueVideoById).not.toHaveBeenCalled();
   });
 
   it('stores only the latest pre-ready seek and applies it once when ready', async () => {

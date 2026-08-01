@@ -38,12 +38,14 @@ export function SearchPanel({
   isContextLoading,
   selectedResult,
   selectedContextRowId,
+  selectedMomentStartMs,
   routeQuery,
   scope,
   embedded = false,
   onSearch,
   onSelectResult,
   onOpenResultContext,
+  onPlaySelectedMoment,
   onReturnToSearch,
   onClearContext,
 }: {
@@ -60,12 +62,16 @@ export function SearchPanel({
   isContextLoading: boolean;
   selectedResult: SearchResult | null;
   selectedContextRowId?: string | null;
+  /** Start of the selected canonical moment, when the transcript gives it a timestamp. */
+  selectedMomentStartMs?: number | null;
   routeQuery?: string | null;
   scope?: SearchPanelScope;
   embedded?: boolean;
   onSearch: (query: string) => void;
   onSelectResult: (result: SearchResult) => void;
   onOpenResultContext?: (result: SearchResult) => void;
+  /** Explicit playback of the selected moment; omitted where this Asset has no playable media. */
+  onPlaySelectedMoment?: (startMs: number) => void;
   onReturnToSearch?: () => void;
   onClearContext?: () => void;
 }) {
@@ -285,6 +291,11 @@ export function SearchPanel({
               <span className="context-panel__hint">Around the matching moment</span>
             </div>
             <div className="selected-context__actions">
+              {onPlaySelectedMoment && selectedMomentStartMs !== null && selectedMomentStartMs !== undefined ? (
+                <Button type="button" onClick={() => onPlaySelectedMoment(selectedMomentStartMs)}>
+                  Play from {formatTranscriptTimestamp(selectedMomentStartMs)}
+                </Button>
+              ) : null}
               {onReturnToSearch ? <Button type="button" tone="secondary" onClick={onReturnToSearch}>Back to search</Button> : null}
               {onClearContext ? <Button type="button" tone="ghost" onClick={onClearContext}>Clear</Button> : null}
             </div>

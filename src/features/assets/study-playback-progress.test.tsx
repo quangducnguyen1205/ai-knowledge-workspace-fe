@@ -83,6 +83,8 @@ function installPlayerApi() {
       options,
       seekTo: vi.fn(),
       playVideo: vi.fn(),
+      pauseVideo: vi.fn(),
+      cueVideoById: vi.fn(),
       destroy: vi.fn(),
       getCurrentTime: vi.fn(() => 0),
       getPlayerState: vi.fn(() => -1),

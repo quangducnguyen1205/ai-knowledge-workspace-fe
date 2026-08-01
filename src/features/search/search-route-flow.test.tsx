@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppRouter } from '../../app/AppRouter';
@@ -456,6 +456,124 @@ describe('Search route query flow', () => {
     window.history.forward();
     await waitFor(() => expect(window.location.hash).toBe('#/assets/asset-1?row=row-1'), routeFlowTimeout);
     await waitFor(() => expect(screen.getByLabelText('Selected transcript moment')).toHaveTextContent(/happens-before/i));
+  });
+});
+
+/**
+ * Observes the Viewer's own media element: what position it was given and whether anything
+ * started playing it. The element reports no metadata on its own in this environment, so the
+ * test decides when the media becomes ready.
+ */
+function stubViewerMedia() {
+  const video = screen.getByLabelText('Uploaded video: Vector Clocks Lecture');
+  if (!(video instanceof HTMLVideoElement)) throw new Error('Expected a native video element');
+
+  let currentTime = 0;
+  Object.defineProperty(video, 'currentTime', {
+    configurable: true,
+    get: () => currentTime,
+    set: (next: number) => {
+      currentTime = next;
+    },
+  });
+  Object.defineProperty(video, 'paused', { configurable: true, get: () => true });
+  const play = vi.fn(() => Promise.resolve());
+  Object.defineProperty(video, 'play', { configurable: true, value: play });
+
+  return {
+    play,
+    setCurrentTime: (next: number) => {
+      currentTime = next;
+    },
+    readCurrentTime: () => currentTime,
+    becomeReady: () => fireEvent.loadedMetadata(video),
+  };
+}
+
+describe('Moment playback from every entry path', () => {
+  it('positions the paused player at the canonical moment opened from Workspace Search', async () => {
+    const user = userEvent.setup();
+    mockTranscriptScrolling();
+    renderAppAt('#/search?q=vector%20clocks');
+
+    await user.click(await screen.findByRole(
+      'button',
+      { name: 'Open moment in Vector Clocks Lecture at 00:01' },
+      routeFlowTimeout,
+    ));
+
+    await waitFor(() => expect(window.location.hash)
+      .toBe('#/assets/asset-1?row=row-2&from=search&q=vector+clocks'));
+    const playMoment = await screen.findByRole('button', { name: 'Play from 00:01' }, routeFlowTimeout);
+
+    const media = stubViewerMedia();
+    media.setCurrentTime(42);
+    media.becomeReady();
+    expect(media.readCurrentTime()).toBe(1);
+    expect(media.play).not.toHaveBeenCalled();
+
+    await user.click(playMoment);
+    expect(media.readCurrentTime()).toBe(1);
+    expect(media.play).toHaveBeenCalledTimes(1);
+  });
+
+  it('positions the paused player identically for a moment opened from Find in transcript', async () => {
+    const user = userEvent.setup();
+    mockTranscriptScrolling();
+    renderAppAt('#/assets/asset-1');
+
+    await user.type(
+      await screen.findByLabelText('Find in transcript', {}, routeFlowTimeout),
+      'happens-before',
+    );
+    await user.click(screen.getByRole('button', { name: 'Search' }));
+    await user.click(await screen.findByRole(
+      'button',
+      { name: 'Open moment in Vector Clocks Lecture at 00:00' },
+      routeFlowTimeout,
+    ));
+
+    await waitFor(() => expect(window.location.hash).toBe('#/assets/asset-1?row=row-1'));
+    const playMoment = await screen.findByRole('button', { name: 'Play from 00:00' }, routeFlowTimeout);
+
+    const media = stubViewerMedia();
+    media.setCurrentTime(42);
+    media.becomeReady();
+    expect(media.readCurrentTime()).toBe(0);
+    expect(media.play).not.toHaveBeenCalled();
+
+    await user.click(playMoment);
+    expect(media.play).toHaveBeenCalledTimes(1);
+  });
+
+  it('hydrates a canonical moment link opened cold in a fresh tab the same way', async () => {
+    mockTranscriptScrolling();
+    renderAppAt('#/assets/asset-1?row=row-2');
+
+    expect(await screen.findByRole('button', { name: 'Play from 00:01' }, routeFlowTimeout))
+      .toBeInTheDocument();
+    expect(screen.getByLabelText('Selected transcript moment')).toHaveTextContent(/vector clocks preserve/i);
+
+    const media = stubViewerMedia();
+    media.setCurrentTime(42);
+    media.becomeReady();
+    expect(media.readCurrentTime()).toBe(1);
+    expect(media.play).not.toHaveBeenCalled();
+  });
+
+  it('leaves a plain Viewer route with no selected moment exactly as it was', async () => {
+    mockTranscriptScrolling();
+    renderAppAt('#/assets/asset-1');
+
+    expect(await screen.findByRole('list', { name: 'Video transcript' }, routeFlowTimeout))
+      .toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /play from/i })).not.toBeInTheDocument();
+
+    const media = stubViewerMedia();
+    media.setCurrentTime(42);
+    media.becomeReady();
+    expect(media.readCurrentTime()).toBe(42);
+    expect(media.play).not.toHaveBeenCalled();
   });
 });
 
