@@ -270,7 +270,7 @@ Dockerized frontend build has also passed successfully, and the Docker local-dev
 
 ## Environment Notes
 
-- `.env.example` keeps the current demo defaults.
+- `.env.example` is the inventory of supported frontend configuration inputs and keeps the current demo defaults. Every `VITE_*` value is substituted into the bundle at build time and is therefore public.
 - `VITE_AUTHENTICATION_MODE=legacy_session` is the default and preserves the existing Spring register/login/session flow.
 - `VITE_AUTHENTICATION_MODE=keycloak_jwt` opts the frontend into the Project 3 Keycloak foundation. It uses Authorization Code + PKCE with the public `workspace-web` client, holds the access token in memory only, and sends product API calls as `Authorization: Bearer <access-token>`.
 - The OIDC redirect transaction may use session-scoped browser storage for temporary state/PKCE callback data. Authenticated token and product-user state remain memory-only.
@@ -279,6 +279,7 @@ Dockerized frontend build has also passed successfully, and the Docker local-dev
 - Local Keycloak public-client settings are `VITE_KEYCLOAK_URL`, `VITE_KEYCLOAK_REALM`, and `VITE_KEYCLOAK_CLIENT_ID`. They are not required in the default legacy mode and must not include client secrets, admin credentials, tokens, or user credentials.
 - Leave `VITE_API_BASE_URL` blank to use the Vite proxy path.
 - In Docker dev, `docker-compose.yml` overrides `VITE_API_PROXY_TARGET` so the container can reach the host backend correctly.
+- `VITE_APP_REVISION` is optional build metadata set by the build or deployment process. Vite stamps it into the bundle and Settings shows a short form of it; when the build supplies nothing, Settings shows `unknown`.
 
 ## Intentional Non-Goals
 
