@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useTranslation } from '../../../shared/i18n';
 import type { ChapterCopy } from './narrative-copy';
 
 /**
@@ -20,6 +21,7 @@ export function NarrativeSection({
   visual?: ReactNode;
   children?: ReactNode;
 }) {
+  const { t } = useTranslation('landing');
   const headingId = `me-chapter-title-${chapterNumber}`;
 
   return (
@@ -30,10 +32,10 @@ export function NarrativeSection({
       aria-labelledby={headingId}
     >
       <div className="me-chapter__copy" data-reveal>
-        <p className="me-eyebrow">{chapter.eyebrow}</p>
-        <h2 id={headingId}>{chapter.title}</h2>
-        {chapter.body.map((paragraph) => (
-          <p key={paragraph} className="me-chapter__body">{paragraph}</p>
+        <p className="me-eyebrow">{t(chapter.eyebrowKey)}</p>
+        <h2 id={headingId}>{t(chapter.titleKey)}</h2>
+        {chapter.bodyKeys.map((bodyKey) => (
+          <p key={bodyKey} className="me-chapter__body">{t(bodyKey)}</p>
         ))}
         {children}
       </div>

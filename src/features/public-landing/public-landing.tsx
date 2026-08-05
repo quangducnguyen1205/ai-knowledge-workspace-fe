@@ -1,8 +1,9 @@
 import { Component, lazy, Suspense, useRef, useState, type ErrorInfo, type MouseEvent, type ReactNode } from 'react';
 import { routeToHash, type AppRoute } from '../../app/router';
+import { useTranslation } from '../../shared/i18n';
 import { StaticChapterVisual } from './fallback/static-moment-engine';
 import {
-  CLOSING_CAPABILITIES,
+  CLOSING_CAPABILITY_KEYS,
   HERO_COPY,
   NARRATIVE_CHAPTERS,
   SEARCH_QUERY_EXAMPLE,
@@ -34,6 +35,7 @@ class SceneErrorBoundary extends Component<{ onError: () => void; children: Reac
 }
 
 export function PublicLanding({ navigate }: { navigate: (route: AppRoute) => void }) {
+  const { t } = useTranslation('landing');
   const rootRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const profile = useSceneProfile();
@@ -65,16 +67,16 @@ export function PublicLanding({ navigate }: { navigate: (route: AppRoute) => voi
 
   return (
     <div ref={rootRef} className={`me-landing ${immersive ? 'me-landing--immersive' : 'me-landing--static'}`}>
-      <a className="me-skip" href="#me-main">Skip to content</a>
+      <a className="me-skip" href="#me-main">{t('skipToContent')}</a>
 
       <header className="me-header">
-        <a className="me-brand" aria-label="AI Knowledge Workspace home" {...publicLink({ name: 'home' })}>
+        <a className="me-brand" aria-label={t('brandHome')} {...publicLink({ name: 'home' })}>
           <span className="me-brand__mark" aria-hidden="true">AK</span>
-          <strong>AI Knowledge Workspace</strong>
+          <strong>{t('brand')}</strong>
         </a>
-        <nav className="me-header__actions" aria-label="Account navigation">
-          <a className="me-cta me-cta--ghost" {...publicLink({ name: 'login' })}>Sign in</a>
-          <a className="me-cta me-cta--primary" {...publicLink({ name: 'register' })}>Get started</a>
+        <nav className="me-header__actions" aria-label={t('accountNav')}>
+          <a className="me-cta me-cta--ghost" {...publicLink({ name: 'login' })}>{t('signIn')}</a>
+          <a className="me-cta me-cta--primary" {...publicLink({ name: 'register' })}>{t('getStarted')}</a>
         </nav>
       </header>
 
@@ -98,15 +100,15 @@ export function PublicLanding({ navigate }: { navigate: (route: AppRoute) => voi
               aria-labelledby="me-hero-title"
             >
               <div className="me-chapter__copy me-hero__copy" data-reveal>
-                <p className="me-eyebrow">{HERO_COPY.eyebrow}</p>
-                <h1 id="me-hero-title">{HERO_COPY.title}</h1>
-                {HERO_COPY.body.map((paragraph) => (
-                  <p key={paragraph} className="me-chapter__body">{paragraph}</p>
+                <p className="me-eyebrow">{t(HERO_COPY.eyebrowKey)}</p>
+                <h1 id="me-hero-title">{t(HERO_COPY.titleKey)}</h1>
+                {HERO_COPY.bodyKeys.map((bodyKey) => (
+                  <p key={bodyKey} className="me-chapter__body">{t(bodyKey)}</p>
                 ))}
                 <div className="me-hero__actions">
-                  <a className="me-cta me-cta--primary" {...publicLink({ name: 'login' })}>Enter workspace</a>
+                  <a className="me-cta me-cta--primary" {...publicLink({ name: 'login' })}>{t('enterWorkspace')}</a>
                   <button type="button" className="me-cta me-cta--ghost" onClick={scrollToStory}>
-                    See how it works
+                    {t('seeHowItWorks')}
                   </button>
                 </div>
               </div>
@@ -116,7 +118,7 @@ export function PublicLanding({ navigate }: { navigate: (route: AppRoute) => voi
             <NarrativeSection chapter={NARRATIVE_CHAPTERS[0]!} chapterNumber={2} align="end" visual={staticVisual(2)} />
 
             <NarrativeSection chapter={NARRATIVE_CHAPTERS[1]!} chapterNumber={3} align="start" visual={staticVisual(3)}>
-              <p className="me-query" aria-label={`Example search: ${SEARCH_QUERY_EXAMPLE}`}>
+              <p className="me-query" aria-label={t('exampleSearch', { query: SEARCH_QUERY_EXAMPLE })}>
                 <span aria-hidden="true">{SEARCH_QUERY_EXAMPLE}</span>
               </p>
             </NarrativeSection>
@@ -127,12 +129,12 @@ export function PublicLanding({ navigate }: { navigate: (route: AppRoute) => voi
 
             <NarrativeSection chapter={NARRATIVE_CHAPTERS[4]!} chapterNumber={6} align="center" visual={staticVisual(6)}>
               <ul className="me-capabilities">
-                {CLOSING_CAPABILITIES.map((capability) => (
-                  <li key={capability}>{capability}</li>
+                {CLOSING_CAPABILITY_KEYS.map((capabilityKey) => (
+                  <li key={capabilityKey}>{t(capabilityKey)}</li>
                 ))}
               </ul>
               <div className="me-hero__actions">
-                <a className="me-cta me-cta--primary" {...publicLink({ name: 'register' })}>Open your workspace</a>
+                <a className="me-cta me-cta--primary" {...publicLink({ name: 'register' })}>{t('openWorkspace')}</a>
               </div>
             </NarrativeSection>
           </div>
@@ -140,8 +142,8 @@ export function PublicLanding({ navigate }: { navigate: (route: AppRoute) => voi
       </main>
 
       <footer className="me-footer">
-        <span>AI Knowledge Workspace</span>
-        <a {...publicLink({ name: 'login' })}>Sign in</a>
+        <span>{t('brand')}</span>
+        <a {...publicLink({ name: 'login' })}>{t('signIn')}</a>
       </footer>
     </div>
   );

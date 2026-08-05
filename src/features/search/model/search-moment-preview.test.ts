@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { SearchResult } from '../api/search-api';
+import { SUPPORTED_LANGUAGES } from '../../../shared/i18n';
+import { resources } from '../../../shared/i18n/resources';
 import {
-  MISSING_SEARCH_MOMENT_PREVIEW,
+  MISSING_SEARCH_MOMENT_PREVIEW_KEY,
   resolveSearchMomentPreview,
 } from './search-moment-preview';
 
@@ -43,12 +45,10 @@ describe('resolveSearchMomentPreview', () => {
       .toBe('Vector clocks preserve causal relationships.');
   });
 
-  it('uses the bounded label only when neither value carries readable text', () => {
-    expect(resolveSearchMomentPreview(moment({ contextSnippet: '  ', text: '   ' })))
-      .toBe(MISSING_SEARCH_MOMENT_PREVIEW);
-    expect(resolveSearchMomentPreview({ contextSnippet: null } as unknown as SearchResult))
-      .toBe(MISSING_SEARCH_MOMENT_PREVIEW);
-    expect(MISSING_SEARCH_MOMENT_PREVIEW).toBe('Transcript snippet unavailable.');
+  it('defers to the caller\'s bounded label only when neither value carries readable text', () => {
+    expect(resolveSearchMomentPreview(moment({ contextSnippet: '  ', text: '   ' }))).toBeNull();
+    expect(resolveSearchMomentPreview({ contextSnippet: null } as unknown as SearchResult)).toBeNull();
+    expect(MISSING_SEARCH_MOMENT_PREVIEW_KEY).toBe('missingPreview');
   });
 
   it('never concatenates the snippet with the matching row text', () => {
@@ -75,8 +75,11 @@ describe('resolveSearchMomentPreview', () => {
     expect(preview).toBe('Compare <em>vector</em> clocks & <script>alert(1)</script> ordering.');
   });
 
-  it('uses neutral video-knowledge copy in the bounded fallback', () => {
-    expect(MISSING_SEARCH_MOMENT_PREVIEW)
-      .not.toMatch(/lesson|course|learner|score|study summary/i);
+  it('uses neutral video-knowledge copy in the bounded fallback, in every language', () => {
+    for (const language of SUPPORTED_LANGUAGES) {
+      const label = resources[language].search[MISSING_SEARCH_MOMENT_PREVIEW_KEY];
+      expect(label, language).toBeTruthy();
+      expect(label, language).not.toMatch(/lesson|course|learner|score|study summary/i);
+    }
   });
 });

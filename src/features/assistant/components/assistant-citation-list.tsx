@@ -1,5 +1,6 @@
 import type { AssistantAnswerCitation } from '../model/types';
 import { InfoBanner } from '../../../lib/ui';
+import { useTranslation } from '../../../shared/i18n';
 import { AssistantCitationItem } from './assistant-citation-item';
 
 export function AssistantCitationList({
@@ -9,12 +10,14 @@ export function AssistantCitationList({
   citations: AssistantAnswerCitation[];
   onOpenCitationContext: (citation: AssistantAnswerCitation) => void;
 }) {
+  const { t } = useTranslation('viewer');
+
   if (!citations.length) {
     return (
       <InfoBanner
         tone="warning"
-        title="No supporting moments"
-        message="Review the transcript directly before relying on this answer."
+        title={t('assistant.citations.noneTitle')}
+        message={t('assistant.citations.noneMessage')}
       />
     );
   }
@@ -22,8 +25,8 @@ export function AssistantCitationList({
   return (
     <div className="assistant-citations-block">
       <div className="panel-block__header">
-        <h3>Supporting moments</h3>
-        <span className="context-panel__hint">{citations.length} {citations.length === 1 ? 'citation' : 'citations'}</span>
+        <h3>{t('assistant.citations.heading')}</h3>
+        <span className="context-panel__hint">{t('assistant.citations.count', { count: citations.length })}</span>
       </div>
       <ol className="assistant-citations">
         {citations.map((citation, index) => (

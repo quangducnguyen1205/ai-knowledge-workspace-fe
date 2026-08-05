@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Button, EmptyState, ErrorFeedback, InfoBanner, LoadingBlock, SuccessNotification, formatDateTime } from '../../../lib/ui';
+import { Button, EmptyState, ErrorFeedback, InfoBanner, LoadingBlock, SuccessNotification } from '../../../lib/ui';
+import { useDateTimeFormat, useTranslation } from '../../../shared/i18n';
 import type { EphemeralNotice } from '../../../shared/ui/use-ephemeral-notice';
 import { getFriendlyDeleteErrorCopy, getFriendlyRenameErrorCopy } from '../model/error-copy';
 import type { AssetSummary } from '../model/types';
@@ -39,6 +40,8 @@ export function AssetList({
   onDeleteAsset: (asset: AssetSummary) => void;
   onRenameAsset: (asset: AssetSummary, title: string) => void;
 }) {
+  const { t } = useTranslation(['library', 'common']);
+  const formatDateTime = useDateTimeFormat();
   const [openMenuAssetId, setOpenMenuAssetId] = useState<string | null>(null);
   const [editingAsset, setEditingAsset] = useState<AssetSummary | null>(null);
   const [draftTitle, setDraftTitle] = useState('');
@@ -78,8 +81,10 @@ export function AssetList({
     }
   }, [assets, editingAsset]);
 
+  // A rename that succeeded clears the inline editor. The notice is matched by its stable id
+  // rather than by its rendered title, which now varies with the active language.
   useEffect(() => {
-    if (editingAsset && successNotice?.title === 'Video renamed') {
+    if (editingAsset && successNotice?.id === 'asset-renamed') {
       setEditingAsset(null);
       setDraftTitle('');
     }
@@ -95,13 +100,13 @@ export function AssetList({
 
   return (
     <div className="asset-list">
-      {assetsLoading ? <LoadingBlock label="Loading videos..." compact /> : null}
+      {assetsLoading ? <LoadingBlock label={t('list.loading')} compact /> : null}
       {!assetsLoading && assetsError ? <ErrorFeedback error={assetsError} /> : null}
       {!assetsLoading && !assetsError && deleteErrorCopy?.tone === 'warning' ? (
-        <InfoBanner tone="warning" title={deleteErrorCopy.title} message={deleteErrorCopy.message} detail={deleteErrorCopy.detail} />
+        <InfoBanner tone="warning" title={t(deleteErrorCopy.titleKey)} message={t(deleteErrorCopy.messageKey)} />
       ) : null}
       {!assetsLoading && !assetsError && deleteErrorCopy?.tone === 'error' ? (
-        <ErrorFeedback error={deleteError} title={deleteErrorCopy.title} message={deleteErrorCopy.message} detail={deleteErrorCopy.detail} />
+        <ErrorFeedback error={deleteError} title={t(deleteErrorCopy.titleKey)} message={t(deleteErrorCopy.messageKey)} />
       ) : null}
       {!assetsLoading && !assetsError && successNotice ? (
         <SuccessNotification
@@ -112,7 +117,7 @@ export function AssetList({
       ) : null}
 
       {!assetsLoading && !assetsError && assets.length === 0 ? (
-        <EmptyState title="No videos found" description={emptyDescription ?? 'Add a file or YouTube URL to build this workspace.'} />
+        <EmptyState title={t('list.emptyTitle')} description={emptyDescription ?? t('list.emptyDescription')} />
       ) : null}
 
       {!assetsLoading && !assetsError && assets.length > 0 ? (
@@ -142,14 +147,14 @@ export function AssetList({
                     ref={openMenuAssetId === asset.assetId ? menuButtonRef : undefined}
                     type="button"
                     className="overflow-menu__trigger"
-                    aria-label={`Actions for ${asset.title}`}
+                    aria-label={t('list.rowActions', { title: asset.title })}
                     aria-expanded={openMenuAssetId === asset.assetId}
                     onClick={() => setOpenMenuAssetId((current) => current === asset.assetId ? null : asset.assetId)}
                   >
                     <span aria-hidden="true">•••</span>
                   </button>
                   {openMenuAssetId === asset.assetId ? (
-                    <div className="overflow-menu__popover" aria-label={`Video actions for ${asset.title}`}>
+                    <div className="overflow-menu__popover" aria-label={t('list.rowActionsMenu', { title: asset.title })}>
                       <button
                         type="button"
                         onClick={() => {
@@ -157,7 +162,7 @@ export function AssetList({
                           onSelectAsset(asset.assetId);
                         }}
                       >
-                        Open
+                        {t('common:actions.open')}
                       </button>
                       <button
                         type="button"
@@ -167,7 +172,7 @@ export function AssetList({
                           setOpenMenuAssetId(null);
                         }}
                       >
-                        Rename
+                        {t('common:actions.rename')}
                       </button>
                       <button
                         type="button"
@@ -178,7 +183,7 @@ export function AssetList({
                         }}
                         disabled={deleteBusy}
                       >
-                        {isDeleting ? 'Deleting...' : 'Delete'}
+                        {isDeleting ? t('common:actions.deleting') : t('common:actions.delete')}
                       </button>
                     </div>
                   ) : null}
@@ -187,7 +192,7 @@ export function AssetList({
                 {isEditing ? (
                   <form className="video-row__rename" onSubmit={submitRename}>
                     <label className="field field--grow">
-                      <span className="visually-hidden">New title for {asset.title}</span>
+                      <span className="visually-hidden">{t('list.renameLabel', { title: asset.title })}</span>
                       <input
                         className="field__input"
                         value={draftTitle}
@@ -198,7 +203,7 @@ export function AssetList({
                       />
                     </label>
                     <Button type="submit" className="button--inline" disabled={renameBusy || !draftTitle.trim() || draftTitle.trim() === asset.title}>
-                      {isRenaming ? 'Saving...' : 'Save'}
+                      {isRenaming ? t('common:actions.saving') : t('common:actions.save')}
                     </Button>
                     <Button
                       type="button"
@@ -210,13 +215,13 @@ export function AssetList({
                       }}
                       disabled={renameBusy}
                     >
-                      Cancel
+                      {t('common:actions.cancel')}
                     </Button>
                     {renameErrorCopy?.tone === 'warning' ? (
-                      <InfoBanner tone="warning" title={renameErrorCopy.title} message={renameErrorCopy.message} />
+                      <InfoBanner tone="warning" title={t(renameErrorCopy.titleKey)} message={t(renameErrorCopy.messageKey)} />
                     ) : null}
                     {renameErrorCopy?.tone === 'error' ? (
-                      <ErrorFeedback error={renameError} title={renameErrorCopy.title} message={renameErrorCopy.message} />
+                      <ErrorFeedback error={renameError} title={t(renameErrorCopy.titleKey)} message={t(renameErrorCopy.messageKey)} />
                     ) : null}
                   </form>
                 ) : null}

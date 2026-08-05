@@ -15,7 +15,8 @@ import {
   resolveActiveTranscriptRow,
 } from '../../entities/transcript/model/active-transcript-row';
 import { matchesTranscriptReference } from '../../entities/transcript/model/transcript-display';
-import { Button, EmptyState, ErrorFeedback, InfoBanner, SuccessNotification, formatDateTime } from '../../lib/ui';
+import { Button, EmptyState, ErrorFeedback, InfoBanner, SuccessNotification } from '../../lib/ui';
+import { useDateTimeFormat, useTranslation } from '../../shared/i18n';
 import type { EphemeralNotice } from '../../shared/ui/use-ephemeral-notice';
 import { getFriendlyRenameErrorCopy } from './model/error-copy';
 import { AssetIndexingRecoveryAction } from './components/asset-indexing-recovery-action';
@@ -143,6 +144,8 @@ export function AssetDetailScreen({
   onClearStudyContext,
   momentAction,
 }: AssetDetailScreenProps) {
+  const { t } = useTranslation(['viewer', 'common', 'library']);
+  const formatDateTime = useDateTimeFormat();
   const [activeTab, setActiveTab] = useState<StudyTab>('transcript');
   const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -323,8 +326,8 @@ export function AssetDetailScreen({
   if (!asset) {
     return (
       <div className="screen-stack">
-        <header className="page-header"><div className="page-header__copy"><h1>Video</h1></div></header>
-        <EmptyState title="Video unavailable" description="Return to the library and choose another video." />
+        <header className="page-header"><div className="page-header__copy"><h1>{t('missing.heading')}</h1></div></header>
+        <EmptyState title={t('missing.title')} description={t('missing.description')} />
       </div>
     );
   }
@@ -332,10 +335,10 @@ export function AssetDetailScreen({
   return (
     <div className="study-screen">
       <header className="study-header">
-        <nav className="product-breadcrumb" aria-label="Breadcrumb">
-          <button type="button" onClick={onOpenLibrary}>Library</button>
+        <nav className="product-breadcrumb" aria-label={t('breadcrumb.label')}>
+          <button type="button" onClick={onOpenLibrary}>{t('breadcrumb.library')}</button>
           <span aria-hidden="true">/</span>
-          <span aria-current="page">Video</span>
+          <span aria-current="page">{t('breadcrumb.current')}</span>
         </nav>
         <div className="study-header__main">
           <div className="study-header__copy">
@@ -348,14 +351,14 @@ export function AssetDetailScreen({
               ref={actionButtonRef}
               type="button"
               className="overflow-menu__trigger overflow-menu__trigger--large"
-              aria-label={`Actions for ${asset.title}`}
+              aria-label={t('header.actions', { title: asset.title })}
               aria-expanded={isActionMenuOpen}
               onClick={() => setIsActionMenuOpen((current) => !current)}
             >
               <span aria-hidden="true">•••</span>
             </button>
             {isActionMenuOpen ? (
-              <div className="overflow-menu__popover" aria-label="Video actions">
+              <div className="overflow-menu__popover" aria-label={t('header.actionsMenu')}>
                 <button
                   type="button"
                   onClick={() => {
@@ -365,7 +368,7 @@ export function AssetDetailScreen({
                     setIsActionMenuOpen(false);
                   }}
                 >
-                  Rename
+                  {t('common:actions.rename')}
                 </button>
                 <button
                   type="button"
@@ -376,7 +379,7 @@ export function AssetDetailScreen({
                   }}
                   disabled={isDeleting}
                 >
-                  {isDeleting ? 'Deleting...' : 'Delete'}
+                  {isDeleting ? t('common:actions.deleting') : t('common:actions.delete')}
                 </button>
               </div>
             ) : null}
@@ -393,7 +396,7 @@ export function AssetDetailScreen({
             }}
           >
             <label className="field field--grow">
-              <span className="field__label">Video title</span>
+              <span className="field__label">{t('header.titleLabel')}</span>
               <input
                 className="field__input"
                 value={draftTitle}
@@ -407,7 +410,7 @@ export function AssetDetailScreen({
               />
             </label>
             <Button type="submit" disabled={isRenaming || !draftTitle.trim() || draftTitle.trim() === asset.title}>
-              {isRenaming ? 'Saving...' : 'Save'}
+              {isRenaming ? t('common:actions.saving') : t('common:actions.save')}
             </Button>
             <Button
               type="button"
@@ -419,13 +422,13 @@ export function AssetDetailScreen({
               }}
               disabled={isRenaming}
             >
-              Cancel
+              {t('common:actions.cancel')}
             </Button>
           </form>
         ) : null}
 
-        {renameErrorCopy?.tone === 'warning' ? <InfoBanner tone="warning" title={renameErrorCopy.title} message={renameErrorCopy.message} /> : null}
-        {renameErrorCopy?.tone === 'error' ? <ErrorFeedback error={renameError} title={renameErrorCopy.title} message={renameErrorCopy.message} /> : null}
+        {renameErrorCopy?.tone === 'warning' ? <InfoBanner tone="warning" title={t(renameErrorCopy.titleKey)} message={t(renameErrorCopy.messageKey)} /> : null}
+        {renameErrorCopy?.tone === 'error' ? <ErrorFeedback error={renameError} title={t(renameErrorCopy.titleKey)} message={t(renameErrorCopy.messageKey)} /> : null}
         {successNotice ? (
           <SuccessNotification
             title={successNotice.title}
@@ -469,10 +472,10 @@ export function AssetDetailScreen({
       ) : null}
 
       {playbackProgressSaveFailed ? (
-        <p className="playback-progress-note">Your playback position could not be saved.</p>
+        <p className="playback-progress-note">{t('resume.saveFailed')}</p>
       ) : null}
 
-      <div className="study-tabs" role="tablist" aria-label="Video tools">
+      <div className="study-tabs" role="tablist" aria-label={t('tabs.label')}>
         {(['transcript', 'ask', 'details'] as const).map((tab) => (
           <button
             key={tab}
@@ -485,7 +488,7 @@ export function AssetDetailScreen({
             onClick={() => setActiveTab(tab)}
             onKeyDown={handleTabKeyDown}
           >
-            {tab === 'ask' ? 'Ask' : tab[0].toUpperCase() + tab.slice(1)}
+            {t(`tabs.${tab}`)}
           </button>
         ))}
       </div>
@@ -584,15 +587,22 @@ export function AssetDetailScreen({
           hidden={isMobileStudyLayout && activeTab !== 'details'}
         >
           <div className="study-pane__header">
-            <p className="panel__eyebrow">Video</p>
-            <h2>Details</h2>
+            <p className="panel__eyebrow">{t('details.eyebrow')}</p>
+            <h2>{t('details.heading')}</h2>
           </div>
           <dl className="detail-list">
-            <div><dt>Workspace</dt><dd>{workspaceName}</dd></div>
+            <div><dt>{t('details.workspace')}</dt><dd>{workspaceName}</dd></div>
             <AssetSourceDetails asset={asset} assetRecord={assetRecord} />
-            <div><dt>Status</dt><dd><StatusBadge status={resolvedAssetStatus} /></dd></div>
-            <div><dt>Added</dt><dd>{formatDateTime(asset.createdAt)}</dd></div>
-            <div><dt>Transcript</dt><dd>{transcriptRowCount ? `${transcriptRowCount} segments` : 'Not ready yet'}</dd></div>
+            <div><dt>{t('details.status')}</dt><dd><StatusBadge status={resolvedAssetStatus} /></dd></div>
+            <div><dt>{t('details.added')}</dt><dd>{formatDateTime(asset.createdAt)}</dd></div>
+            <div>
+              <dt>{t('details.transcript')}</dt>
+              <dd>
+                {transcriptRowCount
+                  ? t('details.segmentCount', { count: transcriptRowCount })
+                  : t('details.transcriptNotReady')}
+              </dd>
+            </div>
           </dl>
           <AssetProcessingRetryAction
             assetStatus={resolvedAssetStatus}
@@ -602,8 +612,8 @@ export function AssetDetailScreen({
             onRetry={onRetryProcessing}
           />
           <details className="processing-details">
-            <summary>Processing details</summary>
-            <p>{getProcessingSummary(resolvedAssetStatus)}</p>
+            <summary>{t('details.processingDetails')}</summary>
+            <p>{t(getProcessingSummaryKey(resolvedAssetStatus))}</p>
             {statusError ? <ErrorFeedback error={statusError} /> : null}
             <AssetIndexingRecoveryAction
               resolvedAssetStatus={resolvedAssetStatus}
@@ -658,12 +668,13 @@ function useMobileStudyLayout(): boolean {
   return matches;
 }
 
-function getProcessingSummary(status: AssetStatus | null): string {
+/** `viewer` namespace key for the Processing-details summary of an Asset status. */
+function getProcessingSummaryKey(status: AssetStatus | null) {
   switch (status) {
-    case 'SEARCHABLE': return 'This video is ready to search and ask questions about.';
-    case 'TRANSCRIPT_READY': return 'The transcript is ready while search preparation finishes.';
-    case 'FAILED': return 'This video could not be processed.';
+    case 'SEARCHABLE': return 'details.summarySearchable' as const;
+    case 'TRANSCRIPT_READY': return 'details.summaryTranscriptReady' as const;
+    case 'FAILED': return 'details.summaryFailed' as const;
     case 'PROCESSING':
-    default: return 'The video is being prepared. This page updates automatically.';
+    default: return 'details.summaryProcessing' as const;
   }
 }

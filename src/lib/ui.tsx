@@ -15,4 +15,4 @@ export {
   joinClassNames,
 } from '../shared/ui';
 export { ErrorFeedback } from '../shared/feedback';
-export { formatDateTime, formatScore } from '../shared/format';
+export { createDateTimeFormatter, formatScore } from '../shared/format';

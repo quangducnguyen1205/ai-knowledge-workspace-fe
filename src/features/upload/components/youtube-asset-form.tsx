@@ -1,11 +1,13 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Button, ErrorFeedback, InfoBanner } from '../../../lib/ui';
+import { useTranslation } from '../../../shared/i18n';
 import { getFriendlyYouTubeCreationErrorCopy } from '../../assets/public';
 
-function getYouTubeUrlValidationError(url: string): string | null {
+/** Which validation message applies, as an `upload` namespace key. */
+function getYouTubeUrlValidationErrorKey(url: string) {
   const trimmedUrl = url.trim();
-  if (!trimmedUrl) return 'Enter a YouTube video URL.';
-  if (!/^https:\/\//i.test(trimmedUrl)) return 'Use an HTTPS YouTube video URL.';
+  if (!trimmedUrl) return 'upload:youtube.urlRequired' as const;
+  if (!/^https:\/\//i.test(trimmedUrl)) return 'upload:youtube.urlNotHttps' as const;
   return null;
 }
 
@@ -22,25 +24,27 @@ export function YouTubeAssetForm({
   isCreating: boolean;
   onCreate: (input: { url: string; title?: string }) => void;
 }) {
+  const { t } = useTranslation(['upload']);
   const [url, setUrl] = useState('');
   const [title, setTitle] = useState('');
-  const [urlValidationError, setUrlValidationError] = useState<string | null>(null);
+  const [urlValidationErrorKey, setUrlValidationErrorKey] =
+    useState<ReturnType<typeof getYouTubeUrlValidationErrorKey>>(null);
   const creationErrorCopy = getFriendlyYouTubeCreationErrorCopy(creationError);
 
   useEffect(() => {
     if (!creationSuccessId) return;
     setUrl('');
     setTitle('');
-    setUrlValidationError(null);
+    setUrlValidationErrorKey(null);
   }, [creationSuccessId]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (isCreating) return;
 
-    const validationError = getYouTubeUrlValidationError(url);
-    setUrlValidationError(validationError);
-    if (validationError) return;
+    const validationErrorKey = getYouTubeUrlValidationErrorKey(url);
+    setUrlValidationErrorKey(validationErrorKey);
+    if (validationErrorKey) return;
 
     onCreate({
       url: url.trim(),
@@ -50,11 +54,9 @@ export function YouTubeAssetForm({
 
   return (
     <form className="upload-form stack" onSubmit={handleSubmit} noValidate>
-      <p className="upload-form__intro">
-        Add a public YouTube video to this workspace. Spring validates and normalizes the URL.
-      </p>
+      <p className="upload-form__intro">{t('youtube.intro')}</p>
       <div className="field">
-        <label className="field__label" htmlFor="youtube-url-input">YouTube URL</label>
+        <label className="field__label" htmlFor="youtube-url-input">{t('youtube.urlLabel')}</label>
         <input
           id="youtube-url-input"
           className="field__input"
@@ -62,26 +64,24 @@ export function YouTubeAssetForm({
           value={url}
           onChange={(event) => {
             setUrl(event.target.value);
-            if (urlValidationError) setUrlValidationError(null);
+            if (urlValidationErrorKey) setUrlValidationErrorKey(null);
           }}
-          placeholder="https://www.youtube.com/watch?v=..."
+          placeholder={t('youtube.urlPlaceholder')}
           required
-          aria-describedby={urlValidationError ? 'youtube-url-hint youtube-url-error' : 'youtube-url-hint'}
-          aria-invalid={Boolean(urlValidationError)}
+          aria-describedby={urlValidationErrorKey ? 'youtube-url-hint youtube-url-error' : 'youtube-url-hint'}
+          aria-invalid={Boolean(urlValidationErrorKey)}
         />
-        <span id="youtube-url-hint" className="field__hint">
-          Use an HTTPS link to a public YouTube video.
-        </span>
-        {urlValidationError ? (
+        <span id="youtube-url-hint" className="field__hint">{t('youtube.urlHint')}</span>
+        {urlValidationErrorKey ? (
           <span id="youtube-url-error" className="field__hint field__hint--error" role="alert">
-            {urlValidationError}
+            {t(urlValidationErrorKey)}
           </span>
         ) : null}
       </div>
 
       <div className="field">
         <label className="field__label" htmlFor="youtube-title-input">
-          Video title <small>(optional)</small>
+          {t('youtube.titleLabel')} <small>{t('file.optional')}</small>
         </label>
         <input
           id="youtube-title-input"
@@ -89,29 +89,28 @@ export function YouTubeAssetForm({
           type="text"
           value={title}
           onChange={(event) => setTitle(event.target.value)}
-          placeholder="Leave blank to use the default title"
+          placeholder={t('youtube.titlePlaceholder')}
           maxLength={255}
         />
       </div>
 
       <div className="upload-form__actions">
         <Button type="submit" disabled={isCreating}>
-          {isCreating ? 'Adding YouTube video...' : 'Add YouTube video'}
+          {isCreating ? t('youtube.submitting') : t('youtube.submit')}
         </Button>
       </div>
 
       {isCreating ? (
         <InfoBanner
-          title="Adding YouTube video"
-          message={`Creating the video in ${workspaceName}. Keep this dialog open until it is accepted.`}
+          title={t('youtube.progressTitle')}
+          message={t('youtube.progressMessage', { workspace: workspaceName })}
         />
       ) : null}
       {creationError ? (
         <ErrorFeedback
           error={creationError}
-          title={creationErrorCopy?.title}
-          message={creationErrorCopy?.message}
-          detail={creationErrorCopy?.detail}
+          title={creationErrorCopy ? t(creationErrorCopy.titleKey) : undefined}
+          message={creationErrorCopy ? t(creationErrorCopy.messageKey) : undefined}
         />
       ) : null}
     </form>

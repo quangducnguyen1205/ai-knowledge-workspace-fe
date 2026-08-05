@@ -7,6 +7,7 @@ import {
   useRenameWorkspaceMutation,
   workspaceKeys,
 } from '../workspaces';
+import { useTranslation } from '../../../shared/i18n';
 import { useEphemeralNotice } from '../../../shared/ui/use-ephemeral-notice';
 
 export function useWorkspaceManagement({
@@ -24,6 +25,7 @@ export function useWorkspaceManagement({
   onClearWorkspaceScope: (workspaceId: string) => void;
   onDeletedWorkspaceRoute: () => void;
 }) {
+  const { t } = useTranslation('workspaces');
   const queryClient = useQueryClient();
   const createMutation = useCreateWorkspaceMutation();
   const renameMutation = useRenameWorkspaceMutation();
@@ -36,8 +38,9 @@ export function useWorkspaceManagement({
       onSuccess: (workspace) => {
         setPreferredWorkspaceId(workspace.id);
         feedback.showNotice({
-          title: 'Workspace created',
-          message: `Created "${workspace.name}" and refreshed the visible workspace scope.`,
+          id: 'workspace-created',
+          title: t('notices.created.title'),
+          message: t('notices.created.message', { name: workspace.name }),
         });
       },
     });
@@ -48,8 +51,9 @@ export function useWorkspaceManagement({
     renameMutation.mutate(input, {
       onSuccess: (workspace) => {
         feedback.showNotice({
-          title: 'Workspace renamed',
-          message: `Active workspace is now "${workspace.name}".`,
+          id: 'workspace-renamed',
+          title: t('notices.renamed.title'),
+          message: t('notices.renamed.message', { name: workspace.name }),
         });
       },
       onError: async (error, variables) => {
@@ -78,10 +82,11 @@ export function useWorkspaceManagement({
             onDeletedWorkspaceRoute();
           }
           feedback.showNotice({
-            title: 'Workspace deleted',
+            id: 'workspace-deleted',
+            title: t('notices.deleted.title'),
             message: isDeletingSelectedWorkspace
-              ? `Removed "${deletingWorkspaceName}" and refreshed the visible workspace scope.`
-              : `Removed "${deletingWorkspaceName}" without changing the current workspace scope.`,
+              ? t('notices.deleted.messageActive', { name: deletingWorkspaceName })
+              : t('notices.deleted.messageOther', { name: deletingWorkspaceName }),
           });
           await queryClient.invalidateQueries({ queryKey: workspaceKeys.all });
         },

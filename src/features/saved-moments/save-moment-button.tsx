@@ -1,4 +1,5 @@
 import { Button } from '../../lib/ui';
+import { useTranslation } from '../../shared/i18n';
 
 export type SaveMomentButtonProps = {
   assetTitle: string;
@@ -23,9 +24,11 @@ export function SaveMomentButton({
   disabled = false,
   onSave,
 }: SaveMomentButtonProps) {
-  const label = isSaved
-    ? `Moment in ${assetTitle} at ${timestampLabel.toLowerCase()} is saved`
-    : `Save moment in ${assetTitle} at ${timestampLabel.toLowerCase()}`;
+  const { t } = useTranslation('moments');
+  const label = t(isSaved ? 'save.savedLabel' : 'save.label', {
+    title: assetTitle,
+    time: timestampLabel.toLowerCase(),
+  });
 
   return (
     <div className="save-moment">
@@ -38,10 +41,10 @@ export function SaveMomentButton({
         aria-label={label}
         aria-pressed={isSaved}
       >
-        {isSaving ? 'Saving...' : isSaved ? 'Saved' : 'Save moment'}
+        {isSaving ? t('save.saving') : isSaved ? t('save.saved') : t('save.action')}
       </Button>
       <span className="save-moment__feedback" role="status" aria-live="polite">
-        {hasFailed ? 'Could not save this moment. Try again.' : null}
+        {hasFailed ? t('save.failed') : null}
       </span>
     </div>
   );

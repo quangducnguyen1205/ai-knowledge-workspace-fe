@@ -14,7 +14,8 @@ export const SUPPORTED_UPLOAD_MEDIA_ACCEPT = [
   'video/msvideo',
 ].join(',');
 
-export const SUPPORTED_UPLOAD_MEDIA_MESSAGE = 'Choose an MP4, MOV, M4V, WebM, or AVI video.';
+/** `upload` namespace key for the message a caller shows; the words live in the resources. */
+export const SUPPORTED_UPLOAD_MEDIA_MESSAGE_KEY = 'upload:file.unsupported' as const;
 
 const GENERIC_CONTENT_TYPES = new Set(['', 'application/octet-stream', 'video/*']);
 
@@ -26,19 +27,18 @@ const supportedMediaTypesByExtension: Record<string, ReadonlySet<string>> = {
   avi: new Set(['video/x-msvideo', 'video/avi', 'video/msvideo']),
 };
 
-export function getUploadMediaValidationError(
-  file: Pick<File, 'name' | 'type'> | null,
-): string | null {
-  if (!file) return 'Choose a video before uploading.';
+/** Which validation message applies, as an `upload` namespace key, or `null` when the file is fine. */
+export function getUploadMediaValidationErrorKey(file: Pick<File, 'name' | 'type'> | null) {
+  if (!file) return 'upload:file.chooseFirst' as const;
 
   const extension = extensionOf(file.name);
   const supportedMediaTypes = extension ? supportedMediaTypesByExtension[extension] : undefined;
-  if (!supportedMediaTypes) return SUPPORTED_UPLOAD_MEDIA_MESSAGE;
+  if (!supportedMediaTypes) return SUPPORTED_UPLOAD_MEDIA_MESSAGE_KEY;
 
   const contentType = normalizeContentType(file.type);
   if (GENERIC_CONTENT_TYPES.has(contentType) || supportedMediaTypes.has(contentType)) return null;
 
-  return SUPPORTED_UPLOAD_MEDIA_MESSAGE;
+  return SUPPORTED_UPLOAD_MEDIA_MESSAGE_KEY;
 }
 
 function extensionOf(filename: string): string | null {

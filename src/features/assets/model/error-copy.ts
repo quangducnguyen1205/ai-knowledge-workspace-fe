@@ -1,216 +1,145 @@
+/**
+ * Which copy an Asset-lifecycle failure shows, as translation keys rather than sentences.
+ *
+ * Keeping the mapping key-based leaves this module pure — no React, no active language — so the
+ * same decision serves both languages and stays unit-testable without an i18n runtime. The words
+ * live in the `library`, `upload` and `viewer` namespaces, next to the surfaces that render them.
+ */
 import { isApiClientError } from '../../../shared/api/api-error';
 import type { AssetStatus, ProcessingJobStatus } from './types';
 
-export type FriendlyMessageCopy = {
-  title: string;
-  message: string;
-  detail?: string;
+function copyKeys<Namespace extends string, Key extends string>(namespace: Namespace, key: Key) {
+  return {
+    titleKey: `${namespace}:${key}.title`,
+    messageKey: `${namespace}:${key}.message`,
+  } as const;
+}
+
+function uploadError<Key extends
+  'unsupportedFormat' | 'uploadOffline' | 'checkVideo' | 'processingUnavailable'
+  | 'youtubeInvalidUrl' | 'youtubeDuplicate' | 'youtubeOffline'
+>(key: Key) {
+  return copyKeys('upload', `errors.${key}` as const);
+}
+
+function libraryError<Key extends
+  'deleteGone' | 'deleteSearchUnavailable' | 'deleteOffline' | 'deleteFailed'
+  | 'renameInvalidTitle' | 'renameNotFound' | 'renameSearchUnavailable' | 'renameOffline' | 'renameFailed'
+>(key: Key) {
+  return copyKeys('library', `errors.${key}` as const);
+}
+
+function viewerFailure<Key extends string>(key: Key) {
+  return copyKeys('viewer', `failure.${key}` as const);
+}
+
+function transcriptConflict<Key extends 'conflictFailed' | 'conflictPreparing' | 'conflictWaiting'>(key: Key) {
+  return copyKeys('viewer', `transcript.${key}` as const);
+}
+
+export type FriendlyMessageKeys = {
+  readonly titleKey: string;
+  readonly messageKey: string;
 };
 
-export function getFriendlyUploadErrorCopy(error: unknown): FriendlyMessageCopy | null {
+export function getFriendlyUploadErrorCopy(error: unknown) {
   if (!isApiClientError(error)) return null;
-  if (error.status === 400 && error.code === 'INVALID_UPLOAD_FILE') {
-    return {
-      title: 'Video format is not supported',
-      message: 'Choose an MP4, MOV, M4V, WebM, or AVI video.',
-    };
-  }
-  if (error.status === 0) {
-    return { title: 'Could not upload video', message: 'Check your connection and try again. The video was not uploaded.' };
-  }
-  if ([400, 409, 413, 415, 422].includes(error.status)) {
-    return {
-      title: 'Check this video',
-      message: 'Check the video format and current workspace, then try again.',
-    };
-  }
+  if (error.status === 400 && error.code === 'INVALID_UPLOAD_FILE') return uploadError('unsupportedFormat');
+  if (error.status === 0) return uploadError('uploadOffline');
+  if ([400, 409, 413, 415, 422].includes(error.status)) return uploadError('checkVideo');
   if (error.code === 'PROCESSING_SERVICE_UNAVAILABLE' ||
       error.code === 'FASTAPI_INTEGRATION_ERROR' ||
       error.code === 'FASTAPI_CONNECTIVITY_ERROR') {
-    return {
-      title: 'Video processing is unavailable',
-      message: 'The video was not sent for processing. Try again later.',
-    };
+    return uploadError('processingUnavailable');
   }
   return null;
 }
 
-export function getFriendlyYouTubeCreationErrorCopy(error: unknown): FriendlyMessageCopy | null {
+export function getFriendlyYouTubeCreationErrorCopy(error: unknown) {
   if (!isApiClientError(error)) return null;
-  if (error.code === 'INVALID_YOUTUBE_URL') {
-    return {
-      title: 'YouTube URL is not supported',
-      message: 'Enter a supported public YouTube video URL.',
-    };
-  }
-  if (error.code === 'DUPLICATE_YOUTUBE_ASSET') {
-    return {
-      title: 'Video already added',
-      message: 'This YouTube video is already in the workspace.',
-    };
-  }
-  if (error.status === 0) {
-    return {
-      title: 'Could not add YouTube video',
-      message: 'Check your connection and try again. The video was not added.',
-    };
-  }
+  if (error.code === 'INVALID_YOUTUBE_URL') return uploadError('youtubeInvalidUrl');
+  if (error.code === 'DUPLICATE_YOUTUBE_ASSET') return uploadError('youtubeDuplicate');
+  if (error.status === 0) return uploadError('youtubeOffline');
   return null;
 }
 
-const ASSET_FAILURE_COPY: Record<string, FriendlyMessageCopy> = {
-  YOUTUBE_UNAVAILABLE: {
-    title: 'YouTube video unavailable',
-    message: 'This YouTube video is unavailable or cannot be accessed.',
-  },
-  YOUTUBE_LIVE_NOT_SUPPORTED: {
-    title: 'Live video not supported',
-    message: 'Live YouTube videos are not supported.',
-  },
-  YOUTUBE_DURATION_LIMIT_EXCEEDED: {
-    title: 'Video is too long',
-    message: 'This video is longer than the supported limit.',
-  },
-  YOUTUBE_SIZE_LIMIT_EXCEEDED: {
-    title: 'Video is too large',
-    message: 'This video is larger than the supported limit.',
-  },
-  YOUTUBE_ACQUISITION_TIMEOUT: {
-    title: 'Video preparation timed out',
-    message: 'Downloading this video timed out. Try again later.',
-  },
-  YOUTUBE_ACQUISITION_FAILED: {
-    title: 'Video preparation failed',
-    message: 'The video could not be prepared for processing.',
-  },
-  PROCESSING_FAILED: {
-    title: 'Processing failed',
-    message: 'Processing failed. You can try again.',
-  },
-};
+/** Spring failure codes the Viewer names explicitly; anything else uses the bounded fallback. */
+const NAMED_FAILURE_CODES = [
+  'YOUTUBE_UNAVAILABLE',
+  'YOUTUBE_LIVE_NOT_SUPPORTED',
+  'YOUTUBE_DURATION_LIMIT_EXCEEDED',
+  'YOUTUBE_SIZE_LIMIT_EXCEEDED',
+  'YOUTUBE_ACQUISITION_TIMEOUT',
+  'YOUTUBE_ACQUISITION_FAILED',
+  'PROCESSING_FAILED',
+] as const;
 
-export function getAssetFailureCopy(failureCode: string | null | undefined): FriendlyMessageCopy {
-  return failureCode && ASSET_FAILURE_COPY[failureCode]
-    ? ASSET_FAILURE_COPY[failureCode]
-    : {
-        title: 'Processing failed',
-        message: 'This video could not be processed. You can try again.',
-      };
+type NamedFailureCode = (typeof NAMED_FAILURE_CODES)[number];
+
+const namedFailureCodes = new Set<string>(NAMED_FAILURE_CODES);
+
+export function getAssetFailureCopy(failureCode: string | null | undefined) {
+  return failureCode && namedFailureCodes.has(failureCode)
+    ? viewerFailure(failureCode as NamedFailureCode)
+    : viewerFailure('unknown');
 }
 
-export function getFriendlyRetryErrorCopy(error: unknown): FriendlyMessageCopy | null {
+export function getFriendlyRetryErrorCopy(error: unknown) {
   if (!isApiClientError(error)) return null;
-  if (error.code === 'ASSET_PROCESSING_RETRY_NOT_ALLOWED') {
-    return {
-      title: 'Retry no longer available',
-      message: 'The video state changed, so processing cannot be retried right now. The latest status is being loaded.',
-    };
-  }
-  if (error.status === 0) {
-    return {
-      title: 'Could not retry processing',
-      message: 'Check your connection and try again.',
-    };
-  }
-  return {
-    title: 'Could not retry processing',
-    message: 'Processing was not restarted. Try again later.',
-  };
+  if (error.code === 'ASSET_PROCESSING_RETRY_NOT_ALLOWED') return viewerFailure('retryNotAllowed');
+  if (error.status === 0) return viewerFailure('retryOffline');
+  return viewerFailure('retryFailed');
 }
 
-export function getFriendlyDeleteErrorCopy(error: unknown): (FriendlyMessageCopy & { tone: 'warning' | 'error' }) | null {
+export function getFriendlyDeleteErrorCopy(error: unknown) {
   if (!isApiClientError(error)) return null;
-  if (error.status === 404) {
-    return {
-      tone: 'warning',
-      title: 'Video already deleted',
-      message: 'The library will refresh to remove it.',
-    };
-  }
+  if (error.status === 404) return { tone: 'warning', ...libraryError('deleteGone') } as const;
   if (error.code === 'SEARCH_SERVICE_UNAVAILABLE' ||
       error.code === 'ELASTICSEARCH_UNAVAILABLE' ||
       error.code === 'ELASTICSEARCH_INTEGRATION_ERROR') {
-    return {
-      tone: 'error',
-      title: 'Could not delete video',
-      message: 'Search is temporarily unavailable. The video was not deleted.',
-    };
+    return { tone: 'error', ...libraryError('deleteSearchUnavailable') } as const;
   }
-  if (error.status === 0) {
-    return { tone: 'error', title: 'Could not delete video', message: 'Check your connection and try again. The video was not deleted.' };
-  }
-  return {
-    tone: 'error',
-    title: 'Could not delete video',
-    message: 'The video was not deleted. Try again later.',
-  };
+  if (error.status === 0) return { tone: 'error', ...libraryError('deleteOffline') } as const;
+  return { tone: 'error', ...libraryError('deleteFailed') } as const;
 }
 
-export function getFriendlyRenameErrorCopy(error: unknown): (FriendlyMessageCopy & { tone: 'warning' | 'error' }) | null {
+export function getFriendlyRenameErrorCopy(error: unknown) {
   if (!isApiClientError(error)) return null;
   if (error.status === 400 && error.code === 'INVALID_ASSET_TITLE') {
-    return {
-      tone: 'warning',
-      title: 'Video title is not valid',
-      message: 'Enter a non-empty title within the allowed length.',
-    };
+    return { tone: 'warning', ...libraryError('renameInvalidTitle') } as const;
   }
-  if (error.status === 404) {
-    return {
-      tone: 'warning',
-      title: 'Video not found',
-      message: 'It no longer exists or you do not have access.',
-    };
-  }
+  if (error.status === 404) return { tone: 'warning', ...libraryError('renameNotFound') } as const;
   if (error.code === 'SEARCH_SERVICE_UNAVAILABLE' ||
       error.code === 'ELASTICSEARCH_UNAVAILABLE' ||
       error.code === 'ELASTICSEARCH_INTEGRATION_ERROR') {
-    return {
-      tone: 'error',
-      title: 'Could not rename video',
-      message: 'Search is temporarily unavailable, so the previous title was kept.',
-    };
+    return { tone: 'error', ...libraryError('renameSearchUnavailable') } as const;
   }
-  if (error.status === 0) {
-    return { tone: 'error', title: 'Could not rename video', message: 'Check your connection and try again. The previous title was kept.' };
-  }
-  return {
-    tone: 'error',
-    title: 'Could not rename video',
-    message: 'The previous title was kept. Try again later.',
-  };
+  if (error.status === 0) return { tone: 'error', ...libraryError('renameOffline') } as const;
+  return { tone: 'error', ...libraryError('renameFailed') } as const;
 }
 
 export function getTranscriptConflictCopy(
   error: unknown,
   resolvedAssetStatus: AssetStatus | null,
   processingJobStatus?: ProcessingJobStatus,
-): FriendlyMessageCopy | null {
+) {
   if (!(isApiClientError(error) && error.status === 409)) return null;
   if (resolvedAssetStatus === 'FAILED' || processingJobStatus === 'FAILED') {
-    return {
-      title: 'Transcript unavailable',
-      message: 'Processing failed, so there is no transcript to review.',
-    };
+    return transcriptConflict('conflictFailed');
   }
   if (processingJobStatus === 'SUCCEEDED' || resolvedAssetStatus === 'TRANSCRIPT_READY') {
-    return {
-      title: 'Preparing transcript',
-      message: 'The video finished processing, but its transcript is not ready yet.',
-    };
+    return transcriptConflict('conflictPreparing');
   }
-  return {
-    title: 'Preparing transcript',
-    message: 'Wait for video processing to finish.',
-  };
+  return transcriptConflict('conflictWaiting');
 }
 
-export function getAssetStatusDescription(status: AssetStatus | null): string {
+/** `viewer:statusDescription.*` key for an Asset status, for the caller to translate. */
+export function getAssetStatusDescriptionKey(status: AssetStatus | null) {
   switch (status) {
-    case 'PROCESSING': return 'Preparing this video and its transcript.';
-    case 'TRANSCRIPT_READY': return 'The transcript is ready while search preparation finishes.';
-    case 'SEARCHABLE': return 'Ready to search and ask questions about.';
-    case 'FAILED': return 'This video could not be processed.';
-    default: return 'Video status is not available yet.';
+    case 'PROCESSING': return 'viewer:statusDescription.PROCESSING' as const;
+    case 'TRANSCRIPT_READY': return 'viewer:statusDescription.TRANSCRIPT_READY' as const;
+    case 'SEARCHABLE': return 'viewer:statusDescription.SEARCHABLE' as const;
+    case 'FAILED': return 'viewer:statusDescription.FAILED' as const;
+    default: return 'viewer:statusDescription.unknown' as const;
   }
 }

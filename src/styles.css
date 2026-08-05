@@ -474,6 +474,21 @@ summary:focus-visible {
   font-weight: 750;
 }
 
+/* Language control on the signed-out surfaces: a signed-out visitor must be able to choose a
+   language before there is an account to store one against. */
+.auth-page__header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.auth-page__language .field__input {
+  width: auto;
+  min-height: 38px;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.86rem;
+}
+
 .auth-page__main {
   min-height: calc(100vh - 76px);
   display: grid;

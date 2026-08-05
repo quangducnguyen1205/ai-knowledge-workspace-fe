@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ApiClientError } from '../shared/api/api-error';
 import type { SearchResponse, SearchResult } from '../features/search/api/search-api';
 import { Button, EmptyState, ErrorFeedback, LoadingBlock } from '../lib/ui';
+import { useTranslation } from '../shared/i18n';
 import { routeToHash, useHashRoute, type AppRoute } from './router';
 import { AppShell } from './AppShell';
 import { useProtectedRouteFallback } from './bootstrap/use-protected-route-fallback';
@@ -56,6 +57,7 @@ import { useAssetRouteWorkspaceHydration } from './bootstrap/use-asset-route-wor
 import type { AssetProcessingResponse, AssetSummary } from '../features/assets/model/types';
 
 export function AppRouter() {
+  const { t } = useTranslation(['shell', 'common', 'upload']);
   const auth = useAuth();
   const queryClient = useQueryClient();
   const [route, navigate] = useHashRoute();
@@ -161,7 +163,7 @@ export function AppRouter() {
     ? (
       <SaveMomentButton
         assetTitle={selectedAsset.title}
-        timestampLabel={momentTimestampLabel(focusedSavedMomentRow?.startMs ?? null)}
+        timestampLabel={momentTimestampLabel(focusedSavedMomentRow?.startMs ?? null, t('common:timeUnavailable'))}
         isSaved={savedMoments.isSaved(route.assetId, focusedSavedMomentRowId)}
         isSaving={savedMoments.savingKey === buildSavedMomentKey(route.assetId, focusedSavedMomentRowId)}
         hasFailed={savedMoments.saveErrorKey === buildSavedMomentKey(route.assetId, focusedSavedMomentRowId)}
@@ -218,7 +220,7 @@ export function AppRouter() {
   const youtubeCreation = useYouTubeAssetCreation({
     workspaceId: selectedWorkspaceId,
     onCreated: (response, input) => {
-      finishAssetCreation(response, input.title?.trim() || 'YouTube video');
+      finishAssetCreation(response, input.title?.trim() || t('upload:youtube.defaultTitle'));
     },
   });
 
@@ -500,7 +502,7 @@ export function AppRouter() {
   if (auth.isResolvingAuth) {
     return (
       <div className="app-shell app-shell--centered">
-        <LoadingBlock label="Completing sign in..." />
+        <LoadingBlock label={t('status.completingSignIn')} />
       </div>
     );
   }
@@ -508,7 +510,7 @@ export function AppRouter() {
   if (currentUserQuery.isLoading) {
     return (
       <div className="app-shell app-shell--centered">
-        <LoadingBlock label="Checking your session..." />
+        <LoadingBlock label={t('status.checkingSession')} />
       </div>
     );
   }
@@ -568,7 +570,7 @@ export function AppRouter() {
   if (workspacesQuery.isLoading) {
     return (
       <div className="app-shell app-shell--centered">
-        <LoadingBlock label="Loading authenticated workspace scope..." />
+        <LoadingBlock label={t('status.loadingWorkspaceScope')} />
       </div>
     );
   }
@@ -584,7 +586,7 @@ export function AppRouter() {
   if (!selectedWorkspace && (workspacesQuery.isFetching || workspaceScopeRefreshAfter !== null || (workspacesQuery.data?.length ?? 0) > 0)) {
     return (
       <div className="app-shell app-shell--centered">
-        <LoadingBlock label="Refreshing workspace scope..." />
+        <LoadingBlock label={t('status.refreshingWorkspaceScope')} />
       </div>
     );
   }
@@ -592,14 +594,14 @@ export function AppRouter() {
   if (route.name === 'asset' && (assetRouteWorkspace.isHydrating || assetRouteWorkspace.isUnavailable)) {
     return (
       <div className="app-shell app-shell--centered">
-        <LoadingBlock label="Resolving the authorized asset workspace..." />
+        <LoadingBlock label={t('status.resolvingAssetWorkspace')} />
       </div>
     );
   }
 
   const settingsScreen = (
     <SettingsScreen
-      currentUserEmail={currentUser?.email ?? 'Unknown account'}
+      currentUserEmail={currentUser?.email ?? t('account.unknown')}
       logoutError={auth.mode === 'legacy_session' ? logoutMutation.error : null}
       isLoggingOut={isLogoutPending}
       onLogout={() => void handleLogout()}
@@ -634,12 +636,12 @@ export function AppRouter() {
       <div className="screen-stack">
         <div className="workspace-setup-card">
           <EmptyState
-            title="No workspace yet"
-            description="Create a workspace to add your first video."
+            title={t('noWorkspace.title')}
+            description={t('noWorkspace.description')}
           />
           <div className="workspace-setup-card__actions">
             <Button type="button" onClick={() => navigate({ name: 'settings' })}>
-              Open settings
+              {t('noWorkspace.action')}
             </Button>
           </div>
         </div>
@@ -823,7 +825,7 @@ export function AppRouter() {
       workspaces={workspacesQuery.data ?? []}
       selectedWorkspace={selectedWorkspace}
       selectedWorkspaceId={selectedWorkspaceId}
-      currentUserEmail={currentUser?.email ?? 'Unknown account'}
+      currentUserEmail={currentUser?.email ?? t('account.unknown')}
       isWorkspaceFetching={workspacesQuery.isFetching}
       isLogoutPending={isLogoutPending}
       onSelectWorkspace={handleSelectWorkspace}

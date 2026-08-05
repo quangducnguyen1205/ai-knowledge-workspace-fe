@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { resolveAuthMode, type AuthMode } from '../../../lib/auth-config';
 import { buildAssetMediaUrl } from '../api/assets-api';
+import { useTranslation } from '../../../shared/i18n';
 import { SourceBadge } from '../components/source-badge';
 import {
   toPlaybackPositionMs,
@@ -48,26 +49,12 @@ type PendingPlayerCommand = {
   shouldPlay: boolean;
 };
 
-const SURFACE_STATE_LABELS: Record<UploadMediaSurfaceState, string> = {
-  loading: 'Loading',
-  ready: 'Ready',
-  error: 'Unavailable',
-};
-
-export const UPLOAD_MEDIA_LOADING_COPY = 'Loading video…';
-
-export const UPLOAD_MEDIA_ERROR_COPY = {
-  title: 'The uploaded video could not be played.',
-  message: 'You can keep reading the transcript.',
-};
-
-export const UPLOAD_MEDIA_UNSUPPORTED_AUTH_COPY = {
-  title: 'Upload playback is not available in this authentication mode yet.',
-  message: 'The transcript and other video tools remain available.',
-};
-
-export const UPLOAD_MEDIA_PLAYBACK_BLOCKED_COPY =
-  'Playback did not start. Use the video controls to start playing.';
+/** `viewer.player` keys for the surface state; the words live in the translation resources. */
+const SURFACE_STATE_LABEL_KEYS = {
+  loading: 'player.loading',
+  ready: 'player.ready',
+  error: 'player.unavailable',
+} as const satisfies Record<UploadMediaSurfaceState, string>;
 
 /**
  * A native media element cannot attach an in-memory bearer token to its own request, so
@@ -141,14 +128,14 @@ export const UploadMediaPlayer = forwardRef<MediaPlayerHandle, {
   const observationEnabledRef = useRef(playbackObservationEnabled);
   const snapshotListenerRef = useRef(onPlaybackSnapshot);
   const [surfaceState, setSurfaceState] = useState<UploadMediaSurfaceState>('loading');
-  const [playbackNotice, setPlaybackNotice] = useState<string | null>(null);
+  const { t } = useTranslation('viewer');
+  // Blocked playback is recorded as a fact, not as a sentence, so the notice re-renders in the
+  // active language rather than in whichever one was active when playback was attempted.
+  const [playbackBlocked, setPlaybackBlocked] = useState(false);
   observationEnabledRef.current = playbackObservationEnabled;
   snapshotListenerRef.current = onPlaybackSnapshot;
 
-  const noteBlockedPlayback = useCallback(
-    () => setPlaybackNotice(UPLOAD_MEDIA_PLAYBACK_BLOCKED_COPY),
-    [],
-  );
+  const noteBlockedPlayback = useCallback(() => setPlaybackBlocked(true), []);
 
   const emitSnapshot = useCallback(
     (state: MediaPlaybackState, positionMs: number | null) => {
@@ -168,7 +155,7 @@ export const UploadMediaPlayer = forwardRef<MediaPlayerHandle, {
     pendingCommandRef.current = null;
     lastSnapshotRef.current = null;
     setSurfaceState('loading');
-    setPlaybackNotice(null);
+    setPlaybackBlocked(false);
 
     return () => {
       metadataReadyRef.current = false;
@@ -232,7 +219,7 @@ export const UploadMediaPlayer = forwardRef<MediaPlayerHandle, {
     metadataReadyRef.current = false;
     pendingCommandRef.current = null;
     setSurfaceState('error');
-    setPlaybackNotice(null);
+    setPlaybackBlocked(false);
     observe('error', element);
   }, [observe]);
 
@@ -242,21 +229,21 @@ export const UploadMediaPlayer = forwardRef<MediaPlayerHandle, {
         ref={regionRef}
         tabIndex={-1}
         className="upload-media-player upload-media-player--unsupported"
-        aria-label={`Uploaded video player for ${title}`}
+        aria-label={t('player.uploadRegionLabel', { title })}
         data-player-state="unsupported-auth"
       >
         <div className="upload-media-player__header">
           <div className="upload-media-player__identity">
             <SourceBadge sourceType="UPLOAD" />
             <span className="upload-media-player__state">
-              {SURFACE_STATE_LABELS.error}
+              {t('player.unavailable')}
             </span>
           </div>
         </div>
         <div className="upload-media-player__viewport">
           <div className="upload-media-player__message">
-            <strong>{UPLOAD_MEDIA_UNSUPPORTED_AUTH_COPY.title}</strong>
-            <span>{UPLOAD_MEDIA_UNSUPPORTED_AUTH_COPY.message}</span>
+            <strong>{t('player.uploadUnsupportedTitle')}</strong>
+            <span>{t('player.uploadUnsupportedMessage')}</span>
           </div>
         </div>
       </section>
@@ -268,14 +255,14 @@ export const UploadMediaPlayer = forwardRef<MediaPlayerHandle, {
       ref={regionRef}
       tabIndex={-1}
       className={`upload-media-player upload-media-player--${surfaceState}`}
-      aria-label={`Uploaded video player for ${title}`}
+      aria-label={t('player.uploadRegionLabel', { title })}
       data-player-state={surfaceState}
     >
       <div className="upload-media-player__header">
         <div className="upload-media-player__identity">
           <SourceBadge sourceType="UPLOAD" />
           <span className="upload-media-player__state">
-            {SURFACE_STATE_LABELS[surfaceState]}
+            {t(SURFACE_STATE_LABEL_KEYS[surfaceState])}
           </span>
         </div>
       </div>
@@ -289,13 +276,13 @@ export const UploadMediaPlayer = forwardRef<MediaPlayerHandle, {
           autoPlay={false}
           preload="metadata"
           playsInline
-          aria-label={`Uploaded video: ${title}`}
+          aria-label={t('player.uploadVideoLabel', { title })}
           title={title}
           onLoadStart={(event) => observe('loadstart', event.currentTarget)}
           onLoadedMetadata={(event) => handleReadiness('loadedmetadata', event.currentTarget)}
           onCanPlay={(event) => handleReadiness('canplay', event.currentTarget)}
           onPlaying={(event) => {
-            setPlaybackNotice(null);
+            setPlaybackBlocked(false);
             observe('playing', event.currentTarget);
           }}
           onPause={(event) => observe('pause', event.currentTarget)}
@@ -309,19 +296,19 @@ export const UploadMediaPlayer = forwardRef<MediaPlayerHandle, {
         />
         {surfaceState === 'loading' ? (
           <div className="upload-media-player__message" role="status" aria-live="polite">
-            {UPLOAD_MEDIA_LOADING_COPY}
+            {t('player.loadingVideo')}
           </div>
         ) : null}
         {surfaceState === 'error' ? (
           <div className="upload-media-player__message" role="alert">
-            <strong>{UPLOAD_MEDIA_ERROR_COPY.title}</strong>
-            <span>{UPLOAD_MEDIA_ERROR_COPY.message}</span>
+            <strong>{t('player.uploadErrorTitle')}</strong>
+            <span>{t('player.uploadErrorMessage')}</span>
           </div>
         ) : null}
       </div>
 
-      {playbackNotice ? (
-        <p className="upload-media-player__notice" role="status">{playbackNotice}</p>
+      {playbackBlocked ? (
+        <p className="upload-media-player__notice" role="status">{t('player.playbackBlocked')}</p>
       ) : null}
     </section>
   );

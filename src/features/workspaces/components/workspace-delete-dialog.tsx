@@ -1,60 +1,41 @@
 import { useEffect, useRef, useState } from 'react';
 import { isApiClientError } from '../../../shared/api/api-error';
 import { Button, ErrorFeedback, InfoBanner } from '../../../lib/ui';
+import { useTranslation } from '../../../shared/i18n';
 import type { Workspace } from '../api/workspaces-api';
 
-type DeleteErrorCopy = {
-  tone: 'warning' | 'error';
-  title: string;
-  message: string;
-};
+function deleteErrorKeys<
+  Key extends 'deleteDefaultForbidden' | 'deleteNotEmpty' | 'deleteNotFound' | 'deleteOffline' | 'deleteFailed',
+>(tone: 'warning' | 'error', key: Key) {
+  return {
+    tone,
+    titleKey: `workspaces:errors.${key}.title`,
+    messageKey: `workspaces:errors.${key}.message`,
+  } as const;
+}
 
-function getDeleteErrorCopy(error: unknown): DeleteErrorCopy | null {
+function getDeleteErrorCopy(error: unknown) {
   if (!isApiClientError(error)) {
-    return error ? {
-      tone: 'error',
-      title: 'Could not delete workspace',
-      message: 'The workspace was not deleted. Try again later.',
-    } : null;
+    return error ? deleteErrorKeys('error', 'deleteFailed') : null;
   }
 
   if (error.status === 409 && error.code === 'DEFAULT_WORKSPACE_DELETE_FORBIDDEN') {
-    return {
-      tone: 'warning',
-      title: 'Default workspace cannot be deleted',
-      message: 'The default workspace is protected.',
-    };
+    return deleteErrorKeys('warning', 'deleteDefaultForbidden');
   }
 
   if (error.status === 409 && error.code === 'WORKSPACE_NOT_EMPTY') {
-    return {
-      tone: 'warning',
-      title: 'Workspace still contains videos',
-      message: 'Delete its videos before trying again.',
-    };
+    return deleteErrorKeys('warning', 'deleteNotEmpty');
   }
 
   if (error.status === 404) {
-    return {
-      tone: 'warning',
-      title: 'Workspace not found',
-      message: 'It no longer exists or you do not have access.',
-    };
+    return deleteErrorKeys('warning', 'deleteNotFound');
   }
 
   if (error.status === 0) {
-    return {
-      tone: 'error',
-      title: 'Could not delete workspace',
-      message: 'Check your connection and try again. The workspace was not deleted.',
-    };
+    return deleteErrorKeys('error', 'deleteOffline');
   }
 
-  return {
-    tone: 'error',
-    title: 'Could not delete workspace',
-    message: 'The workspace was not deleted. Try again later.',
-  };
+  return deleteErrorKeys('error', 'deleteFailed');
 }
 
 export function WorkspaceDeleteDialog({
@@ -70,6 +51,7 @@ export function WorkspaceDeleteDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation(['workspaces', 'common']);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
   const [hasSubmitted, setHasSubmitted] = useState(false);
@@ -132,25 +114,23 @@ export function WorkspaceDeleteDialog({
         aria-labelledby="workspace-delete-dialog-title"
         aria-describedby="workspace-delete-dialog-description"
       >
-        <p className="workspace-delete-dialog__eyebrow">Confirm workspace deletion</p>
-        <h2 id="workspace-delete-dialog-title">Delete “{workspace.name}”?</h2>
-        <p id="workspace-delete-dialog-description">
-          Only empty, non-default workspaces can be deleted. This action cannot be undone after the service confirms it.
-        </p>
+        <p className="workspace-delete-dialog__eyebrow">{t('deleteDialog.eyebrow')}</p>
+        <h2 id="workspace-delete-dialog-title">{t('deleteDialog.title', { name: workspace.name })}</h2>
+        <p id="workspace-delete-dialog-description">{t('deleteDialog.description')}</p>
 
         {errorCopy?.tone === 'warning' ? (
-          <InfoBanner tone="warning" title={errorCopy.title} message={errorCopy.message} />
+          <InfoBanner tone="warning" title={t(errorCopy.titleKey)} message={t(errorCopy.messageKey)} />
         ) : null}
         {errorCopy?.tone === 'error' ? (
-          <ErrorFeedback error={error} title={errorCopy.title} message={errorCopy.message} />
+          <ErrorFeedback error={error} title={t(errorCopy.titleKey)} message={t(errorCopy.messageKey)} />
         ) : null}
 
         <div className="workspace-delete-dialog__actions">
           <button ref={cancelButtonRef} type="button" className="button button--ghost" onClick={onCancel} disabled={isBusy}>
-            Cancel
+            {t('common:actions.cancel')}
           </button>
           <Button type="button" tone="secondary" onClick={handleConfirm} disabled={isBusy}>
-            {isBusy ? 'Deleting...' : 'Delete workspace'}
+            {isBusy ? t('common:actions.deleting') : t('manage.delete')}
           </Button>
         </div>
       </section>

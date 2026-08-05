@@ -1,7 +1,7 @@
 import { formatTranscriptTimestamp } from '../../entities/transcript/model/transcript-time';
 import { Button, EmptyState, LoadingBlock, PanelHeading } from '../../shared/ui';
 import { ErrorFeedback } from '../../shared/feedback';
-import { formatDateTime } from '../../shared/format';
+import { Trans, useDateTimeFormat, useTranslation } from '../../shared/i18n';
 import { SourceBadge } from '../assets/public';
 import type { ContinueWatchingItem } from './api/continue-watching-api';
 
@@ -13,11 +13,14 @@ export type ContinueWatchingPanelProps = {
   onContinueWatching: (item: ContinueWatchingItem) => void;
 };
 
-/** A position that never started, or that the server could not report, has no usable timestamp. */
-export function playbackPositionLabel(positionMs: number | null): string {
+/**
+ * A position that never started, or that the server could not report, has no usable timestamp.
+ * The caller supplies the localized fallback so this helper stays language-independent.
+ */
+export function playbackPositionLabel(positionMs: number | null, unavailableLabel = ''): string {
   return positionMs !== null && Number.isFinite(positionMs) && positionMs > 0
     ? formatTranscriptTimestamp(positionMs)
-    : 'Position unavailable';
+    : unavailableLabel;
 }
 
 /**
@@ -31,22 +34,25 @@ export function ContinueWatchingPanel({
   error,
   onContinueWatching,
 }: ContinueWatchingPanelProps) {
+  const { t } = useTranslation('moments');
+  const formatDateTime = useDateTimeFormat();
+
   return (
     <section className="continue-watching" aria-labelledby="continue-watching-title">
       <PanelHeading
-        eyebrow="Playback"
+        eyebrow={t('continueWatching.eyebrow')}
         trailing={!isLoading && !error && items.length ? (
           <p className="search-summary" role="status">
-            <strong>{items.length}</strong> {items.length === 1 ? 'video' : 'videos'} in progress
+            <Trans i18nKey="continueWatching.count" ns="moments" count={items.length} />
           </p>
         ) : null}
       >
-        <h2 id="continue-watching-title">Continue watching</h2>
+        <h2 id="continue-watching-title">{t('continueWatching.heading')}</h2>
       </PanelHeading>
 
       {isLoading ? (
         <div className="continue-watching__status" role="status" aria-live="polite" aria-atomic="true">
-          <LoadingBlock label={`Loading playback progress in ${workspaceName}...`} compact />
+          <LoadingBlock label={t('continueWatching.loading', { workspace: workspaceName })} compact />
         </div>
       ) : null}
 
@@ -55,8 +61,8 @@ export function ContinueWatchingPanel({
       {!isLoading && !error && items.length === 0 ? (
         <div role="status">
           <EmptyState
-            title="Nothing in progress yet"
-            description="Play a video in this workspace and it will appear here so you can pick up where you left off."
+            title={t('continueWatching.emptyTitle')}
+            description={t('continueWatching.emptyDescription')}
           />
         </div>
       ) : null}
@@ -64,7 +70,7 @@ export function ContinueWatchingPanel({
       {!isLoading && !error && items.length ? (
         <ul className="continue-watching__list">
           {items.map((item) => {
-            const positionLabel = playbackPositionLabel(item.positionMs);
+            const positionLabel = playbackPositionLabel(item.positionMs, t('continueWatching.positionUnavailable'));
 
             return (
               <li key={item.assetId} className="continue-watching-item">
@@ -74,22 +80,22 @@ export function ContinueWatchingPanel({
                     <SourceBadge sourceType={item.sourceType} />
                   </span>
                   <span className="continue-watching-item__position">
-                    <span>Stopped at</span>
+                    <span>{t('continueWatching.stoppedAt')}</span>
                     <span className="continue-watching-item__position-value">{positionLabel}</span>
                   </span>
                 </div>
 
                 <p className="continue-watching-item__watched-at">
-                  Last watched {formatDateTime(item.updatedAt)}
+                  {t('continueWatching.lastWatched', { when: formatDateTime(item.updatedAt) })}
                 </p>
 
                 <div className="continue-watching-item__actions">
                   <Button
                     type="button"
                     onClick={() => onContinueWatching(item)}
-                    aria-label={`Continue watching ${item.assetTitle} at ${positionLabel.toLowerCase()}`}
+                    aria-label={t('continueWatching.actionLabel', { title: item.assetTitle, time: positionLabel.toLowerCase() })}
                   >
-                    Continue watching
+                    {t('continueWatching.action')}
                   </Button>
                 </div>
               </li>

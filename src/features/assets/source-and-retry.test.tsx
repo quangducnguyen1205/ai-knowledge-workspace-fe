@@ -125,21 +125,23 @@ describe('source-aware asset rendering', () => {
 });
 
 describe('failed-state copy and retry action', () => {
+  // The mapping picks the copy; the words come from the translation resources, so the assertion
+  // holds on the key and stays true in every language.
   it.each([
-    ['YOUTUBE_UNAVAILABLE', 'This YouTube video is unavailable or cannot be accessed.'],
-    ['YOUTUBE_LIVE_NOT_SUPPORTED', 'Live YouTube videos are not supported.'],
-    ['YOUTUBE_DURATION_LIMIT_EXCEEDED', 'This video is longer than the supported limit.'],
-    ['YOUTUBE_SIZE_LIMIT_EXCEEDED', 'This video is larger than the supported limit.'],
-    ['YOUTUBE_ACQUISITION_TIMEOUT', 'Downloading this video timed out. Try again later.'],
-    ['YOUTUBE_ACQUISITION_FAILED', 'The video could not be prepared for processing.'],
-    ['PROCESSING_FAILED', 'Processing failed. You can try again.'],
-  ])('maps %s to bounded user-facing copy', (code, expectedMessage) => {
-    expect(getAssetFailureCopy(code).message).toBe(expectedMessage);
+    'YOUTUBE_UNAVAILABLE',
+    'YOUTUBE_LIVE_NOT_SUPPORTED',
+    'YOUTUBE_DURATION_LIMIT_EXCEEDED',
+    'YOUTUBE_SIZE_LIMIT_EXCEEDED',
+    'YOUTUBE_ACQUISITION_TIMEOUT',
+    'YOUTUBE_ACQUISITION_FAILED',
+    'PROCESSING_FAILED',
+  ])('maps %s to bounded user-facing copy', (code) => {
+    expect(getAssetFailureCopy(code).messageKey).toBe(`viewer:failure.${code}.message`);
   });
 
   it('uses a safe fallback for unknown failure codes', () => {
     const copy = getAssetFailureCopy('PROVIDER_STDERR_PRIVATE');
-    expect(copy.message).toBe('This video could not be processed. You can try again.');
+    expect(copy.messageKey).toBe('viewer:failure.unknown.message');
     expect(JSON.stringify(copy)).not.toContain('PROVIDER_STDERR_PRIVATE');
   });
 

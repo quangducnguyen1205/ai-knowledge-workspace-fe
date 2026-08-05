@@ -10,6 +10,7 @@ import {
 } from './api/auth-api';
 import type { AuthConfigurationIssue } from '../../lib/auth-config';
 import { Button, ErrorFeedback } from '../../lib/ui';
+import { LanguageSelect, useTranslation } from '../../shared/i18n';
 import { useAuth } from './auth-provider';
 
 export { authKeys } from './auth-keys';
@@ -45,82 +46,74 @@ export function useLogoutMutation() {
   });
 }
 
-type FriendlyAuthErrorCopy = {
-  title: string;
-  message: string;
-};
+/**
+ * Which copy an authentication failure shows, as `auth` namespace keys rather than sentences.
+ *
+ * The sign-in branch is deliberately non-enumerating: an unknown email, a wrong password and an
+ * input that could never be a valid credential all resolve to one message, so a caller learns
+ * only that the pair did not match. Field-format guidance belongs to registration, where it helps
+ * rather than leaks.
+ */
+function authErrorCopy<Key extends
+  | 'offlineRegister'
+  | 'offlineLogout'
+  | 'emailTaken'
+  | 'invalidCredentials'
+  | 'invalidEmail'
+  | 'invalidPassword'
+  | 'incompleteForm'
+  | 'logoutFailed'
+  | 'registerFailed'
+  | 'loginFailed'
+>(key: Key) {
+  return {
+    titleKey: `auth:errors.${key}.title`,
+    messageKey: `auth:errors.${key}.message`,
+  } as const;
+}
 
-function getFriendlyAuthErrorCopy(error: unknown, mode: 'register' | 'login' | 'logout'): FriendlyAuthErrorCopy | null {
+export type FriendlyAuthErrorCopy = ReturnType<typeof authErrorCopy>;
+
+function getFriendlyAuthErrorCopy(
+  error: unknown,
+  mode: 'register' | 'login' | 'logout',
+): FriendlyAuthErrorCopy | null {
   if (!(error instanceof ApiClientError)) {
     return null;
   }
 
   if (error.status === 0) {
-    return {
-      title: mode === 'logout' ? 'Could not sign out' : 'Sign in is temporarily unavailable',
-      message:
-        mode === 'logout'
-          ? 'Check your connection and try again. Your current session is still active.'
-          : 'Check your connection and try again. Your sign-in state has not changed.',
-    };
+    return authErrorCopy(mode === 'logout' ? 'offlineLogout' : 'offlineRegister');
   }
 
   if (mode === 'register' && error.status === 409 && error.code === 'EMAIL_ALREADY_REGISTERED') {
-    return {
-      title: 'Email already registered',
-      message: 'Sign in with this email or use a different address.',
-    };
+    return authErrorCopy('emailTaken');
   }
 
-  // At sign-in every credential-shaped failure collapses into one non-enumerating message:
-  // whether the email is unknown, the password is wrong, or the input could never be a valid
-  // credential (for example shorter than the minimum), the caller learns only that the pair did
-  // not match. Field-format guidance belongs to registration, where it helps rather than leaks.
   if (mode === 'login'
       && ((error.status === 401 && error.code === 'INVALID_CREDENTIALS')
         || (error.status === 400
           && (error.code === 'INVALID_EMAIL' || error.code === 'INVALID_PASSWORD')))) {
-    return {
-      title: 'Email or password is incorrect',
-      message: 'Check your details and try again.',
-    };
+    return authErrorCopy('invalidCredentials');
   }
 
   if (error.status === 400 && error.code === 'INVALID_EMAIL') {
-    return {
-      title: 'Enter a valid email',
-      message: 'Use a complete email address and try again.',
-    };
+    return authErrorCopy('invalidEmail');
   }
 
   if (error.status === 400 && error.code === 'INVALID_PASSWORD') {
-    return {
-      title: 'Password is not valid',
-      message: 'Check the password requirements and try again.',
-    };
+    return authErrorCopy('invalidPassword');
   }
 
   if (error.status === 400 && error.code === 'INVALID_AUTH_REQUEST') {
-    return {
-      title: 'Complete the form',
-      message: 'Check the fields and submit again.',
-    };
+    return authErrorCopy('incompleteForm');
   }
 
   if (mode === 'logout') {
-    return {
-      title: 'Could not sign out',
-      message: 'Your current session is still active. Try again later.',
-    };
+    return authErrorCopy('logoutFailed');
   }
 
-  return {
-    title: mode === 'register' ? 'Could not create account' : 'Could not sign in',
-    message:
-      mode === 'register'
-        ? 'Your account was not created. Try again later.'
-        : 'Sign in was not completed. Try again later.',
-  };
+  return authErrorCopy(mode === 'register' ? 'registerFailed' : 'loginFailed');
 }
 
 export function AuthEntrySurface({
@@ -146,6 +139,7 @@ export function AuthEntrySurface({
   onNavigateMode: (mode: 'register' | 'login') => void;
   onBackHome: () => void;
 }) {
+  const { t } = useTranslation('auth');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const activeError = mode === 'register' ? registerError : loginError;
@@ -178,54 +172,53 @@ export function AuthEntrySurface({
           <span className="public-brand__mark" aria-hidden="true">AK</span>
           <strong>AI Knowledge Workspace</strong>
         </button>
-        <button
-          type="button"
-          className="auth-page__switch"
-          onClick={() => {
-            onResetErrors();
-            onNavigateMode(mode === 'login' ? 'register' : 'login');
-          }}
-        >
-          {mode === 'login' ? 'Create account' : 'Sign in'}
-        </button>
+        <div className="auth-page__header-actions">
+          <LanguageSelect id="auth-language" hideLabel className="auth-page__language" />
+          <button
+            type="button"
+            className="auth-page__switch"
+            onClick={() => {
+              onResetErrors();
+              onNavigateMode(mode === 'login' ? 'register' : 'login');
+            }}
+          >
+            {mode === 'login' ? t('register.switch') : t('login.switch')}
+          </button>
+        </div>
       </header>
 
       <main className="auth-page__main">
         <div className="auth-card">
           <div className="auth-card__top">
             <div className="auth-card__intro">
-              <p className="hero__eyebrow">{mode === 'register' ? 'Get started' : 'Welcome back'}</p>
-              <h1>{mode === 'register' ? 'Create your account' : 'Sign in to your workspace'}</h1>
-              <p>
-                {mode === 'register'
-                  ? 'Create a workspace for your videos, transcripts, and cited answers.'
-                  : 'Continue where you left off.'}
-              </p>
+              <p className="hero__eyebrow">{mode === 'register' ? t('register.eyebrow') : t('login.eyebrow')}</p>
+              <h1>{mode === 'register' ? t('register.title') : t('login.title')}</h1>
+              <p>{mode === 'register' ? t('register.subtitle') : t('login.subtitle')}</p>
             </div>
           </div>
 
           <form className="auth-form" onSubmit={handleSubmit}>
             <label className="field">
-              <span className="field__label">Email</span>
+              <span className="field__label">{t('fields.email')}</span>
               <input
                 className="field__input"
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                placeholder="you@company.com"
+                placeholder={t('fields.emailPlaceholder')}
                 autoComplete={mode === 'login' ? 'username' : 'email'}
                 maxLength={255}
               />
             </label>
 
             <label className="field">
-              <span className="field__label">Password</span>
+              <span className="field__label">{t('fields.password')}</span>
               <input
                 className="field__input"
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                placeholder={mode === 'register' ? 'Create a secure password' : 'Enter your password'}
+                placeholder={mode === 'register' ? t('register.passwordPlaceholder') : t('login.passwordPlaceholder')}
                 autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                 maxLength={255}
               />
@@ -235,16 +228,14 @@ export function AuthEntrySurface({
               <Button type="submit" disabled={isSubmitting || !email.trim() || !password.trim()}>
                 {isSubmitting
                   ? mode === 'register'
-                    ? 'Creating account...'
-                    : 'Signing in...'
+                    ? t('register.submitting')
+                    : t('login.submitting')
                   : mode === 'register'
-                    ? 'Create account'
-                    : 'Sign in'}
+                    ? t('register.submit')
+                    : t('login.submit')}
               </Button>
               <span className="auth-form__hint">
-                {mode === 'register'
-                  ? 'You will be signed in when your account is ready.'
-                  : 'Your videos remain private to your account.'}
+                {mode === 'register' ? t('register.hint') : t('login.hint')}
               </span>
             </div>
           </form>
@@ -252,8 +243,8 @@ export function AuthEntrySurface({
           {activeError ? (
             <ErrorFeedback
               error={activeError}
-              title={errorCopy?.title}
-              message={errorCopy?.message}
+              title={errorCopy ? t(errorCopy.titleKey) : undefined}
+              message={errorCopy ? t(errorCopy.messageKey) : undefined}
             />
           ) : null}
 
@@ -278,6 +269,7 @@ export function KeycloakAuthEntrySurface({
   onContinue: () => void;
   onBackHome: () => void;
 }) {
+  const { t } = useTranslation('auth');
   const isActionDisabled = Boolean(configIssue) || authModeUnavailable || isStartingLogin;
 
   return (
@@ -287,24 +279,27 @@ export function KeycloakAuthEntrySurface({
           <span className="public-brand__mark" aria-hidden="true">AK</span>
           <strong>AI Knowledge Workspace</strong>
         </button>
+        <div className="auth-page__header-actions">
+          <LanguageSelect id="auth-language" hideLabel className="auth-page__language" />
+        </div>
       </header>
       <main className="auth-page__main">
         <div className="auth-card">
           <div className="auth-card__top">
             <div className="auth-card__intro">
-              <p className="hero__eyebrow">Welcome back</p>
-              <h1>Continue to your workspace</h1>
-              <p>Use your organization account to continue to your workspace.</p>
+              <p className="hero__eyebrow">{t('keycloak.eyebrow')}</p>
+              <h1>{t('keycloak.title')}</h1>
+              <p>{t('keycloak.subtitle')}</p>
             </div>
           </div>
 
           <div className="auth-form">
             <div className="auth-form__actions">
               <Button type="button" onClick={onContinue} disabled={isActionDisabled}>
-                {isStartingLogin ? 'Opening sign in...' : 'Continue to sign in'}
+                {isStartingLogin ? t('keycloak.submitting') : t('keycloak.submit')}
               </Button>
               <span className="auth-form__hint">
-                Your videos remain private to your account.
+                {t('login.hint')}
               </span>
             </div>
           </div>
@@ -312,24 +307,24 @@ export function KeycloakAuthEntrySurface({
           {configIssue ? (
             <ErrorFeedback
               error={new Error(configIssue.message)}
-              title="Sign in is not configured"
-              message="The app cannot start sign in yet. Contact your administrator."
+              title={t('keycloak.notConfigured.title')}
+              message={t('keycloak.notConfigured.message')}
             />
           ) : null}
 
           {authModeUnavailable ? (
             <ErrorFeedback
-              error={new Error(authErrorMessage ?? 'Authentication mode is unavailable.')}
-              title="Sign in is temporarily unavailable"
-              message="The current sign-in method is not available. Try again later."
+              error={new Error(authErrorMessage ?? t('keycloak.modeUnavailable'))}
+              title={t('keycloak.unavailable.title')}
+              message={t('keycloak.unavailable.message')}
             />
           ) : null}
 
           {!configIssue && !authModeUnavailable && authErrorMessage ? (
             <ErrorFeedback
               error={new Error(authErrorMessage)}
-              title="Sign in was not completed"
-              message="Try signing in again."
+              title={t('keycloak.incomplete.title')}
+              message={t('keycloak.incomplete.message')}
             />
           ) : null}
 

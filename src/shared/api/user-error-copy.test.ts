@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { ApiClientError } from './api-error';
 import { getUserSafeErrorCopy } from './user-error-copy';
 
+/**
+ * The mapper resolves *which* copy is shown, not the words. Asserting keys keeps this test
+ * language-independent; that every key resolves to real text in both languages is covered by
+ * `shared/i18n/i18n-parity.test.ts`.
+ */
 describe('getUserSafeErrorCopy', () => {
   it('uses a stable backend code before HTTP status', () => {
     expect(getUserSafeErrorCopy(new ApiClientError(
@@ -9,8 +14,8 @@ describe('getUserSafeErrorCopy', () => {
       'raw provider response from http://internal-service:8000',
       'INVALID_UPLOAD_FILE',
     ))).toEqual({
-      title: 'Video format is not supported',
-      message: 'Choose an MP4, MOV, M4V, WebM, or AVI video.',
+      titleKey: 'errors:codes.INVALID_UPLOAD_FILE.title',
+      messageKey: 'errors:codes.INVALID_UPLOAD_FILE.message',
     });
   });
 
@@ -21,15 +26,23 @@ describe('getUserSafeErrorCopy', () => {
       'ASSISTANT_SERVICE_UNAVAILABLE',
     ));
 
-    expect(copy.title).toBe('Answers are temporarily unavailable');
-    expect(JSON.stringify(copy)).not.toMatch(/FastAPI|Elasticsearch|HTTP 500|raw body/i);
+    expect(copy.titleKey).toBe('errors:codes.ASSISTANT_SERVICE_UNAVAILABLE.title');
+    expect(JSON.stringify(copy)).not.toMatch(/FastAPI|HTTP 500|raw body/i);
+  });
+
+  it('folds a layer-specific code onto the capability copy the product already owns', () => {
+    expect(getUserSafeErrorCopy(new ApiClientError(500, 'connection refused', 'ELASTICSEARCH_INTEGRATION_ERROR')))
+      .toEqual({
+        titleKey: 'errors:codes.SEARCH_SERVICE_UNAVAILABLE.title',
+        messageKey: 'errors:codes.SEARCH_SERVICE_UNAVAILABLE.message',
+      });
   });
 
   it('uses HTTP status when the code is unknown', () => {
     expect(getUserSafeErrorCopy(new ApiClientError(404, 'java.package.InternalException', 'UNKNOWN_CODE')))
       .toEqual({
-        title: 'Content not found',
-        message: 'It no longer exists or you do not have access.',
+        titleKey: 'errors:notFound.title',
+        messageKey: 'errors:notFound.message',
       });
   });
 

@@ -6,6 +6,7 @@ import {
   useState,
   type Ref,
 } from 'react';
+import { useTranslation } from '../../../shared/i18n';
 import { SourceBadge } from '../components/source-badge';
 import {
   toPlaybackPositionMs,
@@ -27,16 +28,17 @@ type PendingPlayerCommand = {
   keepPaused: boolean;
 };
 
-const PLAYER_STATE_LABELS: Record<MediaPlayerState, string> = {
-  idle: 'Preparing player',
-  'loading-api': 'Loading player',
-  'creating-player': 'Creating player',
-  ready: 'Ready',
-  error: 'Unavailable',
-};
+/** `viewer.player` keys for the surface state; the words live in the translation resources. */
+const PLAYER_STATE_LABEL_KEYS = {
+  idle: 'player.idle',
+  'loading-api': 'player.loadingApi',
+  'creating-player': 'player.creatingPlayer',
+  ready: 'player.ready',
+  error: 'player.unavailable',
+} as const satisfies Record<MediaPlayerState, string>;
 
-function configurePlayerIframe(iframe: HTMLIFrameElement, title: string) {
-  iframe.title = `${title} YouTube player`;
+function configurePlayerIframe(iframe: HTMLIFrameElement, iframeTitle: string) {
+  iframe.title = iframeTitle;
   iframe.loading = 'lazy';
   iframe.referrerPolicy = 'strict-origin-when-cross-origin';
   iframe.setAttribute(
@@ -99,17 +101,21 @@ export const YouTubePlayer = forwardRef<MediaPlayerHandle, {
   regionRef,
   onPlaybackSnapshot,
 }, ref) {
+  const { t } = useTranslation('viewer');
+  // The iframe's accessible title is set imperatively on a provider-owned element, so the
+  // translated string is mirrored into a ref for the callbacks that run outside render.
+  const iframeTitle = t('player.youtubeIframeTitle', { title });
   const hostRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YouTubePlayerInstance | null>(null);
   const playerReadyRef = useRef(false);
   const pendingCommandRef = useRef<PendingPlayerCommand | null>(null);
-  const titleRef = useRef(title);
+  const iframeTitleRef = useRef(iframeTitle);
   const videoIdRef = useRef(videoId);
   const observationEnabledRef = useRef(playbackObservationEnabled);
   const snapshotListenerRef = useRef(onPlaybackSnapshot);
   const refreshObservationRef = useRef<() => void>(() => undefined);
   const [playerState, setPlayerState] = useState<MediaPlayerState>('idle');
-  titleRef.current = title;
+  iframeTitleRef.current = iframeTitle;
   videoIdRef.current = videoId;
   observationEnabledRef.current = playbackObservationEnabled;
   snapshotListenerRef.current = onPlaybackSnapshot;
@@ -250,7 +256,7 @@ export const YouTubePlayer = forwardRef<MediaPlayerHandle, {
             onReady: (event) => {
               if (disposed || event.target !== ownedPlayer) return;
 
-              configurePlayerIframe(event.target.getIframe(), titleRef.current);
+              configurePlayerIframe(event.target.getIframe(), iframeTitleRef.current);
 
               playerRef.current = event.target;
               playerReadyRef.current = true;
@@ -295,7 +301,7 @@ export const YouTubePlayer = forwardRef<MediaPlayerHandle, {
           },
         });
         playerRef.current = ownedPlayer;
-        configurePlayerIframe(ownedPlayer.getIframe(), titleRef.current);
+        configurePlayerIframe(ownedPlayer.getIframe(), iframeTitleRef.current);
       })
       .catch(() => {
         if (disposed) return;
@@ -326,8 +332,8 @@ export const YouTubePlayer = forwardRef<MediaPlayerHandle, {
 
   useEffect(() => {
     if (!playerReadyRef.current || !playerRef.current) return;
-    configurePlayerIframe(playerRef.current.getIframe(), title);
-  }, [title]);
+    configurePlayerIframe(playerRef.current.getIframe(), iframeTitle);
+  }, [iframeTitle]);
 
   const isLoading = playerState === 'idle'
     || playerState === 'loading-api'
@@ -338,14 +344,14 @@ export const YouTubePlayer = forwardRef<MediaPlayerHandle, {
       ref={regionRef}
       tabIndex={-1}
       className={`youtube-player youtube-player--${playerState}`}
-      aria-label={`YouTube player for ${title}`}
+      aria-label={t('player.youtubeRegionLabel', { title })}
       data-player-state={playerState}
     >
       <div className="youtube-player__header">
         <div className="youtube-player__identity">
           <SourceBadge sourceType="YOUTUBE" />
           <span className="youtube-player__state" aria-live="polite">
-            {PLAYER_STATE_LABELS[playerState]}
+            {t(PLAYER_STATE_LABEL_KEYS[playerState])}
           </span>
         </div>
         {sourceUrl ? (
@@ -355,7 +361,7 @@ export const YouTubePlayer = forwardRef<MediaPlayerHandle, {
             target="_blank"
             rel="noopener noreferrer"
           >
-            Open on YouTube <span className="visually-hidden">(opens in a new tab)</span>
+            {t('details.openOnYouTube')} <span className="visually-hidden">{t('details.opensInNewTab')}</span>
             <span aria-hidden="true"> ↗</span>
           </a>
         ) : null}
@@ -365,13 +371,13 @@ export const YouTubePlayer = forwardRef<MediaPlayerHandle, {
         <div ref={hostRef} className="youtube-player__host" />
         {isLoading ? (
           <div className="youtube-player__message" role="status" aria-live="polite">
-            Loading YouTube player…
+            {t('player.loadingYouTube')}
           </div>
         ) : null}
         {playerState === 'error' ? (
           <div className="youtube-player__message" role="alert">
-            <strong>The YouTube player could not be loaded.</strong>
-            <span>You can keep reading the transcript or open the video on YouTube.</span>
+            <strong>{t('player.youtubeErrorTitle')}</strong>
+            <span>{t('player.youtubeErrorMessage')}</span>
           </div>
         ) : null}
       </div>

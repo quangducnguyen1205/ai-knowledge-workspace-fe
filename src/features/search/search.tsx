@@ -5,13 +5,17 @@ import { buildTranscriptDisplayRows, matchesTranscriptReference } from '../../en
 import { formatTranscriptTimestamp } from '../../entities/transcript/model/transcript-time';
 import { Button, EmptyState, LoadingBlock, PanelHeading, Section } from '../../shared/ui';
 import { ErrorFeedback } from '../../shared/feedback';
+import { Trans, useTranslation } from '../../shared/i18n';
 import { SourceBadge } from '../assets/public';
 import type { AssetSourceType } from '../assets/public';
 import {
   getSearchMomentAssetTitle,
   groupSearchMomentsByAsset,
 } from './model/group-search-moments';
-import { resolveSearchMomentPreview } from './model/search-moment-preview';
+import {
+  MISSING_SEARCH_MOMENT_PREVIEW_KEY,
+  resolveSearchMomentPreview,
+} from './model/search-moment-preview';
 import { resolveTranscriptLookupId } from './model/search-result-reference';
 
 type SearchPanelScope = {
@@ -75,6 +79,7 @@ export function SearchPanel({
   onReturnToSearch?: () => void;
   onClearContext?: () => void;
 }) {
+  const { t } = useTranslation(['search', 'common']);
   const [searchInput, setSearchInput] = useState('');
   const resultsHeadingId = useId();
   const routeQueryDraft = routeQuery?.trim() || null;
@@ -114,16 +119,17 @@ export function SearchPanel({
     const timestamp = result.startMs !== null && Number.isFinite(result.startMs) && result.startMs >= 0
       ? formatTranscriptTimestamp(result.startMs)
       : null;
-    const timestampLabel = timestamp ?? 'Time unavailable';
+    const timestampLabel = timestamp ?? t('common:timeUnavailable');
     const isSelected =
       selectedResult?.assetId === result.assetId &&
       selectedResult?.transcriptRowId === result.transcriptRowId &&
       selectedResult?.segmentIndex === result.segmentIndex;
-    const actionLabel = !hasContextAction
-      ? `Video moment unavailable in ${assetTitle} at ${timestampLabel.toLowerCase()}`
+    const actionLabelKey = !hasContextAction
+      ? 'results.unavailableLabel'
       : onOpenResultContext
-        ? `Open moment in ${assetTitle} at ${timestampLabel.toLowerCase()}`
-        : `Show transcript context for moment in ${assetTitle} at ${timestampLabel.toLowerCase()}`;
+        ? 'results.openLabel'
+        : 'results.showLabel';
+    const actionLabel = t(actionLabelKey, { title: assetTitle, time: timestampLabel.toLowerCase() });
 
     return (
       <article
@@ -143,15 +149,19 @@ export function SearchPanel({
               <SourceBadge sourceType={sourceType} />
             </span>
             <span className="search-result__timestamp">
-              <span>Video moment</span>
+              <span>{t('common:videoMoment')}</span>
               <span className="search-result__timestamp-value">{timestampLabel}</span>
             </span>
           </span>
           <span className="search-result__excerpt">
-            {resolveSearchMomentPreview(result)}
+            {resolveSearchMomentPreview(result) ?? t(MISSING_SEARCH_MOMENT_PREVIEW_KEY)}
           </span>
           <span className="search-result__open-label">
-            {!hasContextAction ? 'Unavailable' : onOpenResultContext ? 'Open moment' : isSelected ? 'Context shown' : 'Show context'}
+            {!hasContextAction
+              ? t('results.unavailable')
+              : onOpenResultContext
+                ? t('results.open')
+                : isSelected ? t('results.shown') : t('results.show')}
           </span>
         </button>
       </article>
@@ -163,17 +173,17 @@ export function SearchPanel({
       {isAssetScoped ? (
         <div className="study-pane__header search-panel__heading">
           <div>
-            <p className="panel__eyebrow">Transcript</p>
-            <h2>Find in transcript</h2>
+            <p className="panel__eyebrow">{t('panel.assetEyebrow')}</p>
+            <h2>{t('panel.assetTitle')}</h2>
           </div>
-          <span className="panel-pill">{searchEnabled ? 'Ready' : 'Unavailable'}</span>
+          <span className="panel-pill">{searchEnabled ? t('panel.ready') : t('panel.unavailable')}</span>
         </div>
       ) : null}
 
       <form className="search-form" onSubmit={handleSubmit} role="search">
         <label className="field field--grow">
           <span className="field__label">
-            {isAssetScoped ? 'Find in transcript' : `Search within ${workspaceName}`}
+            {isAssetScoped ? t('panel.assetFieldLabel') : t('panel.workspaceFieldLabel', { workspace: workspaceName })}
           </span>
           <input
             className="field__input search-form__input"
@@ -181,34 +191,37 @@ export function SearchPanel({
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
             placeholder={searchEnabled
-              ? isAssetScoped ? 'Find a word or phrase' : 'Search by topic, phrase, or idea'
-              : isAssetScoped ? 'Available when this video is ready' : 'Upload a video to begin searching'}
+              ? isAssetScoped ? t('panel.assetPlaceholder') : t('panel.workspacePlaceholder')
+              : isAssetScoped ? t('panel.assetPlaceholderLocked') : t('panel.workspacePlaceholderLocked')}
             disabled={!searchEnabled}
           />
         </label>
         <Button type="submit" disabled={!searchEnabled || !searchInput.trim() || isSearching}>
-          {isSearching ? 'Searching...' : 'Search'}
+          {isSearching ? t('panel.submitting') : t('panel.submit')}
         </Button>
       </form>
 
       {!searchEnabled ? (
         <p className="search-availability" role="status">
-          {isAssetScoped ? 'Find in transcript will be available when this video is ready.' : 'Search will be available when a video is ready.'}
+          {isAssetScoped ? t('panel.assetLocked') : t('panel.workspaceLocked')}
         </p>
       ) : null}
 
       {searchError ? <ErrorFeedback error={searchError} /> : null}
       {isSearching ? (
         <div className="search-loading-status" role="status" aria-live="polite" aria-atomic="true">
-          <LoadingBlock label={isAssetScoped ? 'Searching this transcript...' : `Searching within ${workspaceName}...`} compact />
+          <LoadingBlock
+            label={isAssetScoped ? t('panel.assetSearching') : t('panel.workspaceSearching', { workspace: workspaceName })}
+            compact
+          />
         </div>
       ) : null}
 
       {!activeQuery && !isSearching ? (
         <div role="status">
           <EmptyState
-            title={isAssetScoped ? 'Find an exact moment' : 'Search this workspace'}
-            description={isAssetScoped ? 'Enter a word or phrase from this video.' : 'Enter a natural content query to find exact moments across your videos.'}
+            title={isAssetScoped ? t('empty.assetTitle') : t('empty.workspaceTitle')}
+            description={isAssetScoped ? t('empty.assetDescription') : t('empty.workspaceDescription')}
           />
         </div>
       ) : null}
@@ -216,16 +229,20 @@ export function SearchPanel({
       {!isSearching && activeQuery && !searchError && !hasSearchResults ? (
         <div role="status">
           <EmptyState
-            title="No video moments found"
-            description={isAssetScoped ? 'Try a broader phrase from this transcript.' : 'Try a broader phrase or a different topic in this workspace.'}
+            title={t('empty.noResultsTitle')}
+            description={isAssetScoped ? t('empty.noResultsAsset') : t('empty.noResultsWorkspace')}
           />
         </div>
       ) : null}
 
       {isAssetScoped && !isSearching && !searchError && activeQuery && hasSearchResults ? (
         <p className="search-summary" role="status">
-          <strong>{searchResponse?.resultCount ?? searchResponse?.results.length ?? 0}</strong>{' '}
-          {(searchResponse?.resultCount ?? 0) === 1 ? 'match' : 'matches'} for “{activeQuery}”
+          <Trans
+            i18nKey="results.matchCount"
+            ns="search"
+            count={searchResponse?.resultCount ?? searchResponse?.results.length ?? 0}
+            values={{ query: activeQuery }}
+          />
         </p>
       ) : null}
 
@@ -242,19 +259,21 @@ export function SearchPanel({
       {!isAssetScoped && !isSearching && !searchError && activeQuery && resultGroups.length ? (
         <section className="workspace-moment-results" aria-labelledby={resultsHeadingId}>
           <PanelHeading
-            eyebrow="Explore"
+            eyebrow={t('panel.workspaceTitle')}
             className="panel-heading--underlined"
             trailing={(
               <p className="search-summary" role="status" aria-live="polite">
                 <strong>{searchResponse?.resultCount ?? searchResponse?.results.length ?? 0}</strong>{' '}
-                {(searchResponse?.resultCount ?? 0) === 1 ? 'matching moment' : 'matching moments'}
+                {t('results.momentCount', { count: searchResponse?.resultCount ?? 0 })}
                 {' · '}
-                {searchResponse?.results.length ?? 0} shown across {resultGroups.length}{' '}
-                {resultGroups.length === 1 ? 'video' : 'videos'}
+                {t('results.shownAcross', {
+                  shown: searchResponse?.results.length ?? 0,
+                  count: resultGroups.length,
+                })}
               </p>
             )}
           >
-            <h2 id={resultsHeadingId}>Video moments</h2>
+            <h2 id={resultsHeadingId}>{t('results.heading')}</h2>
           </PanelHeading>
           <div className="search-result-groups">
             {resultGroups.map((group, groupIndex) => (
@@ -268,7 +287,7 @@ export function SearchPanel({
                     <h3 id={`${resultsHeadingId}-group-${groupIndex}`}>{group.assetTitle}</h3>
                     <SourceBadge sourceType={sourceTypeByAssetId.get(group.assetId) ?? null} />
                   </div>
-                  <span>{group.momentCount} matching {group.momentCount === 1 ? 'moment' : 'moments'}</span>
+                  <span>{t('results.momentCount', { count: group.momentCount })}</span>
                 </header>
                 <ol className="search-results">
                   {group.results.map((result, index) => (
@@ -287,23 +306,23 @@ export function SearchPanel({
         <section className="context-panel" aria-labelledby="local-context-title">
           <div className="panel-block__header">
             <div>
-              <h2 id="local-context-title">Selected context</h2>
-              <span className="context-panel__hint">Around the matching moment</span>
+              <h2 id="local-context-title">{t('context.heading')}</h2>
+              <span className="context-panel__hint">{t('context.hint')}</span>
             </div>
             <div className="selected-context__actions">
               {onPlaySelectedMoment && selectedMomentStartMs !== null && selectedMomentStartMs !== undefined ? (
                 <Button type="button" onClick={() => onPlaySelectedMoment(selectedMomentStartMs)}>
-                  Play from {formatTranscriptTimestamp(selectedMomentStartMs)}
+                  {t('context.playFrom', { time: formatTranscriptTimestamp(selectedMomentStartMs) })}
                 </Button>
               ) : null}
-              {onReturnToSearch ? <Button type="button" tone="secondary" onClick={onReturnToSearch}>Back to search</Button> : null}
-              {onClearContext ? <Button type="button" tone="ghost" onClick={onClearContext}>Clear</Button> : null}
+              {onReturnToSearch ? <Button type="button" tone="secondary" onClick={onReturnToSearch}>{t('context.backToSearch')}</Button> : null}
+              {onClearContext ? <Button type="button" tone="ghost" onClick={onClearContext}>{t('common:actions.clear')}</Button> : null}
             </div>
           </div>
-          {isContextLoading ? <LoadingBlock label="Loading context..." compact /> : null}
+          {isContextLoading ? <LoadingBlock label={t('context.loading')} compact /> : null}
           {!isContextLoading && contextError ? <ErrorFeedback error={contextError} /> : null}
           {!isContextLoading && !contextError && !contextResponse ? (
-            <EmptyState title="Context unavailable" description="Continue with the full transcript below." />
+            <EmptyState title={t('context.unavailableTitle')} description={t('context.unavailableDescription')} />
           ) : null}
           {contextResponse ? (
             <ol className="transcript-list transcript-list--compact">
@@ -312,8 +331,8 @@ export function SearchPanel({
                 return (
                   <li key={row.id ?? `segment-${row.segmentIndex ?? 'missing'}`} className={`transcript-list__item ${isHit ? 'transcript-list__item--active' : ''}`}>
                     <div className="transcript-list__meta">
-                      <span>Moment {row.segmentIndex ?? '—'}</span>
-                      {isHit ? <span className="hit-pill">Match</span> : null}
+                      <span>{t('common:momentIndex', { index: row.segmentIndex ?? '—' })}</span>
+                      {isHit ? <span className="hit-pill">{t('context.match')}</span> : null}
                     </div>
                     <p>{displayText}</p>
                   </li>
@@ -327,5 +346,12 @@ export function SearchPanel({
   );
 
   if (embedded) return content;
-  return <Section title={isAssetScoped ? 'Find in transcript' : 'Explore'} eyebrow={isAssetScoped ? scope?.assetTitle : workspaceName}>{content}</Section>;
+  return (
+    <Section
+      title={isAssetScoped ? t('panel.assetTitle') : t('panel.workspaceTitle')}
+      eyebrow={isAssetScoped ? scope?.assetTitle : workspaceName}
+    >
+      {content}
+    </Section>
+  );
 }

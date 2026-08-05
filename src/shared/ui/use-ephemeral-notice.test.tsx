@@ -10,7 +10,7 @@ function NoticeHarness({ contextKey, showError = false }: { contextKey: string; 
     <div>
       <button
         type="button"
-        onClick={() => showNotice({ title: 'Video renamed', message: 'The title was updated.' })}
+        onClick={() => showNotice({ id: 'asset-renamed', title: 'Video renamed', message: 'The title was updated.' })}
       >
         Show success
       </button>

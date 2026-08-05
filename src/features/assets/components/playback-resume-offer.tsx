@@ -1,5 +1,6 @@
 import { formatTranscriptTimestamp } from '../../../entities/transcript/model/transcript-time';
 import { Button } from '../../../lib/ui';
+import { useTranslation } from '../../../shared/i18n';
 
 /**
  * Explicit resume offer. Progress is never applied automatically, and this surface carries no
@@ -14,20 +15,21 @@ export function PlaybackResumeOffer({
   onResume: () => void;
   onStartFromBeginning: () => void;
 }) {
+  const { t } = useTranslation('viewer');
   const formattedPosition = formatTranscriptTimestamp(positionMs);
 
   return (
     <section className="playback-resume" aria-labelledby="playback-resume-heading">
       <div className="playback-resume__copy">
-        <h2 id="playback-resume-heading">Continue watching</h2>
-        <p>You stopped at {formattedPosition}.</p>
+        <h2 id="playback-resume-heading">{t('resume.heading')}</h2>
+        <p>{t('resume.stoppedAt', { position: formattedPosition })}</p>
       </div>
       <div className="playback-resume__actions">
         <Button type="button" onClick={onResume}>
-          Resume from {formattedPosition}
+          {t('resume.resume', { position: formattedPosition })}
         </Button>
         <Button type="button" tone="secondary" onClick={onStartFromBeginning}>
-          Start from beginning
+          {t('resume.fromStart')}
         </Button>
       </div>
     </section>

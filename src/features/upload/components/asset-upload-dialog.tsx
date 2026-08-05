@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from '../../../shared/i18n';
 import { AssetUploadForm } from './asset-upload-form';
 import { YouTubeAssetForm } from './youtube-asset-form';
 
@@ -35,6 +36,7 @@ export function AssetUploadDialog({
   onResetCreation: () => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation('upload');
   const [sourceType, setSourceType] = useState<'UPLOAD' | 'YOUTUBE'>('UPLOAD');
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -98,13 +100,13 @@ export function AssetUploadDialog({
         <header className="modal__header">
           <div>
             <p className="panel__eyebrow">{workspaceName}</p>
-            <h2 id="add-video-dialog-title">Add video</h2>
+            <h2 id="add-video-dialog-title">{t('dialog.title')}</h2>
           </div>
           <button
             ref={closeButtonRef}
             type="button"
             className="modal__close"
-            aria-label="Close add video dialog"
+            aria-label={t('dialog.close')}
             onClick={onClose}
             disabled={isSubmitting}
           >
@@ -113,7 +115,7 @@ export function AssetUploadDialog({
         </header>
 
         <fieldset className="source-selector">
-          <legend>Video source</legend>
+          <legend>{t('dialog.sourceLegend')}</legend>
           <div className="source-selector__options">
             <label className={`source-selector__option ${sourceType === 'UPLOAD' ? 'source-selector__option--selected' : ''}`}>
               <input
@@ -130,7 +132,7 @@ export function AssetUploadDialog({
                   });
                 }}
               />
-              <span>Upload file</span>
+              <span>{t('dialog.sourceUpload')}</span>
             </label>
             <label className={`source-selector__option ${sourceType === 'YOUTUBE' ? 'source-selector__option--selected' : ''}`}>
               <input
@@ -147,7 +149,7 @@ export function AssetUploadDialog({
                   });
                 }}
               />
-              <span>YouTube URL</span>
+              <span>{t('dialog.sourceYouTube')}</span>
             </label>
           </div>
         </fieldset>

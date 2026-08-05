@@ -251,6 +251,37 @@ docker compose up --build
 
 This runs the Vite dev server inside Docker, bind-mounts the repo for local iteration, and proxies `/api` requests from the container to the host Spring backend through `http://host.docker.internal:8081`.
 
+## Language
+
+The interface ships in **English and Vietnamese**. English is the default and the fallback: a
+first visit is always English, and an unresolvable stored preference resolves to English. Browser
+language is deliberately not detected — the product's own copy is authored in English, so an
+English first paint is the one outcome that is always complete.
+
+- **Choosing a language.** Settings → Language for a signed-in user, and the compact control in
+  the header of the sign-in and registration pages so a signed-out visitor can choose before
+  there is an account. The choice is stored under `localStorage['akw:language']`, applies
+  immediately, survives a reload and a fresh tab, and updates `<html lang>`.
+- **Where the copy lives.** `src/shared/i18n/resources/<namespace>.ts` — one file per namespace,
+  each exporting `{ en, vi }` side by side. Namespaces are `common`, `errors`, `shell`, `auth`,
+  `home`, `library`, `upload`, `workspaces`, `viewer`, `search`, `moments`, `settings`,
+  `landing`, and each is owned by the surface it names.
+- **Adding a translation.** Add the key to that namespace's `en` object and its Vietnamese
+  counterpart, then read it with `useTranslation('<namespace>')` from `src/shared/i18n`. The
+  Vietnamese half is declared `const vi: typeof en`, so a missing or misspelled key is a
+  compile error rather than a string that renders as its own key.
+- **What is never translated.** User-supplied titles and workspace names, transcript text,
+  assistant answers, raw backend messages, identifiers, URLs, and media timestamps such as
+  `08:14` — those are language-neutral by design.
+- **Backend errors.** Spring's `code` and HTTP status select a frontend-owned key in the
+  `errors` namespace; an unmapped code falls through to a localized generic. A raw backend
+  message never becomes product copy.
+- **Validation.** `src/shared/i18n/i18n-parity.test.ts` checks that both languages expose the
+  same key set per namespace with no duplicate, no empty value and matching interpolation
+  variables; `i18n-runtime.test.ts` covers default, switching, persistence, invalid stored values
+  and `<html lang>`. Run them with
+  `docker compose exec -T frontend npx vitest run src/shared/i18n`.
+
 ## Manual Verification Notes
 
 Recently verified in the browser:

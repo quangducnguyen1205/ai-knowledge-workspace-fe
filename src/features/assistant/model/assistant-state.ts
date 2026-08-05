@@ -17,10 +17,9 @@ export function isAssistantUnavailableError(error: unknown): boolean {
   );
 }
 
-export function getGenericAssistantErrorMessage(error: unknown): string {
-  if (isApiClientError(error) && error.status === 400) {
-    return 'Use a focused, non-empty question about this asset transcript.';
-  }
-
-  return 'Try a shorter question, or review the transcript and search results directly.';
+/** `viewer` namespace key for the guidance shown beside a failed answer. */
+export function getGenericAssistantErrorMessageKey(error: unknown) {
+  return isApiClientError(error) && error.status === 400
+    ? ('viewer:assistant.errorInvalidQuestion' as const)
+    : ('viewer:assistant.errorGeneric' as const);
 }

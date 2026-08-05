@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  getUploadMediaValidationError,
+  getUploadMediaValidationErrorKey,
   SUPPORTED_UPLOAD_MEDIA_ACCEPT,
-  SUPPORTED_UPLOAD_MEDIA_MESSAGE,
+  SUPPORTED_UPLOAD_MEDIA_MESSAGE_KEY,
 } from './supported-upload-media';
 
 describe('supported upload media policy', () => {
@@ -13,8 +13,8 @@ describe('supported upload media policy', () => {
   });
 
   it('rejects unsupported extensions even when they claim a video MIME type', () => {
-    expect(getUploadMediaValidationError({ name: 'notes.txt', type: 'video/mp4' }))
-      .toBe(SUPPORTED_UPLOAD_MEDIA_MESSAGE);
+    expect(getUploadMediaValidationErrorKey({ name: 'notes.txt', type: 'video/mp4' }))
+      .toBe(SUPPORTED_UPLOAD_MEDIA_MESSAGE_KEY);
   });
 
   it.each([
@@ -26,11 +26,11 @@ describe('supported upload media policy', () => {
     { name: 'lecture.avi', type: 'video/x-msvideo' },
     { name: 'lecture.mp4', type: '' },
   ])('accepts compatible browser metadata for $name', (file) => {
-    expect(getUploadMediaValidationError(file)).toBeNull();
+    expect(getUploadMediaValidationErrorKey(file)).toBeNull();
   });
 
   it('rejects a supported extension with an incompatible specific MIME type', () => {
-    expect(getUploadMediaValidationError({ name: 'lecture.mp4', type: 'text/plain' }))
-      .toBe(SUPPORTED_UPLOAD_MEDIA_MESSAGE);
+    expect(getUploadMediaValidationErrorKey({ name: 'lecture.mp4', type: 'text/plain' }))
+      .toBe(SUPPORTED_UPLOAD_MEDIA_MESSAGE_KEY);
   });
 });

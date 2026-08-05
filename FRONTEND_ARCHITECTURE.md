@@ -82,6 +82,25 @@ The baseline was `0c4797436c9e7106146388a09322e2d32782fceb`. `AppShell.tsx` was 
   saved-moment, continue-watching); no module builds `['search', …]`/`['auth', …]` arrays ad hoc.
 - Full detail, the hard-coding policy and the brand palette live in `UI_FOUNDATION_AND_BRAND.md`.
 
+## Localization
+
+- `src/shared/i18n` (public entrypoint `src/shared/i18n/index.ts`) owns the whole translation
+  concern: the language registry (`locales.ts`), persistence (`storage.ts`), the i18next runtime
+  and the `<html lang>` side effect (`i18n.ts`), the React surface (`use-language.ts`), the
+  language control (`language-select.tsx`) and the resources.
+- Everything else reaches translation through that barrel — `useTranslation` and `Trans` are
+  re-exported there, and no feature imports `i18next` or `react-i18next` directly or owns
+  language mechanics of its own (enforced in `import-boundaries.test.ts`).
+- Resources live in `src/shared/i18n/resources/<namespace>.ts`, one file per namespace holding
+  `en` and `vi` side by side. The Vietnamese half is typed `const vi: typeof en`, so key-set
+  parity is a compile error rather than a convention; `i18n-parity.test.ts` covers the rest.
+- A module that decides *which* copy applies — the user-safe error map, the asset failure map,
+  the upload validation policy — returns a translation key, never a sentence. That keeps those
+  decisions pure, testable without an i18n runtime, and identical in both languages.
+- `shared/format` owns locale-aware date and time formatting and takes the locale as an
+  argument; `shared/i18n` binds the active language to it through `useDateTimeFormat`. Media
+  timestamps stay language-neutral in `entities/transcript`.
+
 ## Shared HTTP and feature APIs
 
 `shared/api/http-client.ts` is the only request boundary. It preserves Spring base URL resolution, proxy behavior, cookie credentials, in-memory bearer headers, JSON/multipart handling, `AbortSignal`, error parsing, and JWT boundary callbacks. Endpoint paths and DTOs live with auth, workspaces, assets, upload, search, and assistant features. Shared HTTP never imports a product feature.

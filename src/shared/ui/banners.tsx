@@ -1,3 +1,4 @@
+import { useTranslation } from '../i18n';
 import { joinClassNames } from './class-names';
 
 /**
@@ -58,6 +59,10 @@ export function SuccessNotification({
   onDismiss: () => void;
   className?: string;
 }) {
+  // The notice itself is supplied by the caller; only this primitive's own control needs copy,
+  // and it takes it from the localization layer rather than from a prop every caller would repeat.
+  const { t } = useTranslation('common');
+
   return (
     <div
       className={joinClassNames('message', 'message--success', 'message--dismissible', className)}
@@ -71,10 +76,10 @@ export function SuccessNotification({
       <button
         type="button"
         className="message__dismiss"
-        aria-label={`Dismiss ${title}`}
+        aria-label={t('actions.dismissNotice', { title })}
         onClick={onDismiss}
       >
-        Dismiss
+        {t('actions.dismiss')}
       </button>
     </div>
   );

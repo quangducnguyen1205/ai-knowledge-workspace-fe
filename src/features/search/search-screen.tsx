@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { TranscriptContextResponse } from '../../entities/transcript/model/types';
 import type { SearchResponse, SearchResult } from './api/search-api';
+import { useTranslation } from '../../shared/i18n';
 import { SearchPanel, type SearchAssetSource } from './search';
 
 type SearchScreenProps = {
@@ -46,20 +47,22 @@ export function WorkspaceSearchScreen({
   continueWatching,
   savedMoments,
 }: SearchScreenProps) {
+  const { t } = useTranslation('search');
+
   return (
     <div className="screen-stack workspace-search-screen">
       <header className="page-header">
         <div className="page-header__copy">
-          <p className="hero__eyebrow">Explore</p>
-          <h1>Search within {workspaceName}</h1>
-          <p>Find relevant video moments and open the exact transcript row that matters.</p>
+          <p className="hero__eyebrow">{t('screen.eyebrow')}</p>
+          <h1>{t('screen.title', { workspace: workspaceName })}</h1>
+          <p>{t('screen.description')}</p>
         </div>
       </header>
 
       {continueWatching ? (
         <section
           className="workspace-continue-watching-surface"
-          aria-label={`Continue watching in ${workspaceName}`}
+          aria-label={t('screen.continueWatchingLabel', { workspace: workspaceName })}
         >
           {continueWatching}
         </section>
@@ -67,7 +70,7 @@ export function WorkspaceSearchScreen({
 
       <section
         className="workspace-search-surface"
-        aria-label={`Workspace moment search for ${workspaceName}`}
+        aria-label={t('screen.searchSurfaceLabel', { workspace: workspaceName })}
       >
         <SearchPanel
           embedded
@@ -91,7 +94,7 @@ export function WorkspaceSearchScreen({
       </section>
 
       {savedMoments ? (
-        <section className="workspace-saved-moments-surface" aria-label={`Saved moments in ${workspaceName}`}>
+        <section className="workspace-saved-moments-surface" aria-label={t('screen.savedMomentsLabel', { workspace: workspaceName })}>
           {savedMoments}
         </section>
       ) : null}

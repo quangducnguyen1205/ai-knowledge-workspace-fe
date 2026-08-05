@@ -7,10 +7,11 @@ import type {
   ProcessingJobStatus,
 } from './types';
 
+/** Translation keys plus presentation, so the decision stays free of any active language. */
 export type IndexActionState = {
-  title: string;
-  description: string;
-  buttonLabel: string;
+  titleKey: 'viewer:recovery.indexTitle';
+  descriptionKey: 'viewer:recovery.indexDescription';
+  buttonLabelKey: 'viewer:recovery.indexAction';
   buttonTone: 'secondary';
   canIndex: true;
 };
@@ -49,9 +50,9 @@ export function getIndexActionState(input: {
   if (input.resolvedAssetStatus !== 'TRANSCRIPT_READY' || !input.transcriptRows?.length) return null;
 
   return {
-    title: 'Search preparation needs attention',
-    description: 'The transcript is ready, but this video has not become searchable. Retry only if it does not advance automatically.',
-    buttonLabel: 'Retry search preparation',
+    titleKey: 'viewer:recovery.indexTitle',
+    descriptionKey: 'viewer:recovery.indexDescription',
+    buttonLabelKey: 'viewer:recovery.indexAction',
     buttonTone: 'secondary',
     canIndex: true,
   };

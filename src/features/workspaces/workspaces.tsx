@@ -10,6 +10,7 @@ import {
 } from './api/workspaces-api';
 import { isApiClientError } from '../../shared/api/api-error';
 import { Button, ErrorFeedback, InfoBanner, SuccessNotification } from '../../lib/ui';
+import { useTranslation } from '../../shared/i18n';
 import type { EphemeralNotice } from '../../shared/ui/use-ephemeral-notice';
 import { WorkspaceDeleteDialog } from './components/workspace-delete-dialog';
 
@@ -59,47 +60,36 @@ export function useDeleteWorkspaceMutation() {
   });
 }
 
-type FriendlyMessageCopy = {
-  title: string;
-  message: string;
-};
+/** Which rename copy applies, as `workspaces` namespace keys — the words stay in the resources. */
+function renameErrorKeys<Key extends 'renameInvalidName' | 'renameNotFound' | 'renameOffline' | 'renameFailed'>(
+  tone: 'warning' | 'error',
+  key: Key,
+) {
+  return {
+    tone,
+    titleKey: `workspaces:errors.${key}.title`,
+    messageKey: `workspaces:errors.${key}.message`,
+  } as const;
+}
 
-function getFriendlyWorkspaceRenameErrorCopy(
-  error: unknown,
-): (FriendlyMessageCopy & { tone: 'warning' | 'error' }) | null {
+function getFriendlyWorkspaceRenameErrorCopy(error: unknown) {
   if (!isApiClientError(error)) {
     return null;
   }
 
   if (error.status === 400 && error.code === 'INVALID_WORKSPACE_NAME') {
-    return {
-      tone: 'warning',
-      title: 'Workspace name is not valid',
-      message: 'Enter a non-empty name within the allowed length.',
-    };
+    return renameErrorKeys('warning', 'renameInvalidName');
   }
 
   if (error.status === 404) {
-    return {
-      tone: 'warning',
-      title: 'Workspace not found',
-      message: 'It no longer exists or you do not have access.',
-    };
+    return renameErrorKeys('warning', 'renameNotFound');
   }
 
   if (error.status === 0) {
-    return {
-      tone: 'error',
-      title: 'Could not rename workspace',
-      message: 'Check your connection and try again. The previous name was kept.',
-    };
+    return renameErrorKeys('error', 'renameOffline');
   }
 
-  return {
-    tone: 'error',
-    title: 'Could not rename workspace',
-    message: 'The previous name was kept. Try again later.',
-  };
+  return renameErrorKeys('error', 'renameFailed');
 }
 
 export function WorkspaceBar({
@@ -139,6 +129,7 @@ export function WorkspaceBar({
   isRenaming: boolean;
   isDeleting: boolean;
 }) {
+  const { t } = useTranslation(['workspaces', 'common']);
   const [workspaceName, setWorkspaceName] = useState('');
   const [renameWorkspaceName, setRenameWorkspaceName] = useState('');
   const [deleteDialogWorkspace, setDeleteDialogWorkspace] = useState<Workspace | null>(null);
@@ -220,14 +211,14 @@ export function WorkspaceBar({
     <div className="workspace-bar">
       <div className="workspace-bar__cluster">
         <label className="field">
-          <span className="field__label">Current workspace</span>
+          <span className="field__label">{t('current')}</span>
           <select
             className="field__input"
             value={selectedWorkspaceId ?? ''}
             onChange={(event) => onSelectWorkspace(event.target.value)}
             disabled={isLoading || workspaces.length === 0 || isRenaming || isDeleting}
           >
-            {workspaces.length === 0 ? <option value="">No workspace yet</option> : null}
+            {workspaces.length === 0 ? <option value="">{t('empty')}</option> : null}
             {workspaces.map((workspace) => (
               <option key={workspace.id} value={workspace.id}>
                 {workspace.name}
@@ -238,39 +229,39 @@ export function WorkspaceBar({
 
         <form className="workspace-create settings-action" onSubmit={handleSubmit}>
           <div className="settings-action__heading">
-            <h3>Create workspace</h3>
-            <p>Use a short name that is easy to recognize in the header.</p>
+            <h3>{t('create.title')}</h3>
+            <p>{t('create.description')}</p>
           </div>
           <label className="field field--grow">
-            <span className="field__label">Workspace name</span>
+            <span className="field__label">{t('nameLabel')}</span>
             <input
               className="field__input"
               type="text"
               value={workspaceName}
               onChange={(event) => setWorkspaceName(event.target.value)}
-              placeholder="Algorithms, Databases, Distributed Systems"
+              placeholder={t('create.placeholder')}
               maxLength={255}
               disabled={workspaceActionBusy}
             />
           </label>
           <Button type="submit" disabled={workspaceActionBusy || !workspaceName.trim()}>
-            {isCreating ? 'Creating...' : 'Create workspace'}
+            {isCreating ? t('create.submitting') : t('create.submit')}
           </Button>
         </form>
 
         <form className="workspace-manage settings-action" onSubmit={handleRenameSubmit}>
           <div className="settings-action__heading">
-            <h3>Rename or delete</h3>
-            <p>Changes apply to the current workspace.</p>
+            <h3>{t('manage.title')}</h3>
+            <p>{t('manage.description')}</p>
           </div>
           <label className="field field--grow">
-            <span className="field__label">Workspace name</span>
+            <span className="field__label">{t('nameLabel')}</span>
             <input
               className="field__input"
               type="text"
               value={renameWorkspaceName}
               onChange={(event) => setRenameWorkspaceName(event.target.value)}
-              placeholder="Rename the active workspace"
+              placeholder={t('manage.placeholder')}
               maxLength={255}
               disabled={!selectedWorkspace || workspaceActionBusy}
             />
@@ -287,7 +278,7 @@ export function WorkspaceBar({
                 renameWorkspaceName.trim() === selectedWorkspace.name
               }
             >
-              {isRenaming ? 'Saving...' : 'Rename workspace'}
+              {isRenaming ? t('common:actions.saving') : t('manage.rename')}
             </Button>
             <button
               ref={deleteButtonRef}
@@ -296,7 +287,7 @@ export function WorkspaceBar({
               disabled={workspaceActionBusy || !selectedWorkspace}
               onClick={openDeleteDialog}
             >
-              {isDeleting ? 'Deleting...' : 'Delete workspace'}
+              {isDeleting ? t('common:actions.deleting') : t('manage.delete')}
             </button>
           </div>
         </form>
@@ -315,16 +306,16 @@ export function WorkspaceBar({
         <InfoBanner
           className="workspace-bar__error"
           tone="warning"
-          title={renameErrorCopy.title}
-          message={renameErrorCopy.message}
+          title={t(renameErrorCopy.titleKey)}
+          message={t(renameErrorCopy.messageKey)}
         />
       ) : null}
       {renameErrorCopy?.tone === 'error' ? (
         <ErrorFeedback
           error={renameError}
           className="workspace-bar__error"
-          title={renameErrorCopy.title}
-          message={renameErrorCopy.message}
+          title={t(renameErrorCopy.titleKey)}
+          message={t(renameErrorCopy.messageKey)}
         />
       ) : null}
       {deleteDialogWorkspace ? (

@@ -253,6 +253,35 @@ describe('frontend import boundaries', () => {
     expect(feedback).toMatch(/from '\.\.\/ui'/);
   });
 
+  it('keeps the translation library behind the shared/i18n seam', () => {
+    // `shared/i18n` owns initialization, the language registry, persistence and the document
+    // language. Everything else reaches translation through that barrel, so the library has one
+    // replaceable seam and no feature re-implements language mechanics of its own.
+    const i18nRoot = join(sourceRoot, 'shared/i18n');
+    const violations: string[] = [];
+
+    for (const absolutePath of productionSources()) {
+      if (absolutePath.startsWith(i18nRoot)) continue;
+      const file = relative(sourceRoot, absolutePath);
+      const source = readFileSync(absolutePath, 'utf8');
+
+      for (const match of source.matchAll(/from\s+['"]([^'"]+)['"]/g)) {
+        if (/^(react-)?i18next$/.test(match[1]!)) violations.push(`${file} -> ${match[1]}`);
+      }
+
+      if (/i18n\.(init|changeLanguage)\s*\(|localStorage[^\n]*akw:language/.test(source)) {
+        violations.push(`${file} owns language mechanics that belong to shared/i18n`);
+      }
+    }
+
+    expect(violations).toEqual([]);
+
+    // The seam itself stays inside the neutral foundation: no product copy decision leaks into it.
+    const languageRegistry = readSource('shared/i18n/locales.ts');
+    expect(languageRegistry).toMatch(/SUPPORTED_LANGUAGES/);
+    expect(languageRegistry).not.toMatch(/features\/|entities\//);
+  });
+
   it('keeps query keys with their owners instead of ad-hoc arrays', () => {
     const violations = productionSources()
       .map((absolutePath) => ({

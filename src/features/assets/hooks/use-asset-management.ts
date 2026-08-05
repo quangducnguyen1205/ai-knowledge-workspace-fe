@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ApiClientError } from '../../../shared/api/api-error';
 import { assetKeys, useDeleteAssetMutation, useRenameAssetMutation } from './asset-queries';
 import type { AssetSourceType, AssetSummary } from '../model/types';
+import { useTranslation } from '../../../shared/i18n';
 import { useEphemeralNotice } from '../../../shared/ui/use-ephemeral-notice';
 import type { SearchResponse } from '../../search/public';
 import { searchKeys } from '../../search/public';
@@ -36,6 +37,7 @@ export function useAssetManagement({
   onAssetTitleChanged: (assetId: string, title: string) => void;
   onDeletedSelectedRoute: (assetId: string) => void;
 }) {
+  const { t } = useTranslation('library');
   const queryClient = useQueryClient();
   const deleteMutation = useDeleteAssetMutation();
   const renameMutation = useRenameAssetMutation();
@@ -66,9 +68,10 @@ export function useAssetManagement({
 
   function handleDeleteAsset(asset: AssetSummary) {
     if (deleteMutation.isPending) return;
-    const confirmed = window.confirm(
-      `Delete "${asset.title}" from ${workspaceName ?? 'this workspace'}?\n\nThis removes the asset and refreshes the workspace list.`,
-    );
+    const confirmed = window.confirm(t('confirmDelete', {
+      title: asset.title,
+      workspace: workspaceName ?? t('confirmDeleteWorkspaceFallback'),
+    }));
     if (!confirmed) return;
 
     libraryFeedback.clearNotice();
@@ -80,8 +83,12 @@ export function useAssetManagement({
           clearAssetDependentState(variables.assetId, variables.workspaceId);
           onDeletedSelectedRoute(variables.assetId);
           libraryFeedback.showNotice({
-            title: 'Video deleted',
-            message: `Removed "${asset.title}" from ${workspaceName ?? 'the active workspace'}.`,
+            id: 'asset-deleted',
+            title: t('notices.deleted.title'),
+            message: t('notices.deleted.message', {
+              title: asset.title,
+              workspace: workspaceName ?? t('notices.fallbackWorkspace'),
+            }),
           });
           await Promise.all([
             queryClient.invalidateQueries({ queryKey: assetKeys.list(variables.workspaceId) }),
@@ -121,9 +128,14 @@ export function useAssetManagement({
               : asset),
           );
           onAssetTitleChanged(variables.assetId, response.title);
-          libraryFeedback.showNotice({ title: 'Video renamed', message: `Title updated to "${response.title}".` });
+          const renamedNotice = {
+            id: 'asset-renamed',
+            title: t('notices.renamed.title'),
+            message: t('notices.renamed.message', { title: response.title }),
+          };
+          libraryFeedback.showNotice(renamedNotice);
           if (selectedAssetIdRef.current === variables.assetId) {
-            detailFeedback.showNotice({ title: 'Video renamed', message: `Title updated to "${response.title}".` });
+            detailFeedback.showNotice(renamedNotice);
           }
         },
         onError: async (error, variables) => {
@@ -145,8 +157,11 @@ export function useAssetManagement({
     librarySuccessNotice: libraryFeedback.notice,
     detailSuccessNotice: detailFeedback.notice,
     recordCreationSuccess: (sourceType: AssetSourceType, title: string) => libraryFeedback.showNotice({
-      title: sourceType === 'YOUTUBE' ? 'YouTube video added' : 'Video uploaded',
-      message: `Added "${title}" to ${workspaceName ?? 'the active workspace'}.`,
+      id: sourceType === 'YOUTUBE' ? 'asset-youtube-added' : 'asset-uploaded',
+      title: sourceType === 'YOUTUBE' ? t('notices.youtubeAdded.title') : t('notices.uploaded.title'),
+      message: sourceType === 'YOUTUBE'
+        ? t('notices.youtubeAdded.message', { title, workspace: workspaceName ?? t('notices.fallbackWorkspace') })
+        : t('notices.uploaded.message', { title, workspace: workspaceName ?? t('notices.fallbackWorkspace') }),
     }),
     clearNotices: () => {
       libraryFeedback.clearNotice();

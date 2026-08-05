@@ -1,19 +1,21 @@
 import { useMemo, useState } from 'react';
 import type { AssetStatus, AssetSummary } from './model/types';
 import { Button, Section } from '../../lib/ui';
+import { useTranslation } from '../../shared/i18n';
 import { AssetList } from './components/asset-list';
 import { AssetUploadDialog } from '../upload/public';
 import type { EphemeralNotice } from '../../shared/ui/use-ephemeral-notice';
 
 type LibraryFilter = 'ALL' | AssetStatus;
 
-const STATUS_FILTERS: Array<{ value: LibraryFilter; label: string }> = [
-  { value: 'ALL', label: 'All' },
-  { value: 'SEARCHABLE', label: 'Ready' },
-  { value: 'PROCESSING', label: 'Processing' },
-  { value: 'TRANSCRIPT_READY', label: 'Preparing search' },
-  { value: 'FAILED', label: 'Failed' },
-];
+/** The filter values are Spring's `AssetStatus` contract; only their labels are translated. */
+const STATUS_FILTERS = [
+  { value: 'ALL', labelKey: 'filters.all' },
+  { value: 'SEARCHABLE', labelKey: 'filters.ready' },
+  { value: 'PROCESSING', labelKey: 'filters.processing' },
+  { value: 'TRANSCRIPT_READY', labelKey: 'filters.preparingSearch' },
+  { value: 'FAILED', labelKey: 'filters.failed' },
+] as const satisfies ReadonlyArray<{ value: LibraryFilter; labelKey: string }>;
 
 type AssetLibraryScreenProps = {
   workspaceName: string;
@@ -74,6 +76,7 @@ export function AssetLibraryScreen({
   onOpenUpload,
   onCloseUpload,
 }: AssetLibraryScreenProps) {
+  const { t } = useTranslation(['library', 'common']);
   const [titleFilter, setTitleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<LibraryFilter>('ALL');
   const normalizedTitleFilter = titleFilter.trim().toLocaleLowerCase();
@@ -92,32 +95,32 @@ export function AssetLibraryScreen({
       <header className="page-header">
         <div className="page-header__copy">
           <p className="hero__eyebrow">{workspaceName}</p>
-          <h1>Library</h1>
-          <p>Manage the videos in this workspace.</p>
+          <h1>{t('screen.title')}</h1>
+          <p>{t('screen.description')}</p>
         </div>
         <div className="page-header__actions">
-          <Button type="button" onClick={onOpenUpload}>Add video</Button>
+          <Button type="button" onClick={onOpenUpload}>{t('screen.addVideo')}</Button>
         </div>
       </header>
 
       <Section
-        title="Videos"
-        actions={<span className="panel-pill">{assets.length} {assets.length === 1 ? 'video' : 'videos'}</span>}
+        title={t('screen.videos')}
+        actions={<span className="panel-pill">{t('common:videoCount', { count: assets.length })}</span>}
         className="library-panel"
       >
         {assets.length > 0 ? (
-          <div className="library-filters" aria-label="Filter videos">
+          <div className="library-filters" aria-label={t('filters.label')}>
             <label className="library-filter-search">
-              <span className="visually-hidden">Filter videos by title</span>
+              <span className="visually-hidden">{t('filters.byTitle')}</span>
               <input
                 className="field__input"
                 type="search"
                 value={titleFilter}
                 onChange={(event) => setTitleFilter(event.target.value)}
-                placeholder="Filter videos"
+                placeholder={t('filters.titlePlaceholder')}
               />
             </label>
-            <div className="filter-chips" role="group" aria-label="Filter by status">
+            <div className="filter-chips" role="group" aria-label={t('filters.byStatus')}>
               {STATUS_FILTERS.map((filter) => (
                 <button
                   key={filter.value}
@@ -126,7 +129,7 @@ export function AssetLibraryScreen({
                   aria-pressed={statusFilter === filter.value}
                   onClick={() => setStatusFilter(filter.value)}
                 >
-                  {filter.label}
+                  {t(filter.labelKey)}
                 </button>
               ))}
             </div>
@@ -145,7 +148,7 @@ export function AssetLibraryScreen({
           renameBusy={renameBusy}
           renamingAssetId={renamingAssetId}
           assetsLoading={assetsLoading}
-          emptyDescription={filtersActive ? 'Try a different title or status filter.' : undefined}
+          emptyDescription={filtersActive ? t('list.emptyFiltered') : undefined}
           onSelectAsset={onSelectAsset}
           onDeleteAsset={onDeleteAsset}
           onRenameAsset={onRenameAsset}

@@ -5,24 +5,23 @@ import {
   getFriendlyYouTubeCreationErrorCopy,
 } from './error-copy';
 
+/**
+ * The mapping decides *which* copy is shown; the words live in the translation resources. These
+ * assertions therefore hold on keys, which keeps them true in every language, and still prove the
+ * property that matters: no provider diagnostic survives the mapping.
+ */
 describe('source creation and retry error copy', () => {
   it.each([
-    [
-      'INVALID_YOUTUBE_URL',
-      'Enter a supported public YouTube video URL.',
-    ],
-    [
-      'DUPLICATE_YOUTUBE_ASSET',
-      'This YouTube video is already in the workspace.',
-    ],
-  ])('maps stable creation code %s without exposing diagnostics', (code, message) => {
+    ['INVALID_YOUTUBE_URL', 'upload:errors.youtubeInvalidUrl.message'],
+    ['DUPLICATE_YOUTUBE_ASSET', 'upload:errors.youtubeDuplicate.message'],
+  ])('maps stable creation code %s without exposing diagnostics', (code, messageKey) => {
     const copy = getFriendlyYouTubeCreationErrorCopy(new ApiClientError(
       409,
       'provider stderr at https://private.example and stack trace',
       code,
     ));
 
-    expect(copy?.message).toBe(message);
+    expect(copy?.messageKey).toBe(messageKey);
     expect(JSON.stringify(copy)).not.toMatch(/stderr|private\.example|stack trace/i);
   });
 
@@ -34,8 +33,8 @@ describe('source creation and retry error copy', () => {
     ));
 
     expect(copy).toEqual({
-      title: 'Retry no longer available',
-      message: 'The video state changed, so processing cannot be retried right now. The latest status is being loaded.',
+      titleKey: 'viewer:failure.retryNotAllowed.title',
+      messageKey: 'viewer:failure.retryNotAllowed.message',
     });
   });
 });

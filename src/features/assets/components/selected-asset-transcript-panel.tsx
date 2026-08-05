@@ -4,6 +4,7 @@ import { getTranscriptRowIdentity } from '../../../entities/transcript/model/act
 import { formatTranscriptTimestamp } from '../../../entities/transcript/model/transcript-time';
 import type { TranscriptRow } from '../../../entities/transcript/model/types';
 import { EmptyState, ErrorFeedback, InfoBanner, LoadingBlock, Section } from '../../../lib/ui';
+import { useTranslation } from '../../../shared/i18n';
 import { getTranscriptConflictCopy } from '../model/error-copy';
 import type { AssetStatus, AssetStatusResponse, AssetSummary } from '../model/types';
 
@@ -120,6 +121,7 @@ export function SelectedAssetTranscriptPanel({
   momentAction?: ReactNode;
   embedded?: boolean;
 }) {
+  const { t } = useTranslation(['viewer', 'common']);
   const transcriptConflictCopy = getTranscriptConflictCopy(transcriptError, resolvedAssetStatus, statusResponse?.processingJobStatus);
   const focusedRowRef = useRef<HTMLLIElement | null>(null);
   const activePlaybackRowRef = useRef<HTMLLIElement | null>(null);
@@ -131,16 +133,14 @@ export function SelectedAssetTranscriptPanel({
   const focusedRowIsVisible = Boolean(
     focusedTranscriptRowId && displayTranscriptRows.some(({ row }) => matchesTranscriptReference(row, focusedTranscriptRowId)),
   );
-  const focusedRowLabel = focusedTranscriptSource === 'assistant' ? 'Citation' : focusedTranscriptSource === 'search' ? 'Search match' : 'Selected';
-  const missingFocusedRowCopy = focusedTranscriptSource === 'assistant'
-    ? {
-        title: 'Cited moment is not visible',
-        message: 'The cited moment could not be matched in this transcript. Search the transcript directly.',
-      }
-    : {
-        title: 'Selected moment is not visible',
-        message: 'The transcript may have changed. Use the selected context above or return to search.',
-      };
+  const focusedRowLabel = focusedTranscriptSource === 'assistant'
+    ? t('transcript.labelCitation')
+    : focusedTranscriptSource === 'search'
+      ? t('transcript.labelSearchMatch')
+      : t('transcript.labelSelected');
+  const missingFocusedRowKey = focusedTranscriptSource === 'assistant'
+    ? 'transcript.missingCitation'
+    : 'transcript.missingSelected';
 
   const scrollToActivePlaybackRow = useCallback((force: boolean) => {
     if (!transcriptViewVisible) return;
@@ -221,28 +221,28 @@ export function SelectedAssetTranscriptPanel({
         <div className="panel-block__header">
           <div>
             <p className="panel__eyebrow">{workspaceName}</p>
-            <h2>Transcript</h2>
+            <h2>{t('transcript.heading')}</h2>
           </div>
           {momentAction ? <div className="panel-block__actions">{momentAction}</div> : null}
         </div>
 
-        {transcriptLoading ? <LoadingBlock label="Loading transcript..." /> : null}
+        {transcriptLoading ? <LoadingBlock label={t('transcript.loading')} /> : null}
         {!transcriptLoading && transcriptConflictCopy ? (
-          <InfoBanner tone="warning" title={transcriptConflictCopy.title} message={transcriptConflictCopy.message} detail={transcriptConflictCopy.detail} />
+          <InfoBanner tone="warning" title={t(transcriptConflictCopy.titleKey)} message={t(transcriptConflictCopy.messageKey)} />
         ) : null}
         {!transcriptLoading && transcriptError && !transcriptConflictCopy ? <ErrorFeedback error={transcriptError} /> : null}
         {!transcriptLoading && !transcriptError && !transcriptRows?.length ? (
-          <EmptyState title="Transcript not ready yet" description="This page updates automatically while the video is being prepared." />
+          <EmptyState title={t('transcript.emptyTitle')} description={t('transcript.emptyDescription')} />
         ) : null}
         {focusedTranscriptRowId && !transcriptLoading && displayTranscriptRows.length > 0 && !focusedRowIsVisible ? (
-          <InfoBanner tone="warning" title={missingFocusedRowCopy.title} message={missingFocusedRowCopy.message} />
+          <InfoBanner tone="warning" title={t(`${missingFocusedRowKey}.title`)} message={t(`${missingFocusedRowKey}.message`)} />
         ) : null}
 
         {displayTranscriptRows.length ? (
           <>
             {followMode === 'suspended-by-user' ? (
               <div className="transcript-follow-control">
-                <span role="status">Transcript following is paused.</span>
+                <span role="status">{t('transcript.followPaused')}</span>
                 <button
                   type="button"
                   className="button button--secondary"
@@ -254,7 +254,7 @@ export function SelectedAssetTranscriptPanel({
                     });
                   }}
                 >
-                  Resume following
+                  {t('transcript.resumeFollowing')}
                 </button>
               </div>
             ) : null}
@@ -262,7 +262,7 @@ export function SelectedAssetTranscriptPanel({
               ref={transcriptListRef}
               className="transcript-list transcript-list--scrollable"
               tabIndex={0}
-              aria-label="Video transcript"
+              aria-label={t('transcript.listLabel')}
               onWheel={() => onSuspendFollowing?.()}
               onTouchStart={() => onSuspendFollowing?.()}
               onKeyDown={suspendForKeyboard}
@@ -297,21 +297,21 @@ export function SelectedAssetTranscriptPanel({
                   aria-current={isPlaybackActive ? 'time' : isFocusedRow ? 'true' : undefined}
                   aria-label={
                     isFocusedRow && isPlaybackActive
-                      ? 'Selected transcript moment, currently playing'
+                      ? t('transcript.rowSelectedPlaying')
                       : isFocusedRow
-                        ? 'Selected transcript moment'
+                        ? t('transcript.rowSelected')
                         : isPlaybackActive
-                          ? 'Currently playing transcript segment'
+                          ? t('transcript.rowPlaying')
                           : undefined
                   }
                 >
                   <div className="transcript-list__meta">
-                    <span>Moment {row.segmentIndex ?? '—'}</span>
+                    <span>{t('common:momentIndex', { index: row.segmentIndex ?? '—' })}</span>
                     {rowIsSeekable && formattedStartTime ? (
                       <button
                         type="button"
                         className="transcript-seek-action"
-                        aria-label={`Play transcript segment from ${formattedStartTime}`}
+                        aria-label={t('transcript.playFrom', { time: formattedStartTime })}
                         onClick={() => {
                           if (row.startMs !== null) {
                             onPlaySegment?.(row.startMs, rowIdentity);
@@ -322,7 +322,7 @@ export function SelectedAssetTranscriptPanel({
                         <span>{formattedStartTime}</span>
                       </button>
                     ) : null}
-                    {isPlaybackActive ? <span className="playback-pill">Playing</span> : null}
+                    {isPlaybackActive ? <span className="playback-pill">{t('transcript.playing')}</span> : null}
                     {isFocusedRow ? <span className="hit-pill">{focusedRowLabel}</span> : null}
                   </div>
                   <p>{displayText}</p>
@@ -336,5 +336,5 @@ export function SelectedAssetTranscriptPanel({
   );
 
   if (embedded) return content;
-  return <Section title="Transcript" eyebrow={workspaceName}>{content}</Section>;
+  return <Section title={t('transcript.heading')} eyebrow={workspaceName}>{content}</Section>;
 }

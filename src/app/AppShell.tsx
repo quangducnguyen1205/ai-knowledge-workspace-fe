@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Workspace } from '../features/workspaces/api/workspaces-api';
 import { Button } from '../lib/ui';
+import { useTranslation } from '../shared/i18n';
 import { routeToHash, type AppRoute } from './router';
 
 type ShellNavItem = {
+  /** Stable list identity, so a translated label never becomes a React key. */
+  key: string;
   label: string;
   route: AppRoute;
   disabled?: boolean;
@@ -38,6 +41,7 @@ export function AppShell({
   onLogout,
   children,
 }: AppShellProps) {
+  const { t } = useTranslation(['shell', 'common']);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const mobileMenuButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -51,19 +55,21 @@ export function AppShell({
   }, [currentUserEmail]);
 
   const navItems: ShellNavItem[] = [
-    { label: 'Home', route: { name: 'home' }, isActive: route.name === 'home' },
+    { key: 'home', label: t('nav.home'), route: { name: 'home' }, isActive: route.name === 'home' },
     {
-      label: 'Library',
+      key: 'library',
+      label: t('nav.library'),
       route: { name: 'library' },
       disabled: !selectedWorkspace,
-      disabledReason: 'Create or select a workspace before opening the video library.',
+      disabledReason: t('nav.libraryDisabled'),
       isActive: route.name === 'library' || route.name === 'asset',
     },
     {
-      label: 'Explore',
+      key: 'search',
+      label: t('nav.explore'),
       route: { name: 'search' },
       disabled: !selectedWorkspace,
-      disabledReason: 'Create or select a workspace before exploring video moments.',
+      disabledReason: t('nav.exploreDisabled'),
       isActive: route.name === 'search',
     },
   ];
@@ -115,7 +121,7 @@ export function AppShell({
 
   return (
     <div className="app-shell app-shell--product">
-      <a className="skip-link" href="#main-content">Skip to content</a>
+      <a className="skip-link" href="#main-content">{t('common:skipToContent')}</a>
       <div className="product-shell">
         <header className="product-header">
           <div className="product-header__bar">
@@ -126,12 +132,12 @@ export function AppShell({
                 event.preventDefault();
                 navigateFromShell({ name: 'home' });
               }}
-              aria-label="AI Knowledge Workspace home"
+              aria-label={t('brand.homeLabel')}
             >
               <span className="product-brand__mark" aria-hidden="true">AK</span>
               <span className="product-brand__copy">
-                <strong>AI Knowledge Workspace</strong>
-                <small>Video knowledge workspace</small>
+                <strong>{t('brand.name')}</strong>
+                <small>{t('brand.tagline')}</small>
               </span>
             </a>
 
@@ -146,17 +152,17 @@ export function AppShell({
                 setIsMobileNavOpen((current) => !current);
               }}
             >
-              Menu
+              {t('nav.menu')}
             </button>
 
             <nav
               id="product-primary-nav"
               className={`product-nav ${isMobileNavOpen ? 'product-nav--open' : ''}`}
-              aria-label="Primary navigation"
+              aria-label={t('nav.label')}
             >
               {navItems.map((item) => (
                 <a
-                  key={item.label}
+                  key={item.key}
                   className={`product-nav__link ${item.isActive ? 'product-nav__link--active' : ''}`}
                   href={routeToHash(item.route)}
                   aria-current={item.isActive ? 'page' : undefined}
@@ -178,15 +184,15 @@ export function AppShell({
 
             <div className="product-header__actions">
               <label className="product-workspace-switcher">
-                <span className="visually-hidden">Current workspace</span>
+                <span className="visually-hidden">{t('workspaceSwitcher.current')}</span>
                 <select
                   className="field__input"
                   value={selectedWorkspaceId ?? ''}
                   onChange={(event) => onSelectWorkspace(event.target.value)}
                   disabled={isWorkspaceFetching || workspaces.length === 0}
-                  aria-label="Workspace"
+                  aria-label={t('workspaceSwitcher.label')}
                 >
-                  {workspaces.length === 0 ? <option value="">No workspace yet</option> : null}
+                  {workspaces.length === 0 ? <option value="">{t('workspaceSwitcher.empty')}</option> : null}
                   {workspaces.map((workspace) => (
                     <option key={workspace.id} value={workspace.id}>{workspace.name}</option>
                   ))}
@@ -196,12 +202,12 @@ export function AppShell({
               <Button
                 type="button"
                 className="product-upload-action"
-                aria-label="Add video to current workspace"
+                aria-label={t('addVideo.accessibleLabel')}
                 onClick={() => navigateFromShell({ name: 'library', upload: true })}
                 disabled={!selectedWorkspace}
-                title={!selectedWorkspace ? 'Create or select a workspace before adding a video.' : undefined}
+                title={!selectedWorkspace ? t('addVideo.disabled') : undefined}
               >
-                Add video
+                {t('addVideo.label')}
               </Button>
 
               <div ref={accountMenuRef} className="account-menu">
@@ -209,7 +215,7 @@ export function AppShell({
                   ref={accountButtonRef}
                   type="button"
                   className="account-menu__trigger"
-                  aria-label="Open account menu"
+                  aria-label={t('account.open')}
                   aria-controls="account-menu-popover"
                   aria-expanded={isAccountMenuOpen}
                   onClick={() => {
@@ -221,9 +227,9 @@ export function AppShell({
                 </button>
 
                 {isAccountMenuOpen ? (
-                  <div id="account-menu-popover" className="account-menu__popover" aria-label="Account menu">
+                  <div id="account-menu-popover" className="account-menu__popover" aria-label={t('account.menu')}>
                     <div className="account-menu__identity">
-                      <span>Signed in as</span>
+                      <span>{t('account.signedInAs')}</span>
                       <strong>{currentUserEmail}</strong>
                     </div>
                     <a
@@ -234,10 +240,10 @@ export function AppShell({
                         navigateFromShell({ name: 'settings' });
                       }}
                     >
-                      Workspace tools
+                      {t('account.workspaceTools')}
                     </a>
                     <button type="button" onClick={() => void onLogout()} disabled={isLogoutPending}>
-                      {isLogoutPending ? 'Signing out...' : 'Sign out'}
+                      {isLogoutPending ? t('account.signingOut') : t('account.signOut')}
                     </button>
                   </div>
                 ) : null}

@@ -7,6 +7,11 @@ import {
 
 type ActiveAssistantRequest = { id: number; controller: AbortController };
 
+/** The two validation messages this hook can raise, as `viewer` namespace keys. */
+type AssistantValidationKey =
+  | 'viewer:assistant.validationEmpty'
+  | 'viewer:assistant.validationNotReady';
+
 export function useAssetAssistant({
   workspaceId,
   assetId,
@@ -17,7 +22,8 @@ export function useAssetAssistant({
   isAssetSearchable: boolean;
 }) {
   const [question, setQuestion] = useState('');
-  const [validationError, setValidationError] = useState<string | null>(null);
+  // Stored as a key, so the message re-renders in whichever language is active when it is shown.
+  const [validationErrorKey, setValidationErrorKey] = useState<AssistantValidationKey | null>(null);
   const [result, setResult] = useState<AssistantResultState>({ status: 'idle' });
   const activeRequestRef = useRef<ActiveAssistantRequest | null>(null);
   const requestIdRef = useRef(0);
@@ -26,7 +32,7 @@ export function useAssetAssistant({
     activeRequestRef.current?.controller.abort();
     activeRequestRef.current = null;
     setQuestion('');
-    setValidationError(null);
+    setValidationErrorKey(null);
     setResult({ status: 'idle' });
   }, []);
 
@@ -35,19 +41,19 @@ export function useAssetAssistant({
 
   const updateQuestion = useCallback((value: string) => {
     setQuestion(value);
-    if (value.trim()) setValidationError(null);
+    if (value.trim()) setValidationErrorKey(null);
   }, []);
 
   const submit = useCallback(async () => {
     const trimmedQuestion = question.trim();
-    setValidationError(null);
+    setValidationErrorKey(null);
 
     if (!trimmedQuestion) {
-      setValidationError('Ask a question about this asset transcript first.');
+      setValidationErrorKey('viewer:assistant.validationEmpty');
       return;
     }
     if (!isAssetSearchable) {
-      setValidationError('Index this asset before asking for a grounded answer.');
+      setValidationErrorKey('viewer:assistant.validationNotReady');
       return;
     }
 
@@ -77,7 +83,7 @@ export function useAssetAssistant({
   return {
     question,
     updateQuestion,
-    validationError,
+    validationErrorKey,
     result,
     isLoading: result.status === 'loading',
     submit,

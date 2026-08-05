@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import type { AssetSummary } from '../assets/public';
 import { Button, EmptyState, Section } from '../../shared/ui';
-import { formatDateTime } from '../../shared/format';
+import { useDateTimeFormat, useTranslation } from '../../shared/i18n';
 import { SourceBadge, StatusBadge } from '../assets/public';
 import { SpatialMomentScene } from './spatial-moment-scene';
 
@@ -29,6 +29,8 @@ export function WorkspaceHomeScreen({
   onOpenSearch,
   onOpenAsset,
 }: WorkspaceHomeScreenProps) {
+  const { t } = useTranslation(['home', 'common']);
+  const formatDateTime = useDateTimeFormat();
   const hasAssets = assets.length > 0;
   const processingCount = assets.filter((asset) => asset.assetStatus === 'PROCESSING').length;
   const sceneVariant = !hasAssets
@@ -45,17 +47,14 @@ export function WorkspaceHomeScreen({
       <header className={`home-hero ${hasAssets ? 'home-hero--working' : 'home-hero--welcome'}`}>
         <div className="home-hero__copy">
           <p className="hero__eyebrow">{workspaceName}</p>
-          <h1>Find the exact moment in every video.</h1>
-          <p className="home-hero__statement">
-            Search across a workspace of videos and jump directly to the exact moments that
-            matter — every video becomes a transcript you can search, revisit and resume.
-          </p>
+          <h1>{t('hero.title')}</h1>
+          <p className="home-hero__statement">{t('hero.statement')}</p>
 
           {hasAssets ? (
-            <p className="page-header__summary" aria-label="Workspace video summary">
-              <span>{assets.length} {assets.length === 1 ? 'video' : 'videos'}</span>
-              {searchableAssetCount > 0 ? <span>{searchableAssetCount} ready to search</span> : null}
-              {processingCount > 0 ? <span>{processingCount} processing</span> : null}
+            <p className="page-header__summary" aria-label={t('hero.summaryLabel')}>
+              <span>{t('common:videoCount', { count: assets.length })}</span>
+              {searchableAssetCount > 0 ? <span>{t('hero.readyToSearch', { count: searchableAssetCount })}</span> : null}
+              {processingCount > 0 ? <span>{t('hero.processing', { count: processingCount })}</span> : null}
             </p>
           ) : null}
 
@@ -63,19 +62,17 @@ export function WorkspaceHomeScreen({
             {hasAssets ? (
               <>
                 <Button type="button" onClick={onOpenSearch} disabled={searchableAssetCount === 0}>
-                  Search this workspace
+                  {t('hero.search')}
                 </Button>
-                <Button type="button" tone="ghost" onClick={onUploadVideo}>Add video</Button>
+                <Button type="button" tone="ghost" onClick={onUploadVideo}>{t('hero.addVideo')}</Button>
               </>
             ) : (
-              <Button type="button" onClick={onUploadVideo}>Add your first video</Button>
+              <Button type="button" onClick={onUploadVideo}>{t('hero.addFirstVideo')}</Button>
             )}
           </div>
 
           {hasAssets && searchableAssetCount === 0 ? (
-            <p className="home-hero__note" role="status">
-              Search unlocks as soon as a transcript finishes processing.
-            </p>
+            <p className="home-hero__note" role="status">{t('hero.searchLocked')}</p>
           ) : null}
         </div>
 
@@ -85,22 +82,13 @@ export function WorkspaceHomeScreen({
       {!hasAssets ? (
         <section className="home-first-steps" aria-labelledby="home-first-steps-title">
           <div>
-            <p className="hero__eyebrow">First steps</p>
-            <h2 id="home-first-steps-title">From video to searchable moments</h2>
+            <p className="hero__eyebrow">{t('firstSteps.eyebrow')}</p>
+            <h2 id="home-first-steps-title">{t('firstSteps.title')}</h2>
           </div>
           <ol>
-            <li>
-              <span aria-hidden="true">1</span>
-              Add a video — upload a file or paste a YouTube link.
-            </li>
-            <li>
-              <span aria-hidden="true">2</span>
-              Its transcript is prepared automatically while you keep working.
-            </li>
-            <li>
-              <span aria-hidden="true">3</span>
-              Search what was said, open the exact timestamped moment, and save it.
-            </li>
+            <li><span aria-hidden="true">1</span>{t('firstSteps.one')}</li>
+            <li><span aria-hidden="true">2</span>{t('firstSteps.two')}</li>
+            <li><span aria-hidden="true">3</span>{t('firstSteps.three')}</li>
           </ol>
         </section>
       ) : (
@@ -112,18 +100,18 @@ export function WorkspaceHomeScreen({
             <div className="panel home-current-work__cell">{savedMoments}</div>
           ) : null}
           <Section
-            title="Recent videos"
-            eyebrow="Library"
-            actions={<span className="panel-pill">Latest first</span>}
+            title={t('recent.title')}
+            eyebrow={t('recent.eyebrow')}
+            actions={<span className="panel-pill">{t('recent.pill')}</span>}
             className="recent-videos home-current-work__recent"
           >
             {recentAssets.length === 0 ? (
               <div className="home-empty">
                 <EmptyState
-                  title="Your first video starts here"
-                  description="Upload a file or add a YouTube URL and its transcript will appear in this workspace."
+                  title={t('recent.emptyTitle')}
+                  description={t('recent.emptyDescription')}
                 />
-                <Button type="button" onClick={onUploadVideo}>Add video</Button>
+                <Button type="button" onClick={onUploadVideo}>{t('hero.addVideo')}</Button>
               </div>
             ) : (
               <div className="recent-video-grid">
@@ -153,30 +141,21 @@ export function WorkspaceHomeScreen({
 
       <section className="home-capabilities" aria-labelledby="home-capabilities-title">
         <div>
-          <p className="hero__eyebrow">What this workspace does</p>
-          <h2 id="home-capabilities-title">Built for finding what was said</h2>
+          <p className="hero__eyebrow">{t('capabilities.eyebrow')}</p>
+          <h2 id="home-capabilities-title">{t('capabilities.title')}</h2>
         </div>
         <div className="home-capabilities__grid">
           <article>
-            <h3>Find exact moments</h3>
-            <p>
-              Search spoken content across the workspace or inside one video, and jump straight
-              to the timestamped row that matches.
-            </p>
+            <h3>{t('capabilities.momentsTitle')}</h3>
+            <p>{t('capabilities.momentsBody')}</p>
           </article>
           <article>
-            <h3>Keep canonical context</h3>
-            <p>
-              Every moment opens with its surrounding transcript, and you can copy a stable link
-              to the exact canonical row while the video stays in your workspace.
-            </p>
+            <h3>{t('capabilities.contextTitle')}</h3>
+            <p>{t('capabilities.contextBody')}</p>
           </article>
           <article>
-            <h3>Resume and save knowledge</h3>
-            <p>
-              Playback progress is remembered per video, and saved moments keep the passages you
-              want to find again.
-            </p>
+            <h3>{t('capabilities.resumeTitle')}</h3>
+            <p>{t('capabilities.resumeBody')}</p>
           </article>
         </div>
       </section>

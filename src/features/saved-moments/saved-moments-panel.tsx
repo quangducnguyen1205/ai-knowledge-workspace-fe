@@ -3,7 +3,7 @@ import { buildMomentPermalink } from '../../entities/moment/model';
 import { formatTranscriptTimestamp } from '../../entities/transcript/model/transcript-time';
 import { Button, EmptyState, LoadingBlock, PanelHeading } from '../../shared/ui';
 import { ErrorFeedback } from '../../shared/feedback';
-import { formatDateTime } from '../../shared/format';
+import { Trans, useDateTimeFormat, useTranslation } from '../../shared/i18n';
 import { SourceBadge } from '../assets/public';
 import type { SavedMoment } from './api/saved-moments-api';
 
@@ -38,10 +38,14 @@ type PendingRemovalFocus = {
   workspaceId: string;
 };
 
-export function momentTimestampLabel(startMs: number | null): string {
+/**
+ * A moment with no usable timing has no timestamp to show. The caller passes the localized
+ * fallback rather than this module owning copy, so the same helper serves every language.
+ */
+export function momentTimestampLabel(startMs: number | null, unavailableLabel = ''): string {
   return startMs !== null && Number.isFinite(startMs) && startMs >= 0
     ? formatTranscriptTimestamp(startMs)
-    : 'Time unavailable';
+    : unavailableLabel;
 }
 
 /**
@@ -59,6 +63,8 @@ export function SavedMomentsPanel({
   onOpenMoment,
   onRemoveMoment,
 }: SavedMomentsPanelProps) {
+  const { t } = useTranslation(['moments', 'common']);
+  const formatDateTime = useDateTimeFormat();
   const [copyState, setCopyState] = useState<{ savedMomentId: string; status: 'copied' | 'failed' } | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const openButtonRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -166,22 +172,25 @@ export function SavedMomentsPanel({
   return (
     <section className="saved-moments" aria-labelledby="saved-moments-title">
       <PanelHeading
-        eyebrow="Saved"
+        eyebrow={t('saved.eyebrow')}
         trailing={!isLoading && !error && items.length ? (
           <p className="search-summary" role="status">
-            <strong>{items.length}</strong> {items.length === 1 ? 'saved moment' : 'saved moments'}
-            {' in '}
-            {workspaceName}
+            <Trans
+              i18nKey="saved.count"
+              ns="moments"
+              count={items.length}
+              values={{ workspace: workspaceName }}
+            />
           </p>
         ) : null}
       >
         {/* tabIndex -1 keeps the heading out of normal Tab order while allowing programmatic focus. */}
-        <h2 id="saved-moments-title" ref={headingRef} tabIndex={-1}>Saved moments</h2>
+        <h2 id="saved-moments-title" ref={headingRef} tabIndex={-1}>{t('saved.heading')}</h2>
       </PanelHeading>
 
       {isLoading ? (
         <div className="saved-moments__status" role="status" aria-live="polite" aria-atomic="true">
-          <LoadingBlock label={`Loading saved moments in ${workspaceName}...`} compact />
+          <LoadingBlock label={t('saved.loading', { workspace: workspaceName })} compact />
         </div>
       ) : null}
 
@@ -191,8 +200,8 @@ export function SavedMomentsPanel({
       {!isLoading && !error && items.length === 0 ? (
         <div role="status">
           <EmptyState
-            title="No saved moments yet"
-            description="Save a moment from a search result or the video transcript to find it again here."
+            title={t('saved.emptyTitle')}
+            description={t('saved.emptyDescription')}
           />
         </div>
       ) : null}
@@ -200,7 +209,7 @@ export function SavedMomentsPanel({
       {!isLoading && !error && items.length ? (
         <ul className="saved-moments__list">
           {items.map((moment, index) => {
-            const timestampLabel = momentTimestampLabel(moment.startMs);
+            const timestampLabel = momentTimestampLabel(moment.startMs, t('common:timeUnavailable'));
             const describedBy = `saved-moment-text-${moment.savedMomentId}`;
             const isRemoving = removingId === moment.savedMomentId;
             const copyFeedback = copyState?.savedMomentId === moment.savedMomentId ? copyState.status : null;
@@ -213,30 +222,30 @@ export function SavedMomentsPanel({
                     <SourceBadge sourceType={moment.sourceType} />
                   </span>
                   <span className="saved-moment__timestamp">
-                    <span>Video moment</span>
+                    <span>{t('common:videoMoment')}</span>
                     <span className="saved-moment__timestamp-value">{timestampLabel}</span>
                   </span>
                 </div>
 
                 <p className="saved-moment__text" id={describedBy}>{moment.text}</p>
-                <p className="saved-moment__saved-at">Saved {formatDateTime(moment.savedAt)}</p>
+                <p className="saved-moment__saved-at">{t('saved.savedAt', { when: formatDateTime(moment.savedAt) })}</p>
 
                 <div className="saved-moment__actions">
                   <Button
                     type="button"
                     ref={registerActionRef(openButtonRefs, moment.savedMomentId)}
                     onClick={() => onOpenMoment(moment)}
-                    aria-label={`Open moment in ${moment.assetTitle} at ${timestampLabel.toLowerCase()}`}
+                    aria-label={t('saved.openLabel', { title: moment.assetTitle, time: timestampLabel.toLowerCase() })}
                   >
-                    Open moment
+                    {t('saved.open')}
                   </Button>
                   <Button
                     type="button"
                     tone="secondary"
                     onClick={() => void handleCopy(moment)}
-                    aria-label={`Copy link to moment in ${moment.assetTitle} at ${timestampLabel.toLowerCase()}`}
+                    aria-label={t('saved.copyLabel', { title: moment.assetTitle, time: timestampLabel.toLowerCase() })}
                   >
-                    Copy link
+                    {t('saved.copy')}
                   </Button>
                   <Button
                     type="button"
@@ -245,17 +254,15 @@ export function SavedMomentsPanel({
                     ref={registerActionRef(removeButtonRefs, moment.savedMomentId)}
                     disabled={isRemoving}
                     onClick={() => void handleRemove(moment, index)}
-                    aria-label={`Remove saved moment in ${moment.assetTitle} at ${timestampLabel.toLowerCase()}`}
+                    aria-label={t('saved.removeLabel', { title: moment.assetTitle, time: timestampLabel.toLowerCase() })}
                   >
-                    {isRemoving ? 'Removing...' : 'Remove'}
+                    {isRemoving ? t('saved.removing') : t('saved.remove')}
                   </Button>
                 </div>
 
                 <p className="saved-moment__feedback" role="status" aria-live="polite">
-                  {copyFeedback === 'copied' ? 'Link copied to the clipboard.' : null}
-                  {copyFeedback === 'failed'
-                    ? 'Could not copy the link. Copy it from the address bar after opening the moment.'
-                    : null}
+                  {copyFeedback === 'copied' ? t('saved.copied') : null}
+                  {copyFeedback === 'failed' ? t('saved.copyFailed') : null}
                 </p>
               </li>
             );

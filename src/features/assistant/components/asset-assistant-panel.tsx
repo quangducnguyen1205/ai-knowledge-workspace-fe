@@ -1,8 +1,9 @@
 import type { FormEvent } from 'react';
 import type { AssistantAnswerCitation } from '../model/types';
 import { Button, ErrorFeedback, LoadingBlock, Section } from '../../../lib/ui';
+import { useTranslation } from '../../../shared/i18n';
 import { useAssetAssistant } from '../hooks/use-asset-assistant';
-import { getGenericAssistantErrorMessage } from '../model/assistant-state';
+import { getGenericAssistantErrorMessageKey } from '../model/assistant-state';
 import { AssistantAnswerPanel } from './assistant-answer-panel';
 
 export function AssetAssistantPanel({
@@ -17,6 +18,7 @@ export function AssetAssistantPanel({
   isAssetSearchable: boolean;
   onOpenCitationContext: (citation: AssistantAnswerCitation) => void;
 }) {
+  const { t } = useTranslation(['viewer']);
   const assistant = useAssetAssistant({ workspaceId, assetId, isAssetSearchable });
   const questionErrorId = 'asset-assistant-question-error';
   const questionHintId = 'asset-assistant-question-hint';
@@ -27,43 +29,43 @@ export function AssetAssistantPanel({
   }
 
   return (
-    <Section title="Ask this video" className="assistant-panel">
+    <Section title={t('assistant.title')} className="assistant-panel">
       <form className="assistant-form" onSubmit={handleSubmit}>
         <label className="field assistant-form__field" htmlFor="asset-assistant-question">
-          <span className="field__label">Question</span>
+          <span className="field__label">{t('assistant.questionLabel')}</span>
           <textarea
             id="asset-assistant-question"
             className="field__input field__input--textarea"
             value={assistant.question}
             onChange={(event) => assistant.updateQuestion(event.target.value)}
-            placeholder={isAssetSearchable ? 'Ask a question about this video' : 'Available when this video is ready'}
+            placeholder={isAssetSearchable ? t('assistant.questionPlaceholder') : t('assistant.questionUnavailable')}
             disabled={assistant.isLoading || !isAssetSearchable}
-            aria-describedby={assistant.validationError ? `${questionHintId} ${questionErrorId}` : questionHintId}
-            aria-invalid={Boolean(assistant.validationError)}
+            aria-describedby={assistant.validationErrorKey ? `${questionHintId} ${questionErrorId}` : questionHintId}
+            aria-invalid={Boolean(assistant.validationErrorKey)}
             rows={3}
             maxLength={500}
           />
-          <span id={questionHintId} className="field__hint">Answers include links to supporting transcript moments.</span>
-          {assistant.validationError ? (
+          <span id={questionHintId} className="field__hint">{t('assistant.questionHint')}</span>
+          {assistant.validationErrorKey ? (
             <span id={questionErrorId} className="field__hint field__hint--error" role="alert">
-              {assistant.validationError}
+              {t(assistant.validationErrorKey)}
             </span>
           ) : null}
         </label>
         <div className="assistant-form__actions">
           <Button type="submit" disabled={assistant.isLoading || !isAssetSearchable}>
-            {assistant.isLoading ? 'Asking...' : 'Ask'}
+            {assistant.isLoading ? t('assistant.submitting') : t('assistant.submit')}
           </Button>
         </div>
       </form>
 
-      {!isAssetSearchable ? <p className="assistant-availability" role="status">Ask will be available when this video is ready.</p> : null}
+      {!isAssetSearchable ? <p className="assistant-availability" role="status">{t('assistant.unavailableNote')}</p> : null}
 
       <div className="assistant-status" aria-live="polite" aria-atomic="false">
         {assistant.result.status === 'idle' && isAssetSearchable ? (
-          <p className="assistant-idle">Ask about a concept, argument, or detail from this video.</p>
+          <p className="assistant-idle">{t('assistant.idle')}</p>
         ) : null}
-        {assistant.result.status === 'loading' ? <LoadingBlock label="Finding an answer..." compact /> : null}
+        {assistant.result.status === 'loading' ? <LoadingBlock label={t('assistant.loading')} compact /> : null}
         {assistant.result.status === 'success' || assistant.result.status === 'insufficient' ? (
           <AssistantAnswerPanel
             question={assistant.result.question}
@@ -74,12 +76,16 @@ export function AssetAssistantPanel({
         {assistant.result.status === 'unavailable' ? (
           <ErrorFeedback
             error={assistant.result.error}
-            title="Answers are temporarily unavailable"
-            message="You can still read and search this transcript. Try asking again later."
+            title={t('assistant.unavailableTitle')}
+            message={t('assistant.unavailableMessage')}
           />
         ) : null}
         {assistant.result.status === 'error' ? (
-          <ErrorFeedback error={assistant.result.error} title="Could not answer this question" message={getGenericAssistantErrorMessage(assistant.result.error)} />
+          <ErrorFeedback
+            error={assistant.result.error}
+            title={t('assistant.errorTitle')}
+            message={t(getGenericAssistantErrorMessageKey(assistant.result.error))}
+          />
         ) : null}
       </div>
     </Section>

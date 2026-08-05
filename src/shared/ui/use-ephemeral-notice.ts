@@ -3,6 +3,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 export const EPHEMERAL_NOTICE_DURATION_MS = 4_000;
 
 export type NoticeCopy = {
+  /**
+   * Stable identity of *what happened*, independent of the words shown. A caller that reacts to a
+   * particular notice matches on this; matching on the rendered title would break the moment the
+   * title is translated.
+   */
+  id: string;
   title: string;
   message: string;
 };

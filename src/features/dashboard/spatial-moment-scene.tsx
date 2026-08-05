@@ -1,13 +1,14 @@
 import { useRef } from 'react';
+import { useTranslation } from '../../shared/i18n';
 import { usePointerDepth } from './use-pointer-depth';
 
 export type SpatialMomentSceneVariant = 'welcome' | 'processing' | 'returning';
 
-const CAPTIONS: Record<SpatialMomentSceneVariant, string> = {
-  welcome: 'From a video to the exact spoken moment.',
-  processing: 'Search opens once a transcript finishes processing.',
-  returning: 'How search lands on the exact spoken moment.',
-};
+const CAPTION_KEYS = {
+  welcome: 'scene.captionWelcome',
+  processing: 'scene.captionProcessing',
+  returning: 'scene.captionReturning',
+} as const satisfies Record<SpatialMomentSceneVariant, string>;
 
 /**
  * Decorative spatial rendering of the real product flow: video → transcript layers → search
@@ -18,6 +19,7 @@ const CAPTIONS: Record<SpatialMomentSceneVariant, string> = {
  * always illustrative and labelled as an example — never production data.
  */
 export function SpatialMomentScene({ variant }: { variant: SpatialMomentSceneVariant }) {
+  const { t } = useTranslation('home');
   const stageRef = useRef<HTMLDivElement>(null);
   usePointerDepth(stageRef);
 
@@ -25,13 +27,13 @@ export function SpatialMomentScene({ variant }: { variant: SpatialMomentSceneVar
     <figure
       className={`moment-scene moment-scene--${variant}`}
       role="img"
-      aria-label="Example of the product flow: a video becomes transcript layers, a search lands on the exact spoken moment, and that canonical row gets a stable link"
+      aria-label={t('scene.label')}
     >
       <div ref={stageRef} className="moment-scene__stage" aria-hidden="true">
         <div className="moment-scene__space">
           <div className="moment-scene__plane moment-scene__plane--video">
             <span className="moment-scene__play">▶</span>
-            <span className="moment-scene__video-title">Learning Science Lecture</span>
+            <span className="moment-scene__video-title">{t('scene.videoTitle')}</span>
             <div className="moment-scene__rail">
               <span className="moment-scene__rail-marker" />
             </div>
@@ -55,21 +57,21 @@ export function SpatialMomentScene({ variant }: { variant: SpatialMomentSceneVar
               <span>&ldquo;retrieval practice&rdquo;</span>
             </div>
             <ol className="moment-scene__rows">
-              <li>…compared passive review with active recall.</li>
+              <li>{t('scene.rowBefore')}</li>
               <li className="moment-scene__hit">
                 <span>12:40</span>
-                Retrieval practice strengthens memory by asking you to recall it.
+                {t('scene.rowHit')}
               </li>
-              <li>That effect compounds when sessions are spaced.</li>
+              <li>{t('scene.rowAfter')}</li>
             </ol>
-            <p className="moment-scene__link">Copy a stable link to this exact canonical row.</p>
+            <p className="moment-scene__link">{t('scene.link')}</p>
           </div>
         </div>
       </div>
 
       <figcaption className="moment-scene__caption">
-        <span className="moment-scene__example-pill">Example</span>
-        {CAPTIONS[variant]}
+        <span className="moment-scene__example-pill">{t('scene.example')}</span>
+        {t(CAPTION_KEYS[variant])}
       </figcaption>
     </figure>
   );
